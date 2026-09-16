@@ -5340,6 +5340,100 @@ const BENEVOLE_STATUT_INFO = {
 // le profil actif, affiche simplement ses enfants (children).
 // Modification d'un profil déjà créé (nom, pays, ville, photo). Distinct de ProfilGate, qui
 // ne gère que la création/connexion initiale.
+// Onglet "Profil" dédié — inspiré des grandes plateformes (photo circulaire en tête façon
+// WhatsApp, nom en évidence, liste de réglages en dessous). Tant qu'aucun profil n'est créé,
+// affiche directement ProfilGate : c'est le point d'entrée pour créer son compte avant
+// d'accéder au reste d'EcoVigil.
+function ProfilTab({ profilInfo, onProfilChange, lang }) {
+  const [showEdit, setShowEdit] = useState(false);
+
+  if (profilInfo === undefined) {
+    return <div style={{ padding: 24, textAlign: "center", color: "var(--c-text-muted)", fontSize: 13 }}>Chargement…</div>;
+  }
+
+  if (!profilInfo) {
+    return (
+      <div>
+        <SectionTitle sub="Crée ton compte pour accéder à EcoVigil">Mon profil</SectionTitle>
+        <ProfilGate profilInfo={profilInfo}><div /></ProfilGate>
+      </div>
+    );
+  }
+
+  if (showEdit) {
+    return (
+      <div>
+        <SectionTitle sub="Modifie tes informations">Mon profil</SectionTitle>
+        <ProfilEditeur profilInfo={profilInfo} onSaved={() => { setShowEdit(false); onProfilChange && onProfilChange(); }} onCancel={() => setShowEdit(false)} />
+      </div>
+    );
+  }
+
+  async function seDeconnecter() {
+    if (!confirm("Se déconnecter de ce profil ?")) return;
+    await supabase.auth.signOut();
+    onProfilChange && onProfilChange();
+  }
+
+  const ligne = { display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 4px", border: "none", background: "none", borderBottom: "1px solid var(--c-border)", cursor: "pointer", textAlign: "left", fontSize: 13.5 };
+
+  return (
+    <div>
+      {/* En-tête façon WhatsApp : avatar circulaire, badge appareil photo, nom en évidence. */}
+      <div style={{ display: "flex", flexDirection: "column", alignItems: "center", padding: "18px 0 24px" }}>
+        <div style={{ position: "relative", marginBottom: 12 }}>
+          <div style={{ width: 100, height: 100, borderRadius: "50%", background: profilInfo.photo_url ? `url(${profilInfo.photo_url}) center/cover` : "var(--c-surface)", border: "1px solid var(--c-border)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            {!profilInfo.photo_url && <IconUserCircle size={48} color="var(--c-text-faint)" />}
+          </div>
+          <button onClick={() => setShowEdit(true)} aria-label="Changer la photo de profil" style={{
+            position: "absolute", bottom: 0, right: 0, width: 30, height: 30, borderRadius: "50%", background: "var(--c-accent-dark)",
+            border: "2px solid var(--c-bg)", display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: "#fff" }}>
+            <IconCamera size={14} />
+          </button>
+        </div>
+        <div style={{ fontFamily: "Fraunces, serif", fontSize: 19, fontWeight: 700, color: "var(--c-text)" }}>{profilInfo.nom}</div>
+        <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 2 }}>{[profilInfo.ville, profilInfo.pays].filter(Boolean).join(" · ") || profilInfo.email}</div>
+      </div>
+
+      {/* Liste de réglages, façon menu WhatsApp/Facebook. */}
+      <div style={{ background: "var(--c-surface)", borderRadius: 14, border: "1px solid var(--c-border)", padding: "0 14px", marginBottom: 16 }}>
+        <button onClick={() => setShowEdit(true)} style={ligne}>
+          <IconEdit size={17} color="var(--c-text-secondary)" />
+          <span style={{ flex: 1 }}>Modifier mes informations</span>
+        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 4px", fontSize: 13.5, color: "var(--c-text-secondary)" }}>
+          <IconMailPlus size={17} color="var(--c-text-secondary)" />
+          <span style={{ flex: 1 }}>{profilInfo.email}</span>
+        </div>
+        <button onClick={seDeconnecter} style={{ ...ligne, borderBottom: "none", color: "#B5451B" }}>
+          <IconLogOut size={17} color="#B5451B" />
+          <span style={{ flex: 1 }}>Se déconnecter</span>
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Mur d'accès obligatoire, façon Facebook/WhatsApp : aucun contenu d'EcoVigil (pas même
+// l'accueil) n'est accessible tant qu'un profil n'a pas été créé ou qu'on ne s'est pas
+// reconnecté. Remplace tout l'habillage habituel (barre de navigation incluse).
+function MurProfilObligatoire({ profilInfo, lang }) {
+  return (
+    <div style={{ padding: "12px 4px 32px" }}>
+      <div style={{ textAlign: "center", marginBottom: 20 }}>
+        <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--c-surface)", margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", border: "1px solid var(--c-border)" }}>
+          <img src={LOGO_DATA_URL} alt={t(lang, "logo_pace_alt")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        </div>
+        <div style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: 19 }}>Bienvenue sur EcoVigil</div>
+        <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 4, padding: "0 20px" }}>
+          Un profil est nécessaire pour accéder à l'application, comme sur Facebook ou WhatsApp.
+        </div>
+      </div>
+      <ProfilGate profilInfo={profilInfo}><div /></ProfilGate>
+    </div>
+  );
+}
+
 function ProfilEditeur({ profilInfo, onSaved, onCancel }) {
   const [nom, setNom] = useState((profilInfo && profilInfo.nom) || "");
   const [pays, setPays] = useState((profilInfo && profilInfo.pays) || "");
@@ -8156,6 +8250,7 @@ const TABS = [
   { id: "carte", label: "Carte", icon: IconMapPin },
   { id: "signaler", label: "Signaler", icon: IconAlert, cta: true },
   { id: "arbre", label: "Mon Arbre", icon: IconTree },
+  { id: "profil", label: "Profil", icon: IconUserCircle },
 ];
 
 function NotifBell({ email, onNavigate }) {
@@ -12305,6 +12400,12 @@ function App() {
           <AdminSpace signalements={signalements} arbres={arbres} onUpdateStatut={adminUpdateStatut} onResolve={adminResolve} onValidate={adminValidate} onValidateArbre={adminValidateArbre} onDelete={adminDelete} onSoftDeleteArbre={adminSoftDeleteArbre} onRevertModeration={adminRevertModeration} onSoftDeleteSignalement={adminSoftDeleteSignalement} onRestaurerItem={onRestaurerItem} onRafraichir={chargerDonneesPrincipales} rafraichissementEnCours={rafraichissementEnCours} onExit={() => setShowAdmin(false)} />
         ) : tab === "confidentialite" ? (
           <Confidentialite onBack={() => setTab("accueil")} />
+        ) : profilInfo === undefined ? (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: "var(--c-text-muted)", fontSize: 13, gap: 8 }}>
+            <IconClock size={15} /> Chargement…
+          </div>
+        ) : profilInfo === null ? (
+          <MurProfilObligatoire profilInfo={profilInfo} lang={lang} />
         ) : accesBloque ? (
           <BenevoleAccesBloque statut={benevoleStatut} />
         ) : ecransReserves.includes(tab) && statutEnCours ? (
@@ -12327,15 +12428,16 @@ function App() {
             {tab === "carte" && accesEtendu && <Carte signalements={signalements} arbres={arbres} observations={observations} onAddSignalement={addSignalement} onAddArbre={addArbre} onAddObservation={addObservation} online={online} pendingQueueCount={pendingQueueCount} onFlushQueue={flushPendingQueue} lang={lang} coordFormat={coordFormat} />}
             {tab === "signaler" && accesEtendu && <Signaler onSubmit={addSignalement} lang={lang} coordFormat={coordFormat} />}
             {tab === "arbre" && accesEtendu && <MonArbre arbres={arbres.filter(a => a.device_id === DEVICE_ID)} suivis={suivis} onAdd={addArbre} onAddSuivi={addSuivi} lang={lang} coordFormat={coordFormat} />}
+            {tab === "profil" && <ProfilTab profilInfo={profilInfo} onProfilChange={rafraichirProfil} lang={lang} />}
           </div>
         )}
 
-        {!showAdmin && !accesBloque && tab !== "biodiversite" && tab !== "confidentialite" && tab !== "assistant" && tab !== "espace_org" && tab !== "evenements" && tab !== "groupes_terrain" && (
+        {!showAdmin && !!profilInfo && !accesBloque && tab !== "biodiversite" && tab !== "confidentialite" && tab !== "assistant" && tab !== "espace_org" && tab !== "evenements" && tab !== "groupes_terrain" && (
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "var(--c-surface)", borderTop: "1px solid var(--c-border)", display: "flex", padding: "8px 6px", borderRadius: "18px 18px 0 0", boxShadow: "0 -4px 16px rgba(0,0,0,0.04)" }}>
             {TABS.map(tabItem => {
               const IconT = tabItem.icon;
               const active = tab === tabItem.id;
-              const verrouille = tabItem.id !== "accueil" && !accesEtendu;
+              const verrouille = tabItem.id !== "accueil" && tabItem.id !== "profil" && !accesEtendu;
               const navLabels = { accueil: t(lang, "nav_accueil"), carte: t(lang, "nav_carte"), arbre: t(lang, "nav_arbre") };
               return (
                 <button key={tabItem.id} onClick={() => setTab(verrouille ? "accueil" : tabItem.id)} style={{ flex: 1, background: "none", border: "none", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", gap: 3, padding: "6px 0", opacity: verrouille ? 0.45 : 1 }}>
