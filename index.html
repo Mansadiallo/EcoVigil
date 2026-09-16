@@ -1468,9 +1468,14 @@ const supabase = {
         if (json.access_token) {
           const session = { access_token: json.access_token, refresh_token: json.refresh_token, user: json.user };
           persistSession(session);
-          return { data: { session }, error: null };
+          return { data: { session, user: json.user }, error: null };
         }
-        return { data: { session: null }, error: null };
+        // Pas de session : confirmation par e-mail requise. GoTrue renvoie alors l'objet
+        // utilisateur directement dans "json". Note anti-énumération : si l'e-mail est déjà
+        // enregistré, GoTrue répond aussi sans erreur (pour ne pas révéler qu'un compte existe)
+        // mais avec "identities: []" et n'envoie AUCUN e-mail — c'est ce cas qu'il faut détecter
+        // côté appelant pour ne pas faire croire à tort qu'un e-mail de confirmation part.
+        return { data: { session: null, user: json }, error: null };
       } catch (e) { return { error: { message: e.message } }; }
     },
     async signOut() { persistSession(null); return { error: null }; },
@@ -5425,9 +5430,6 @@ function MurProfilObligatoire({ profilInfo, lang }) {
           <img src={LOGO_DATA_URL} alt={t(lang, "logo_pace_alt")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
         <div style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: 19 }}>Bienvenue sur EcoVigil</div>
-        <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 4, padding: "0 20px" }}>
-          Un profil est nécessaire pour accéder à l'application, comme sur Facebook ou WhatsApp.
-        </div>
       </div>
       <ProfilGate profilInfo={profilInfo}><div /></ProfilGate>
     </div>
@@ -5505,8 +5507,15 @@ function ProfilEditeur({ profilInfo, onSaved, onCancel }) {
   );
 }
 
+const ETAPES_PROFIL = [
+  { titre: "Qui es-tu ?", icone: IconUserCircle },
+  { titre: "Ton compte", icone: IconLock },
+  { titre: "Dernière touche", icone: IconMapPin },
+];
+
 function ProfilGate({ profilInfo, children }) {
   const [modeProfil, setModeProfil] = useState("signup"); // signup | login
+  const [etape, setEtape] = useState(0);
   const [nom, setNom] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -5515,8 +5524,27 @@ function ProfilGate({ profilInfo, children }) {
   const [photo, setPhoto] = useState(null); // dataUrl compressée, en attente d'upload
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState("");
-  const [messageConfirmation, setMessageConfirmation] = useState("");
+  const [messageConfirmation, setMessageConfirmation] = useState(null); // { compteExistant: bool, texte } | null
   const fileRef = useRef(null);
+  const nomRef = useRef(null);
+  const emailRef = useRef(null);
+  const emailLoginRef = useRef(null);
+
+  const emailValide = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  const etape0Ok = nom.trim().length > 0;
+  const etape1Ok = emailValide && password.length >= 6;
+
+  // Focus automatique sur le champ principal de l'étape affichée, pour ne jamais faire chercher
+  // le curseur : ça fait gagner un tap et rend l'enchaînement des étapes plus naturel.
+  useEffect(() => {
+    if (profilInfo || messageConfirmation) return;
+    const t = setTimeout(() => {
+      if (modeProfil === "login") { emailLoginRef.current && emailLoginRef.current.focus(); return; }
+      if (etape === 0) nomRef.current && nomRef.current.focus();
+      if (etape === 1) emailRef.current && emailRef.current.focus();
+    }, 260); // laisse l'animation d'entrée se terminer avant de faire apparaître le clavier mobile
+    return () => clearTimeout(t);
+  }, [etape, modeProfil, profilInfo, messageConfirmation]);
 
   if (profilInfo === undefined) {
     return <div style={{ fontSize: 12, color: "var(--c-text-muted)" }}>Chargement…</div>;
@@ -5525,7 +5553,8 @@ function ProfilGate({ profilInfo, children }) {
     return children;
   }
 
-  const champ = { width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" };
+  const champ = { width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13.5, marginBottom: 8, boxSizing: "border-box", transition: "border-color .15s ease" };
+  const champErreur = { ...champ, borderColor: "#C0522A" };
 
   async function choisirPhoto(e) {
     const f = e.target.files && e.target.files[0];
@@ -5536,10 +5565,32 @@ function ProfilGate({ profilInfo, children }) {
     reader.readAsDataURL(f);
   }
 
+  function allerEtape(suivante) {
+    setErreur("");
+    setEtape(suivante);
+  }
+
+  function suivant(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    if (etape === 0) {
+      if (!etape0Ok) { setErreur("Merci d'indiquer ton nom."); return; }
+      allerEtape(1);
+    } else if (etape === 1) {
+      if (!emailValide) { setErreur("Cette adresse e-mail ne semble pas valide."); return; }
+      if (password.length < 6) { setErreur("6 caractères minimum pour le mot de passe."); return; }
+      allerEtape(2);
+    }
+  }
+
+  function precedent() {
+    setErreur("");
+    setEtape(e => Math.max(0, e - 1));
+  }
+
   async function creerProfil(e) {
     if (e && e.preventDefault) e.preventDefault();
-    setErreur(""); setMessageConfirmation("");
-    if (!nom.trim() || !email.trim() || !password) { setErreur("Merci de renseigner au moins le nom, l'e-mail et le mot de passe."); return; }
+    if (etape < 2) { suivant(e); return; }
+    setErreur("");
     setBusy(true);
     // La photo est envoyée dans le stockage AVANT la création du compte (l'upload ne nécessite
     // pas d'être connecté), pour que son URL puisse être incluse dans les métadonnées et reprise
@@ -5547,12 +5598,18 @@ function ProfilGate({ profilInfo, children }) {
     const photoUrl = photo ? await uploadPhotoGeneric(photo, "profils") : null;
     const { data, error } = await supabase.auth.signUp({
       email: email.trim(), password,
-      options: { data: { type_compte: "profil", nom: nom.trim(), pays: pays || null, ville: ville || null, photo_url: photoUrl } },
+      options: { emailRedirectTo: urlRedirectionAuth(), data: { type_compte: "profil", nom: nom.trim(), pays: pays || null, ville: ville || null, photo_url: photoUrl } },
     });
     setBusy(false);
     if (error) { setErreur(error.message || "Impossible de créer le profil pour le moment."); return; }
     if (!data || !data.session) {
-      setMessageConfirmation("Profil créé. Vérifie ta boîte mail pour confirmer ton adresse, puis reviens ici.");
+      // GoTrue répond sans erreur même si le compte existe déjà (pour ne pas permettre de deviner
+      // les e-mails inscrits) : dans ce cas "identities" est vide et AUCUN e-mail n'est envoyé.
+      // Sans ce contrôle, on affichait à tort "vérifie ta boîte mail" alors que rien ne partait.
+      const compteExisteDeja = data && data.user && Array.isArray(data.user.identities) && data.user.identities.length === 0;
+      setMessageConfirmation(compteExisteDeja
+        ? { compteExistant: true, texte: "Un profil existe déjà avec cette adresse e-mail." }
+        : { compteExistant: false, texte: "Vérifie ta boîte mail (et tes courriers indésirables) pour confirmer ton adresse, puis reviens ici." });
     }
     // Si une session est renvoyée directement, l'écran bascule seul (citoyenSession changé).
   }
@@ -5567,54 +5624,145 @@ function ProfilGate({ profilInfo, children }) {
     if (error) { setErreur("E-mail ou mot de passe incorrect."); return; }
   }
 
+  const boutonPrincipal = { width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "opacity .15s ease" };
+  const boutonLien = { width: "100%", padding: "6px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer" };
+
+  // --- Écran de confirmation (après inscription) ---
+  if (messageConfirmation) {
+    const OkIcon = messageConfirmation.compteExistant ? IconInfo : IconCheck;
+    return (
+      <div className="pace-fade-in" style={{ background: "var(--c-bg)", borderRadius: 12, padding: 18, textAlign: "center" }}>
+        <div className="pace-scale-in" style={{
+          width: 52, height: 52, borderRadius: "50%", margin: "0 auto 12px", display: "flex", alignItems: "center", justifyContent: "center",
+          background: messageConfirmation.compteExistant ? "var(--c-surface-soft)" : "var(--c-accent-dark)" }}>
+          <OkIcon size={24} color={messageConfirmation.compteExistant ? "var(--c-accent-dark)" : "#fff"} />
+        </div>
+        <div style={{ fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600, color: "var(--c-text)", marginBottom: 6 }}>
+          {messageConfirmation.compteExistant ? "Déjà inscrit·e" : "Presque prêt·e"}
+        </div>
+        <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.6, marginBottom: 16 }}>{messageConfirmation.texte}</div>
+        <button type="button" onClick={() => { setMessageConfirmation(null); setModeProfil("login"); setPassword(""); allerEtape(0); }} style={boutonPrincipal}>
+          {messageConfirmation.compteExistant ? "Se connecter" : "J'ai confirmé, me connecter"}
+        </button>
+        {!messageConfirmation.compteExistant && (
+          <button type="button" onClick={() => setMessageConfirmation(null)} style={boutonLien}>Corriger l'adresse e-mail</button>
+        )}
+      </div>
+    );
+  }
+
   return (
-    <div style={{ background: "var(--c-bg)", borderRadius: 12, padding: 14 }}>
-      <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
+    <div className="pace-fade-in" style={{ background: "var(--c-bg)", borderRadius: 12, padding: 14 }}>
+      <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
         Un profil de base est nécessaire avant de continuer — il te servira aussi bien pour devenir bénévole que pour créer un compte organisation.
       </div>
-      {messageConfirmation ? (
-        <div style={{ fontSize: 12.5, color: "var(--c-accent)" }}>{messageConfirmation}</div>
-      ) : modeProfil === "signup" ? (
-        <form onSubmit={creerProfil}>
-          <input ref={fileRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: "none" }} />
-          <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
-            <button type="button" onClick={() => fileRef.current && fileRef.current.click()} style={{
-              width: 72, height: 72, borderRadius: "50%", border: "1px dashed var(--c-border)", background: photo ? `url(${photo}) center/cover` : "var(--c-surface)",
-              display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, overflow: "hidden" }} aria-label="Choisir une photo de profil">
-              {!photo && <IconCamera size={20} color="var(--c-text-muted)" />}
-            </button>
-          </div>
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", textAlign: "center", marginBottom: 10 }}>Photo de profil (optionnel)</div>
-          <input required value={nom} onChange={e => setNom(e.target.value)} placeholder="Nom complet" style={champ} />
-          <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail" style={champ} />
-          <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" style={champ} />
-          <input value={ville} onChange={e => setVille(e.target.value)} placeholder="Ville (optionnel)" style={champ} />
-          <select value={pays} onChange={e => setPays(e.target.value)}
-            style={{ ...champ, background: "var(--c-surface)", color: pays ? "var(--c-text)" : "var(--c-text-muted)" }}>
-            <option value="">Pays (optionnel)</option>
-            {Object.entries(PAYS_INDICATIFS.reduce((acc, p) => { (acc[p.region] = acc[p.region] || []).push(p); return acc; }, {})).map(([region, list]) => (
-              <optgroup key={region} label={region}>
-                {list.map(p => <option key={p.pays} value={p.pays}>{p.pays}</option>)}
-              </optgroup>
+
+      {modeProfil === "signup" ? (
+        <>
+          {/* Barre de progression + en-tête d'étape : rendent visible où on en est et ce qu'il reste. */}
+          <div style={{ display: "flex", gap: 5, marginBottom: 12 }}>
+            {ETAPES_PROFIL.map((_, i) => (
+              <div key={i} style={{ flex: 1, height: 4, borderRadius: 2, background: i <= etape ? "var(--c-accent-dark)" : "var(--c-border)", transition: "background-color .3s ease" }} />
             ))}
-          </select>
-          {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>{erreur}</div>}
-          <button type="button" onClick={creerProfil} disabled={busy} style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 6 }}>
-            {busy ? "…" : "Créer mon profil"}
-          </button>
-          <button type="button" onClick={() => { setModeProfil("login"); setErreur(""); }} style={{ width: "100%", padding: "6px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer" }}>
-            Déjà un profil ? Se connecter
-          </button>
-        </form>
+          </div>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: 12 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
+              {etape > 0 && (
+                <button type="button" onClick={precedent} aria-label="Étape précédente" style={{ background: "none", border: "none", cursor: "pointer", color: "var(--c-text-muted)", display: "flex", padding: 2 }}>
+                  <IconArrowLeft size={16} />
+                </button>
+              )}
+              <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: "var(--c-surface-soft)", color: "var(--c-accent-dark)" }}>
+                {React.createElement(ETAPES_PROFIL[etape].icone, { size: 14 })}
+              </span>
+              <span style={{ fontFamily: "Fraunces, serif", fontSize: 14.5, fontWeight: 600, color: "var(--c-text)" }}>{ETAPES_PROFIL[etape].titre}</span>
+            </div>
+            <span style={{ fontSize: 10.5, color: "var(--c-text-faint)" }}>{etape + 1}/{ETAPES_PROFIL.length}</span>
+          </div>
+
+          <form onSubmit={creerProfil}>
+            <div key={etape} className="pace-fade-in">
+              {etape === 0 && (
+                <>
+                  <input ref={fileRef} type="file" accept="image/*" onChange={choisirPhoto} style={{ display: "none" }} />
+                  <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+                    <button type="button" onClick={() => fileRef.current && fileRef.current.click()} style={{
+                      width: 76, height: 76, borderRadius: "50%", border: "1px dashed var(--c-border)", background: photo ? `url(${photo}) center/cover` : "var(--c-surface)",
+                      display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", padding: 0, overflow: "hidden" }} aria-label="Choisir une photo de profil">
+                      {!photo && <IconCamera size={21} color="var(--c-text-muted)" />}
+                    </button>
+                  </div>
+                  <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", textAlign: "center", marginBottom: 12 }}>Photo de profil (optionnel)</div>
+                  <input ref={nomRef} required value={nom} onChange={e => setNom(e.target.value)} placeholder="Nom complet" style={champ} />
+                </>
+              )}
+              {etape === 1 && (
+                <>
+                  <input ref={emailRef} required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail"
+                    style={email && !emailValide ? champErreur : champ} />
+                  <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe (6 caractères min.)" style={champ} />
+                  {password.length > 0 && (
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, color: password.length >= 6 ? "var(--c-accent-dark)" : "var(--c-text-muted)", marginTop: -3, marginBottom: 8 }}>
+                      {password.length >= 6 ? <IconCheck size={11} /> : null}
+                      {password.length >= 6 ? "Longueur suffisante" : `Encore ${6 - password.length} caractère${6 - password.length > 1 ? "s" : ""}`}
+                    </div>
+                  )}
+                </>
+              )}
+              {etape === 2 && (
+                <>
+                  <input value={ville} onChange={e => setVille(e.target.value)} placeholder="Ville (optionnel)" style={champ} />
+                  <select value={pays} onChange={e => setPays(e.target.value)}
+                    style={{ ...champ, background: "var(--c-surface)", color: pays ? "var(--c-text)" : "var(--c-text-muted)" }}>
+                    <option value="">Pays (optionnel)</option>
+                    {Object.entries(PAYS_INDICATIFS.reduce((acc, p) => { (acc[p.region] = acc[p.region] || []).push(p); return acc; }, {})).map(([region, list]) => (
+                      <optgroup key={region} label={region}>
+                        {list.map(p => <option key={p.pays} value={p.pays}>{p.pays}</option>)}
+                      </optgroup>
+                    ))}
+                  </select>
+                </>
+              )}
+            </div>
+
+            {erreur && (
+              <div role="alert" className="pace-fade-in" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>
+                <IconAlert size={13} color="#B5451B" />
+                <span>{erreur}</span>
+              </div>
+            )}
+
+            {etape < 2 ? (
+              <button type="button" onClick={suivant} disabled={etape === 0 ? !etape0Ok : !etape1Ok} style={{ ...boutonPrincipal, opacity: (etape === 0 ? !etape0Ok : !etape1Ok) ? 0.55 : 1 }}>
+                Continuer
+              </button>
+            ) : (
+              <button type="button" onClick={creerProfil} disabled={busy} style={{ ...boutonPrincipal, opacity: busy ? 0.75 : 1 }}>
+                {busy ? <IconClock size={14} /> : <IconSprout size={14} />}
+                {busy ? "Création…" : "Créer mon profil"}
+              </button>
+            )}
+            {etape === 0 && (
+              <button type="button" onClick={() => { setModeProfil("login"); setErreur(""); allerEtape(0); }} style={boutonLien}>
+                Déjà un profil ? Se connecter
+              </button>
+            )}
+          </form>
+        </>
       ) : (
-        <form onSubmit={connecterProfil}>
-          <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail" style={champ} />
+        <form onSubmit={connecterProfil} className="pace-fade-in">
+          <input ref={emailLoginRef} required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail" style={champ} />
           <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" style={champ} />
-          {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>{erreur}</div>}
-          <button type="button" onClick={connecterProfil} disabled={busy} style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 6 }}>
-            {busy ? "…" : "Se connecter"}
+          {erreur && (
+            <div role="alert" className="pace-fade-in" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>
+              <IconAlert size={13} color="#B5451B" />
+              <span>{erreur}</span>
+            </div>
+          )}
+          <button type="button" onClick={connecterProfil} disabled={busy} style={{ ...boutonPrincipal, opacity: busy ? 0.75 : 1 }}>
+            {busy ? "Connexion…" : "Se connecter"}
           </button>
-          <button type="button" onClick={() => { setModeProfil("signup"); setErreur(""); }} style={{ width: "100%", padding: "6px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer" }}>
+          <button type="button" onClick={() => { setModeProfil("signup"); setErreur(""); allerEtape(0); }} style={boutonLien}>
             Pas encore de profil ? En créer un
           </button>
         </form>
