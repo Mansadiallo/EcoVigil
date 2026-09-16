@@ -9276,7 +9276,7 @@ function AdminSpace({ signalements: signalementsProp, arbres, onUpdateStatut, on
       {panel === "organisations" && <AdminOrganisations isSuperAdmin={isSuperAdmin} adminEmail={session.user.email} />}
       {panel === "publications" && <AdminVerification isSuperAdmin={isSuperAdmin} adminEmail={session.user.email} />}
       {panel === "rapports" && <AdminRapports signalements={signalements} arbres={arbres} isSuperAdmin={isSuperAdmin} centreVerrouille={centreVerrouille} onToggleCentre={toggleCentreVerrouille} />}
-      {panel === "suppressions" && <AdminSuppressions />}
+      {panel === "suppressions" && <AdminSuppressions isSuperAdmin={isSuperAdmin} />}
 
       <button onClick={onExit} style={{ marginTop: 18, width: "100%", background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", padding: 8 }}>← Retour à l'app</button>
     </Screen>
@@ -10086,9 +10086,12 @@ function PreuveItem({ preuve, onStatuer, busy }) {
   );
 }
 
-function AdminSuppressions() {
+function AdminSuppressions({ isSuperAdmin }) {
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [emailLibre, setEmailLibre] = useState("");
+  const [busyLibre, setBusyLibre] = useState(false);
+  const [msgLibre, setMsgLibre] = useState(null); // { ok: bool, texte } | null
 
   async function load() {
     setLoading(true);
@@ -10098,9 +10101,36 @@ function AdminSuppressions() {
   }
   useEffect(() => { load(); }, []);
 
-  async function marquerTraitee(id) {
-    if (!confirm("Confirmer que le compte et les données associées ont bien été supprimés manuellement (dashboard Supabase) avant de marquer cette demande comme traitée ?")) return;
-    await supabase.from("demandes_suppression").update({ statut: "traitee", traitee_at: new Date().toISOString() }).eq("id", id);
+  // Supprime réellement le compte auth (et tout ce qui en dépend, en cascade) via la fonction
+  // admin_supprimer_compte_par_email, restreinte aux super-admins côté base. Renvoie true/false
+  // pour que l'appelant sache si la suite (ex. marquer une demande traitée) doit continuer.
+  async function supprimerCompteParEmail(email) {
+    const { error } = await supabase.rpc("admin_supprimer_compte_par_email", { p_email: email });
+    if (error) { setMsgLibre({ ok: false, texte: error.message || "Suppression impossible." }); return false; }
+    return true;
+  }
+
+  async function libererAdresse(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    const email = emailLibre.trim();
+    if (!email) return;
+    if (!confirm(`Supprimer définitivement le compte associé à ${email} ? Cette action est irréversible.`)) return;
+    setMsgLibre(null);
+    setBusyLibre(true);
+    const ok = await supprimerCompteParEmail(email);
+    setBusyLibre(false);
+    if (ok) { setMsgLibre({ ok: true, texte: `Compte supprimé. L'adresse ${email} est de nouveau libre.` }); setEmailLibre(""); load(); }
+  }
+
+  async function marquerTraitee(d) {
+    if (isSuperAdmin && d.email) {
+      if (!confirm(`Supprimer définitivement le compte de ${d.email}, puis marquer cette demande comme traitée ?`)) return;
+      const ok = await supprimerCompteParEmail(d.email);
+      if (!ok) return; // le message d'erreur est déjà affiché par supprimerCompteParEmail
+    } else {
+      if (!confirm("Confirmer que le compte et les données associées ont bien été supprimés manuellement (dashboard Supabase) avant de marquer cette demande comme traitée ?")) return;
+    }
+    await supabase.from("demandes_suppression").update({ statut: "traitee", traitee_at: new Date().toISOString() }).eq("id", d.id);
     load();
   }
 
@@ -10111,9 +10141,28 @@ function AdminSuppressions() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ background: "var(--c-warning-bg)", border: "1px solid var(--c-warning-border-soft)", borderRadius: 12, padding: 12, fontSize: 12, color: "var(--c-warning-text)", lineHeight: 1.5 }}>
-        Ces demandes ne suppriment rien automatiquement. Pour chaque demande, va supprimer manuellement le compte (Supabase → Authentication) et les données associées (device_id ou email), puis marque la demande comme traitée. Délai légal engagé : 30 jours maximum depuis la demande.
-      </div>
+      {isSuperAdmin ? (
+        <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 3 }}>Libérer une adresse e-mail</div>
+          <div style={{ fontSize: 11.5, color: "var(--c-text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
+            Supprime directement le compte associé (profil, organisation ou admin) pour permettre une nouvelle inscription avec cette même adresse. Action immédiate et irréversible.
+          </div>
+          <form onSubmit={libererAdresse} style={{ display: "flex", gap: 8 }}>
+            <input type="email" required value={emailLibre} onChange={e => setEmailLibre(e.target.value)} placeholder="adresse@exemple.com"
+              style={{ flex: 1, padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, boxSizing: "border-box" }} />
+            <button type="submit" disabled={busyLibre || !emailLibre.trim()} style={{ background: "var(--c-accent-dark)", border: "none", color: "#fff", fontSize: 12.5, fontWeight: 600, borderRadius: 10, padding: "0 14px", cursor: "pointer", opacity: busyLibre ? 0.7 : 1, whiteSpace: "nowrap" }}>
+              {busyLibre ? "…" : "Supprimer"}
+            </button>
+          </form>
+          {msgLibre && (
+            <div className="pace-fade-in" style={{ fontSize: 12, marginTop: 8, color: msgLibre.ok ? "var(--c-accent-dark)" : "#B5451B" }}>{msgLibre.texte}</div>
+          )}
+        </div>
+      ) : (
+        <div style={{ background: "var(--c-warning-bg)", border: "1px solid var(--c-warning-border-soft)", borderRadius: 12, padding: 12, fontSize: 12, color: "var(--c-warning-text)", lineHeight: 1.5 }}>
+          La suppression directe d'un compte est réservée au super-admin. Pour chaque demande ci-dessous, un super-admin doit la traiter (ou passer par le dashboard Supabase). Délai légal engagé : 30 jours maximum depuis la demande.
+        </div>
+      )}
 
       <div>
         <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>En attente ({enAttente.length})</div>
@@ -10126,7 +10175,9 @@ function AdminSuppressions() {
                 {d.motif && <div style={{ fontSize: 11.5, color: "var(--c-text-secondary)" }}>{d.motif}</div>}
                 <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 2 }}>Demandé le {new Date(d.created_at).toLocaleDateString("fr-FR")}</div>
               </div>
-              <button onClick={() => marquerTraitee(d.id)} style={{ background: "var(--c-accent-dark)", border: "none", color: "#fff", fontSize: 11.5, fontWeight: 600, borderRadius: 8, padding: "7px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>Marquer traitée</button>
+              <button onClick={() => marquerTraitee(d)} style={{ background: "var(--c-accent-dark)", border: "none", color: "#fff", fontSize: 11.5, fontWeight: 600, borderRadius: 8, padding: "7px 10px", cursor: "pointer", whiteSpace: "nowrap" }}>
+                {isSuperAdmin && d.email ? "Supprimer et marquer traitée" : "Marquer traitée"}
+              </button>
             </div>
           ))}
         </div>
