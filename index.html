@@ -13,6 +13,23 @@
 <meta name="apple-mobile-web-app-capable" content="yes" />
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
 <meta name="apple-mobile-web-app-title" content="EcoVigil" />
+<script>
+  // Distingue le nom de l'onglet et le nom suggéré par "Ajouter à l'écran d'accueil" (iOS lit le
+  // <title>/la balise apple-mobile-web-app-title au moment de l'enregistrement) selon qu'on ouvre
+  // le lien citoyen ou le lien admin (?admin=1) — permet d'avoir deux raccourcis distincts sur
+  // l'écran d'accueil, un par espace, plutôt que deux icônes identiques nommées "EcoVigil".
+  (function () {
+    try {
+      var estAdmin = new URLSearchParams(location.search).get("admin") === "1";
+      if (!estAdmin) return;
+      document.title = "Centre EcoVigil";
+      var meta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
+      if (meta) meta.setAttribute("content", "Centre EcoVigil");
+      var theme = document.querySelector('meta[name="theme-color"]');
+      if (theme) theme.setAttribute("content", "#8B2E2E"); // teinte différente pour repérer l'onglet/l'appli admin au premier coup d'œil
+    } catch (e) {}
+  })();
+</script>
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <link href="https://unpkg.com/maplibre-gl@5/dist/maplibre-gl.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
@@ -9071,6 +9088,23 @@ function AdminSpace({ signalements: signalementsProp, arbres, onUpdateStatut, on
           <button onClick={handleLogout} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: 13 }}>Se déconnecter</button>
           <button onClick={onExit} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", cursor: "pointer", fontSize: 13 }}>Retour à l'app</button>
         </div>
+      </Screen>
+    );
+  }
+
+  // Double authentification obligatoire pour tout compte admin : tant qu'aucun facteur TOTP
+  // vérifié n'est associé au compte, l'accès au tableau de bord est bloqué et l'activation est
+  // forcée ici — un mot de passe seul (deviné, réutilisé ailleurs, ou compromis dans une fuite
+  // de données externe) ne doit jamais suffire à entrer dans le Centre d'EcoVigil.
+  if (isAdmin && facteursTotpVerifies.length === 0) {
+    return (
+      <Screen>
+        <SectionTitle sub="Obligatoire pour tout compte administrateur avant de continuer.">Sécurise ton compte</SectionTitle>
+        <AdminMfaPanel session={session} />
+        <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginTop: 4, marginBottom: 14 }}>
+          Une fois le code confirmé, reconnecte-toi pour accéder au Centre d'EcoVigil.
+        </div>
+        <button onClick={handleLogout} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: 13 }}>Se déconnecter</button>
       </Screen>
     );
   }
