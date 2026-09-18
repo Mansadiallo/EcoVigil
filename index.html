@@ -658,7 +658,8 @@ async function subscribeToPush() {
       });
     }
     const json = sub.toJSON();
-    const email = currentSession && currentSession.user ? currentSession.user.email : null;
+    const s = getActiveSession();
+    const email = s && s.user ? s.user.email : null;
     await supabase.from("push_subscriptions").upsert({
       device_id: DEVICE_ID, endpoint: json.endpoint, p256dh: json.keys.p256dh, auth: json.keys.auth, email,
     }, { onConflict: "device_id" });
@@ -1042,7 +1043,8 @@ function dequeuePendingAction(tempId) {
 
 async function logActivity(action, table, id, detail) {
   try {
-    const acteur = currentSession && currentSession.user ? currentSession.user.email : "inconnu";
+    const s = getActiveSession();
+    const acteur = s && s.user ? s.user.email : "inconnu";
     await supabase.from("activity_log").insert({ action, cible_table: table, cible_id: id ? String(id) : null, acteur, detail: detail || null });
   } catch (e) { /* journal best-effort, ne bloque jamais l'action principale */ }
 }
@@ -1078,10 +1080,13 @@ async function logGroupeAudit(groupeId, action, cibleType, cibleId, detail) {
   } catch (e) { /* journal best-effort, ne bloque jamais l'action principale */ }
 }
 
-// Journal d'audit immuable (spécifique aux actions de modération sensibles : signalements)
+// Journal d'audit immuable (spécifique aux actions de modération sensibles : signalements).
+// Exclusivement appelé depuis le Centre d'EcoVigil : on lit donc la session active (qui vaut
+// toujours la session admin à ce moment-là) plutôt que la session citoyen.
 async function logAudit(actionType, targetEntity, targetId, reason, metadata) {
   try {
-    const adminId = currentSession && currentSession.user ? currentSession.user.email : "inconnu";
+    const s = getActiveSession();
+    const adminId = s && s.user ? s.user.email : "inconnu";
     await supabase.from("audit_logs").insert({
       admin_id: adminId, action_type: actionType, target_entity: targetEntity, target_id: String(targetId),
       reason: reason || null, metadata: metadata || {},
@@ -1148,6 +1153,28 @@ let currentSession = null;
 try { currentSession = JSON.parse(localStorage.getItem("pace-session") || "null"); } catch (e) { currentSession = null; }
 let authListeners = [];
 
+// ===== Session du Centre d'EcoVigil (admin), totalement indépendante de la session citoyen =====
+// Stockage localStorage séparé + écouteurs séparés : avoir un profil citoyen connecté ne bloque
+// jamais l'accès direct au Centre d'EcoVigil, et s'y connecter ne déconnecte jamais le profil
+// citoyen. "activeIdentity" détermine laquelle des deux sessions restHeaders() /
+// refreshSessionIfNeeded() / l'objet "auth" ci-dessous utilisent à un instant donné : il est
+// basculé de façon strictement synchrone par App (enterAdminIdentity/exitAdminIdentity), avant
+// même que le composant du Centre d'EcoVigil ne soit monté — jamais via un effet asynchrone qui
+// pourrait s'exécuter dans le mauvais ordre.
+let adminSession = null;
+try { adminSession = JSON.parse(localStorage.getItem("pace-admin-session") || "null"); } catch (e) { adminSession = null; }
+let adminAuthListeners = [];
+// "admin" dès le chargement si l'URL contient déjà ?admin=1 (accès direct au Centre d'EcoVigil,
+// typiquement une navigation fraîche vers ce lien) : indispensable pour que le tout premier appel
+// à getSession()/getActiveSession(), déclenché par l'effet de montage du Centre d'EcoVigil, lise
+// déjà le bon store — avant même que React n'ait eu l'occasion de monter le moindre composant.
+let activeIdentity = (function () {
+  try { return new URLSearchParams(window.location.search).get("admin") === "1" ? "admin" : "citoyen"; } catch (e) { return "citoyen"; }
+})(); // "citoyen" | "admin"
+function enterAdminIdentity() { activeIdentity = "admin"; }
+function exitAdminIdentity() { activeIdentity = "citoyen"; }
+function getActiveSession() { return activeIdentity === "admin" ? adminSession : currentSession; }
+
 function persistSession(session) {
   currentSession = session;
   try {
@@ -1155,6 +1182,23 @@ function persistSession(session) {
     else localStorage.removeItem("pace-session");
   } catch (e) {}
   authListeners.forEach((cb) => { try { cb(session ? "SIGNED_IN" : "SIGNED_OUT", session); } catch (e) {} });
+}
+
+function persistAdminSession(session) {
+  adminSession = session;
+  try {
+    if (session) localStorage.setItem("pace-admin-session", JSON.stringify(session));
+    else localStorage.removeItem("pace-admin-session");
+  } catch (e) {}
+  adminAuthListeners.forEach((cb) => { try { cb(session ? "SIGNED_IN" : "SIGNED_OUT", session); } catch (e) {} });
+}
+
+// Les méthodes signIn*/signUp/signOut/mfa.* ci-dessous sont écrites une seule fois et partagées
+// entre le profil citoyen et le Centre d'EcoVigil : elles persistent toujours via cette fonction,
+// qui redirige elle-même vers le bon stockage selon l'identité active au moment de l'appel.
+function persistActiveSession(session) {
+  if (activeIdentity === "admin") persistAdminSession(session);
+  else persistSession(session);
 }
 
 function decodeJwtExp(token) {
@@ -1166,28 +1210,31 @@ function decodeJwtExp(token) {
 
 let refreshInFlight = null;
 async function refreshSessionIfNeeded() {
-  if (!currentSession || !currentSession.refresh_token) return;
-  const exp = decodeJwtExp(currentSession.access_token);
+  const session = getActiveSession();
+  if (!session || !session.refresh_token) return;
+  const exp = decodeJwtExp(session.access_token);
   const now = Math.floor(Date.now() / 1000);
   if (exp && exp - now > 300) return; // encore valide plus de 5 minutes, rien à faire
   if (refreshInFlight) return refreshInFlight;
+  const forAdmin = activeIdentity === "admin";
   refreshInFlight = (async () => {
     try {
       const res = await fetch(`${AUTH_URL}/token?grant_type=refresh_token`, {
         method: "POST",
         headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
-        body: JSON.stringify({ refresh_token: currentSession.refresh_token }),
+        body: JSON.stringify({ refresh_token: session.refresh_token }),
       });
       if (res.ok) {
         const json = await res.json().catch(() => ({}));
         if (json.access_token) {
-          persistSession({ access_token: json.access_token, refresh_token: json.refresh_token, user: json.user || currentSession.user });
+          const nouvelleSession = { access_token: json.access_token, refresh_token: json.refresh_token, user: json.user || session.user };
+          if (forAdmin) persistAdminSession(nouvelleSession); else persistSession(nouvelleSession);
         }
       } else if (res.status === 400 || res.status === 401 || res.status === 403) {
         // Le serveur a explicitement rejeté le refresh_token (révoqué / expiré / invalide) :
         // la session est définitivement morte. On la nettoie pour éviter un état incohérent
         // où l'app se croit connectée mais où chaque appel échouerait silencieusement.
-        persistSession(null);
+        if (forAdmin) persistAdminSession(null); else persistSession(null);
       }
       // Toute autre erreur (5xx, réseau) est traitée comme transitoire : on garde la session
       // et on retentera au prochain cycle plutôt que de déconnecter sur un simple problème réseau.
@@ -1200,7 +1247,8 @@ async function refreshSessionIfNeeded() {
 }
 
 function restHeaders(extra) {
-  const token = currentSession ? currentSession.access_token : null;
+  const session = getActiveSession();
+  const token = session ? session.access_token : null;
   return Object.assign({ apikey: SUPABASE_KEY, Authorization: "Bearer " + (token || SUPABASE_KEY) }, extra || {});
 }
 
@@ -1413,8 +1461,17 @@ const supabase = {
     },
   },
   auth: {
-    async getSession() { return { data: { session: currentSession } }; },
+    async getSession() { return { data: { session: getActiveSession() } }; },
+    // S'abonne au store correspondant à l'identité active AU MOMENT de l'appel : comme
+    // enterAdminIdentity()/exitAdminIdentity() sont toujours basculés de façon synchrone AVANT le
+    // montage du composant concerné (voir App), le Centre d'EcoVigil s'abonne toujours à
+    // adminAuthListeners et le reste de l'app (profil citoyen, organisation) toujours à
+    // authListeners — chacun des deux écouteurs de haut niveau reste ainsi bien isolé de l'autre.
     onAuthStateChange(cb) {
+      if (activeIdentity === "admin") {
+        adminAuthListeners.push(cb);
+        return { data: { subscription: { unsubscribe() { adminAuthListeners = adminAuthListeners.filter((f) => f !== cb); } } } };
+      }
       authListeners.push(cb);
       return { data: { subscription: { unsubscribe() { authListeners = authListeners.filter((f) => f !== cb); } } } };
     },
@@ -1428,7 +1485,7 @@ const supabase = {
         const json = await res.json().catch(() => ({}));
         if (!res.ok) return { error: { message: json.error_description || json.msg || "Identifiants incorrects." } };
         const session = { access_token: json.access_token, refresh_token: json.refresh_token, user: json.user };
-        persistSession(session);
+        persistActiveSession(session);
         return { data: { session }, error: null };
       } catch (e) { return { error: { message: e.message } }; }
     },
@@ -1467,7 +1524,7 @@ const supabase = {
         }
         if (json.access_token) {
           const session = { access_token: json.access_token, refresh_token: json.refresh_token, user: json.user };
-          persistSession(session);
+          persistActiveSession(session);
           return { data: { session, user: json.user }, error: null };
         }
         // Pas de session : confirmation par e-mail requise. GoTrue renvoie alors l'objet
@@ -1478,7 +1535,7 @@ const supabase = {
         return { data: { session: null, user: json }, error: null };
       } catch (e) { return { error: { message: e.message } }; }
     },
-    async signOut() { persistSession(null); return { error: null }; },
+    async signOut() { persistActiveSession(null); return { error: null }; },
     // Session anonyme Supabase (déjà activée sur ce projet) : sert de base d'identité stable
     // (auth.uid()) pour un membre d'organisation qui rejoint via un code d'invitation, sans
     // e-mail ni téléphone ni mot de passe.
@@ -1492,7 +1549,7 @@ const supabase = {
         const json = await res.json().catch(() => ({}));
         if (!res.ok) return { data: null, error: { message: json.error_description || json.msg || "Erreur de connexion." } };
         const session = { access_token: json.access_token, refresh_token: json.refresh_token, user: json.user };
-        persistSession(session);
+        persistActiveSession(session);
         return { data: { session }, error: null };
       } catch (e) { return { data: null, error: { message: e.message } }; }
     },
@@ -1530,7 +1587,7 @@ const supabase = {
         try {
           const res = await fetch(`${AUTH_URL}/factors`, {
             method: "POST",
-            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + (currentSession && currentSession.access_token), "Content-Type": "application/json" },
+            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + (getActiveSession() && getActiveSession().access_token), "Content-Type": "application/json" },
             body: JSON.stringify({ factor_type: factorType, friendly_name: friendlyName }),
           });
           const json = await res.json().catch(() => ({}));
@@ -1542,7 +1599,7 @@ const supabase = {
         try {
           const res = await fetch(`${AUTH_URL}/factors/${factorId}/challenge`, {
             method: "POST",
-            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + (currentSession && currentSession.access_token), "Content-Type": "application/json" },
+            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + (getActiveSession() && getActiveSession().access_token), "Content-Type": "application/json" },
           });
           const json = await res.json().catch(() => ({}));
           if (!res.ok) return { data: null, error: { message: json.error_description || json.msg || json.message || "Erreur lors de la demande de code." } };
@@ -1550,20 +1607,20 @@ const supabase = {
         } catch (e) { return { data: null, error: { message: e.message } }; }
       },
       // accessToken optionnel : lors du step-up post-connexion, la session courante n'est encore
-      // qu'au niveau aal1, on utilise donc explicitement ce token plutôt que currentSession (identique
-      // dans ce cas précis, gardé pour clarté et robustesse).
+      // qu'au niveau aal1, on utilise donc explicitement ce token plutôt que la session active
+      // (identique dans ce cas précis, gardé pour clarté et robustesse).
       async verify({ factorId, challengeId, code, accessToken }) {
         try {
           const res = await fetch(`${AUTH_URL}/factors/${factorId}/verify`, {
             method: "POST",
-            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + (accessToken || (currentSession && currentSession.access_token)), "Content-Type": "application/json" },
+            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + (accessToken || (getActiveSession() && getActiveSession().access_token)), "Content-Type": "application/json" },
             body: JSON.stringify({ challenge_id: challengeId, code }),
           });
           const json = await res.json().catch(() => ({}));
           if (!res.ok) return { data: null, error: { message: json.error_description || json.msg || json.message || "Code incorrect ou expiré." } };
           if (json.access_token) {
             const session = { access_token: json.access_token, refresh_token: json.refresh_token, user: json.user };
-            persistSession(session);
+            persistActiveSession(session);
             return { data: { session }, error: null };
           }
           return { data: json, error: null };
@@ -1573,7 +1630,7 @@ const supabase = {
         try {
           const res = await fetch(`${AUTH_URL}/factors/${factorId}`, {
             method: "DELETE",
-            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + (currentSession && currentSession.access_token), "Content-Type": "application/json" },
+            headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + (getActiveSession() && getActiveSession().access_token), "Content-Type": "application/json" },
           });
           const json = await res.json().catch(() => ({}));
           if (!res.ok) return { data: null, error: { message: json.error_description || json.msg || json.message || "Erreur lors de la suppression." } };
@@ -8640,7 +8697,7 @@ function AdminSpace({ signalements: signalementsProp, arbres, onUpdateStatut, on
       try {
         const res = await fetch(`${AUTH_URL}/user`, { headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + token } });
         const user = await res.json().catch(() => null);
-        persistSession({ access_token: token, refresh_token: refreshToken, user });
+        persistActiveSession({ access_token: token, refresh_token: refreshToken, user });
         setSession({ access_token: token, refresh_token: refreshToken, user });
         setWelcomeSession(true);
         window.location.hash = "";
@@ -10215,7 +10272,7 @@ function AdminBenevoles() {
 
   async function remove(b) {
     if (!confirm(`Mettre "${b.nom}" à la corbeille ? Il sera restaurable depuis Historique.`)) return;
-    const email = currentSession && currentSession.user ? currentSession.user.email : "";
+    const email = (getActiveSession() || {}).user ? getActiveSession().user.email : "";
     const { error } = await supabase.from("benevoles").update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: email }).eq("id", b.id);
     if (error) { alert("Action refusée par le serveur (droits admin requis)."); return; }
     logActivity("soft_delete", "benevoles", b.id, b.nom);
@@ -10575,7 +10632,7 @@ function TacheUpdates({ tacheId, assignee }) {
     if (e && e.preventDefault) e.preventDefault();
     if (!text.trim()) return;
     setBusy(true);
-    const acteur = currentSession && currentSession.user ? currentSession.user.email : "admin";
+    const acteur = (getActiveSession() || {}).user ? getActiveSession().user.email : "admin";
     const { error } = await supabase.from("tache_updates").insert({ tache_id: tacheId, contenu: text.trim(), auteur: acteur });
     if (!error) {
       logActivity("decision", "taches", tacheId, text.trim());
@@ -11901,9 +11958,16 @@ function App() {
   const [showSplash, setShowSplash] = useState(true);
   const [citoyenSession, setCitoyenSession] = useState(undefined); // undefined = en cours de vérification, null = pas connecté
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => setCitoyenSession(data.session || null));
-    const { data: sub } = supabase.auth.onAuthStateChange((_e, s) => setCitoyenSession(s));
-    return () => sub && sub.subscription && sub.subscription.unsubscribe();
+    // Lit et écoute directement le store citoyen (currentSession/authListeners), plutôt que via
+    // supabase.auth.getSession()/onAuthStateChange() qui suivent l'identité active du moment
+    // (activeIdentity). Ce watcher tourne toujours, même quand on arrive directement sur
+    // ?admin=1 (où activeIdentity démarre sur "admin") : il doit rester en permanence isolé du
+    // Centre d'EcoVigil pour qu'un compte admin connecté ne "prenne" jamais la place du profil
+    // citoyen, ni l'inverse.
+    setCitoyenSession(currentSession || null);
+    const cb = (_e, s) => setCitoyenSession(s);
+    authListeners.push(cb);
+    return () => { authListeners = authListeners.filter((f) => f !== cb); };
   }, []);
   // Statistiques d'usage par zone géographique pour le Centre d'EcoVigil : une seule fois par
   // ouverture de l'app, pour tout utilisateur (citoyen anonyme ou compte admin/organisation).
@@ -12234,7 +12298,7 @@ function App() {
   const MOTIF_LABELS = { faux: "Faux signalement", doublon: "Doublon", spam: "Spam", erreur_localisation: "Erreur de localisation" };
 
   async function adminRevertModeration(signalement, { reason, motif }) {
-    const email = currentSession && currentSession.user ? currentSession.user.email : "";
+    const email = (getActiveSession() || {}).user ? getActiveSession().user.email : "";
     setSignalements(prev => prev.map(s => s.id === signalement.id ? { ...s, valide: false, statut: "attente", moderation_motif: motif, moderation_par: email } : s));
     await supabase.from("signalements").update({
       valide: false, statut: "attente", moderation_motif: motif, moderation_par: email, moderation_le: new Date().toISOString(),
@@ -12249,7 +12313,7 @@ function App() {
   }
 
   async function adminSoftDeleteSignalement(signalement, { reason }) {
-    const email = currentSession && currentSession.user ? currentSession.user.email : "";
+    const email = (getActiveSession() || {}).user ? getActiveSession().user.email : "";
     const { data, error } = await supabase.from("signalements").update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: email }).eq("id", signalement.id).select();
     if (error || !data || data.length === 0) { alert("Suppression refusée par le serveur (droits admin requis) : le signalement n'a pas été modifié et réapparaîtra."); return; }
     await logAudit("soft_delete", "signalement", signalement.id, reason);
@@ -12266,7 +12330,7 @@ function App() {
   }
 
   async function adminSoftDeleteArbre(arbre) {
-    const email = currentSession && currentSession.user ? currentSession.user.email : "";
+    const email = (getActiveSession() || {}).user ? getActiveSession().user.email : "";
     const { data, error } = await supabase.from("arbres").update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: email }).eq("id", arbre.id).select();
     if (error) { alert("Action refusée par le serveur (droits admin requis)."); return; }
     if (!data || data.length === 0) { alert("Suppression refusée par le serveur (droits admin requis) : l'arbre n'a pas été modifié et réapparaîtra."); return; }
@@ -12596,7 +12660,7 @@ function App() {
         )}
 
         {showAdmin ? (
-          <AdminSpace signalements={signalements} arbres={arbres} onUpdateStatut={adminUpdateStatut} onResolve={adminResolve} onValidate={adminValidate} onValidateArbre={adminValidateArbre} onDelete={adminDelete} onSoftDeleteArbre={adminSoftDeleteArbre} onRevertModeration={adminRevertModeration} onSoftDeleteSignalement={adminSoftDeleteSignalement} onRestaurerItem={onRestaurerItem} onRafraichir={chargerDonneesPrincipales} rafraichissementEnCours={rafraichissementEnCours} onExit={() => setShowAdmin(false)} />
+          <AdminSpace signalements={signalements} arbres={arbres} onUpdateStatut={adminUpdateStatut} onResolve={adminResolve} onValidate={adminValidate} onValidateArbre={adminValidateArbre} onDelete={adminDelete} onSoftDeleteArbre={adminSoftDeleteArbre} onRevertModeration={adminRevertModeration} onSoftDeleteSignalement={adminSoftDeleteSignalement} onRestaurerItem={onRestaurerItem} onRafraichir={chargerDonneesPrincipales} rafraichissementEnCours={rafraichissementEnCours} onExit={() => { exitAdminIdentity(); setShowAdmin(false); }} />
         ) : tab === "confidentialite" ? (
           <Confidentialite onBack={() => setTab("accueil")} />
         ) : profilInfo === undefined ? (
@@ -12623,7 +12687,7 @@ function App() {
           <GroupesTerrain onBack={() => setTab("accueil")} estBenevoleValide={estBenevoleValide} />
         ) : (
           <div key={tab} className="pace-fade-in">
-            {tab === "accueil" && <Accueil signalements={signalements.filter(s => s.device_id === DEVICE_ID)} arbres={arbres.filter(a => a.device_id === DEVICE_ID)} notifState={notifState} onEnableNotif={enableNotif} onOpenAdmin={() => setShowAdmin(true)} actualites={actualites} onNavigate={setTab} lang={lang} estBenevoleValide={estBenevoleValide} benevoleStatut={benevoleStatut} onBenevoleInscrit={() => { setBenevoleStatut("en_attente"); try { localStorage.setItem("pace-benevole-statut", "en_attente"); } catch (e) {} }} estOrganisationValidee={estOrganisationValidee} organisationStatut={organisationStatut} organisationEtapeDossier={organisationEtapeDossier} organisationEtapeMotif={organisationEtapeMotif} onBasculerStatutSignalement={citoyenBasculerStatutSignalement} profilInfo={profilInfo} onProfilChange={rafraichirProfil} />}
+            {tab === "accueil" && <Accueil signalements={signalements.filter(s => s.device_id === DEVICE_ID)} arbres={arbres.filter(a => a.device_id === DEVICE_ID)} notifState={notifState} onEnableNotif={enableNotif} onOpenAdmin={() => { enterAdminIdentity(); setShowAdmin(true); }} actualites={actualites} onNavigate={setTab} lang={lang} estBenevoleValide={estBenevoleValide} benevoleStatut={benevoleStatut} onBenevoleInscrit={() => { setBenevoleStatut("en_attente"); try { localStorage.setItem("pace-benevole-statut", "en_attente"); } catch (e) {} }} estOrganisationValidee={estOrganisationValidee} organisationStatut={organisationStatut} organisationEtapeDossier={organisationEtapeDossier} organisationEtapeMotif={organisationEtapeMotif} onBasculerStatutSignalement={citoyenBasculerStatutSignalement} profilInfo={profilInfo} onProfilChange={rafraichirProfil} />}
             {tab === "carte" && accesEtendu && <Carte signalements={signalements} arbres={arbres} observations={observations} onAddSignalement={addSignalement} onAddArbre={addArbre} onAddObservation={addObservation} online={online} pendingQueueCount={pendingQueueCount} onFlushQueue={flushPendingQueue} lang={lang} coordFormat={coordFormat} />}
             {tab === "signaler" && accesEtendu && <Signaler onSubmit={addSignalement} lang={lang} coordFormat={coordFormat} />}
             {tab === "arbre" && accesEtendu && <MonArbre arbres={arbres.filter(a => a.device_id === DEVICE_ID)} suivis={suivis} onAdd={addArbre} onAddSuivi={addSuivi} lang={lang} coordFormat={coordFormat} />}
