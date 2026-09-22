@@ -2680,6 +2680,18 @@ function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpenAdmin,
       </div>
 
       <div style={{ marginBottom: 18 }}>
+        <button onClick={() => onNavigate("enquetes")} style={{
+          display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: 14, borderRadius: 14,
+          border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", textAlign: "left", width: "100%" }}>
+          <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 8 }}>
+            <IconSearch size={18} color="var(--c-accent)" />
+          </div>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--c-text)" }}>Enquêtes environnementales</div>
+          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)" }}>Réponds à des questionnaires citoyens et suis l'avancée des investigations en cours</div>
+        </button>
+      </div>
+
+      <div style={{ marginBottom: 18 }}>
         <button onClick={() => onNavigate("evenements")} style={{
           display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: 14, borderRadius: 14,
           border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", textAlign: "left", width: "100%" }}>
@@ -6787,16 +6799,27 @@ function EspaceOrganisation({ organisationEmail, organisationUserId, onBack, coo
     });
   }
 
-  async function ouvrirGroupeOrg(groupeId) {
-    if (groupeOuvertOrg === groupeId) { setGroupeOuvertOrg(null); return; }
-    setGroupeOuvertOrg(groupeId);
-    setDetailGroupeOrg(null);
+  async function chargerDetailGroupeOrg(groupeId) {
     const [{ data: mi }, { data: log }] = await Promise.all([
       supabase.from("gt_missions").select("*").eq("groupe_id", groupeId).order("created_at", { ascending: false }).limit(10),
       supabase.from("gt_audit_log").select("*").eq("groupe_id", groupeId).order("created_at", { ascending: false }).limit(10),
     ]);
     setDetailGroupeOrg({ missions: mi || [], log: log || [] });
   }
+  async function ouvrirGroupeOrg(groupeId) {
+    if (groupeOuvertOrg === groupeId) { setGroupeOuvertOrg(null); return; }
+    setGroupeOuvertOrg(groupeId);
+    setDetailGroupeOrg(null);
+    await chargerDetailGroupeOrg(groupeId);
+  }
+  // Même logique de rafraîchissement que côté groupe (toutes les 15s) : sans ça, une organisation
+  // qui garde un groupe ouvert à l'écran ne verrait une mission terminée qu'en le refermant puis
+  // le rouvrant.
+  useEffect(() => {
+    if (!groupeOuvertOrg) return;
+    const t = setInterval(() => chargerDetailGroupeOrg(groupeOuvertOrg), 15000);
+    return () => clearInterval(t);
+  }, [groupeOuvertOrg]);
 
   // Un gouvernement garde ses pleins droits (accès non restreint, comme avant cette
   // fonctionnalité) ; une ONG doit d'abord s'assigner des bénévoles pour voir leurs signalements.
@@ -8335,6 +8358,204 @@ function GroupesTerrain({ onBack, estBenevoleValide }) {
   );
 }
 
+function Enquetes({ onBack }) {
+  const [liste, setListe] = useState(null);
+  const [selection, setSelection] = useState(null);
+  const [questions, setQuestions] = useState(null);
+  const [reponses, setReponses] = useState({});
+  const [dejaRepondu, setDejaRepondu] = useState(() => {
+    try { return JSON.parse(localStorage.getItem("pace-enquetes-repondues") || "[]"); } catch (e) { return []; }
+  });
+  const [busy, setBusy] = useState(false);
+  const [erreur, setErreur] = useState("");
+  const [merci, setMerci] = useState(false);
+
+  async function charger() {
+    const { data } = await supabase.from("enquetes").select("*").order("created_at", { ascending: false }).limit(100);
+    setListe(data || []);
+  }
+  useEffect(() => { charger(); }, []);
+
+  async function ouvrir(enq) {
+    setSelection(enq);
+    setReponses({});
+    setErreur("");
+    setMerci(false);
+    setQuestions(null);
+    if (enq.type !== "investigation") {
+      const { data } = await supabase.from("enquete_questions").select("*").eq("enquete_id", enq.id).order("ordre", { ascending: true });
+      setQuestions(data || []);
+    }
+  }
+
+  async function envoyerReponses() {
+    if (!selection) return;
+    setBusy(true);
+    setErreur("");
+    // Une ligne "participation" par personne et par enquête (contrainte unique côté base) : une
+    // deuxième tentative avec le même appareil échoue proprement plutôt que de dupliquer.
+    const { data: part, error: errPart } = await supabase.from("enquete_participations")
+      .insert({ enquete_id: selection.id, device_id: DEVICE_ID }).select().single();
+    if (errPart || !part) {
+      setBusy(false);
+      setErreur("Impossible d'enregistrer ta participation — tu as peut-être déjà répondu depuis cet appareil.");
+      return;
+    }
+    const lignes = Object.entries(reponses)
+      .filter(([, v]) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0))
+      .map(([question_id, valeur]) => ({ participation_id: part.id, question_id, valeur: Array.isArray(valeur) ? valeur.join(", ") : String(valeur) }));
+    if (lignes.length) await supabase.from("enquete_reponses").insert(lignes);
+    setBusy(false);
+    setMerci(true);
+    const maj = [...dejaRepondu, selection.id];
+    setDejaRepondu(maj);
+    try { localStorage.setItem("pace-enquetes-repondues", JSON.stringify(maj)); } catch (e) {}
+  }
+
+  function setReponse(qId, val) { setReponses(prev => ({ ...prev, [qId]: val })); }
+  function toggleChoixMultiple(qId, opt) {
+    setReponses(prev => {
+      const cur = Array.isArray(prev[qId]) ? prev[qId] : [];
+      return { ...prev, [qId]: cur.includes(opt) ? cur.filter(o => o !== opt) : [...cur, opt] };
+    });
+  }
+
+  const champBtn = (actif) => ({
+    padding: "8px 12px", borderRadius: 10, border: `1px solid ${actif ? "var(--c-accent-dark)" : "var(--c-border)"}`,
+    background: actif ? "var(--c-accent-dark)" : "var(--c-surface)", color: actif ? "#fff" : "var(--c-text)",
+    fontSize: 12.5, cursor: "pointer", marginRight: 6, marginBottom: 6,
+  });
+
+  // --- Vue détail d'une enquête ---
+  if (selection) {
+    const aDejaRepondu = dejaRepondu.includes(selection.id) || merci;
+    const questionnaireVisible = selection.type !== "investigation" && selection.statut === "ouverte" && !aDejaRepondu;
+    return (
+      <Screen>
+        <button onClick={() => setSelection(null)} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Enquêtes</button>
+        <SectionTitle sub={selection.categorie || (selection.type === "investigation" ? "Dossier d'investigation" : selection.type === "mixte" ? "Investigation + questionnaire" : "Questionnaire citoyen")}>{selection.titre}</SectionTitle>
+        {selection.description && <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.6, margin: "10px 0" }}>{selection.description}</div>}
+
+        {selection.type !== "questionnaire" && (
+          <div style={{ background: "var(--c-surface-soft)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12, marginBottom: 16 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, marginBottom: selection.statut === "fermee" ? 6 : 0 }}>
+              <IconSearch size={14} color="var(--c-accent-dark)" />
+              {selection.statut === "fermee" ? "Investigation clôturée" : "Investigation en cours"}
+            </div>
+            {selection.statut === "fermee" && (
+              <div style={{ fontSize: 12, color: "var(--c-text-secondary)", lineHeight: 1.6 }}>
+                {selection.resultat_public || "Cette investigation est close ; aucune conclusion publique n'a été publiée."}
+              </div>
+            )}
+          </div>
+        )}
+
+        {questionnaireVisible && (
+          <>
+            {questions === null ? (
+              <div style={{ fontSize: 12, color: "var(--c-text-muted)" }}>Chargement du questionnaire…</div>
+            ) : (
+              <div>
+                {questions.map(q => (
+                  <div key={q.id} style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{q.texte}</div>
+                    {q.type_reponse === "texte" && (
+                      <textarea value={reponses[q.id] || ""} onChange={e => setReponse(q.id, e.target.value)} rows={3}
+                        style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, boxSizing: "border-box", fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+                    )}
+                    {q.type_reponse === "oui_non" && (
+                      <div>
+                        {["Oui", "Non"].map(opt => (
+                          <button key={opt} type="button" onClick={() => setReponse(q.id, opt)} style={champBtn(reponses[q.id] === opt)}>{opt}</button>
+                        ))}
+                      </div>
+                    )}
+                    {q.type_reponse === "echelle" && (
+                      <div>
+                        {[1, 2, 3, 4, 5].map(n => (
+                          <button key={n} type="button" onClick={() => setReponse(q.id, n)} style={champBtn(reponses[q.id] === n)}>{n}</button>
+                        ))}
+                      </div>
+                    )}
+                    {q.type_reponse === "choix_unique" && (
+                      <div>
+                        {(q.options || []).map(opt => (
+                          <button key={opt} type="button" onClick={() => setReponse(q.id, opt)} style={champBtn(reponses[q.id] === opt)}>{opt}</button>
+                        ))}
+                      </div>
+                    )}
+                    {q.type_reponse === "choix_multiple" && (
+                      <div>
+                        {(q.options || []).map(opt => (
+                          <button key={opt} type="button" onClick={() => toggleChoixMultiple(q.id, opt)} style={champBtn(Array.isArray(reponses[q.id]) && reponses[q.id].includes(opt))}>{opt}</button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+                {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 10 }}>{erreur}</div>}
+                <button onClick={envoyerReponses} disabled={busy} style={{ width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>
+                  {busy ? "Envoi…" : "Envoyer mes réponses"}
+                </button>
+              </div>
+            )}
+          </>
+        )}
+
+        {aDejaRepondu && selection.type !== "investigation" && (
+          <div className="pace-fade-in" style={{ textAlign: "center", padding: 16, color: "var(--c-accent-dark)", fontSize: 13, fontWeight: 600 }}>
+            <IconCheck size={18} /><br />Merci pour ta participation !
+          </div>
+        )}
+      </Screen>
+    );
+  }
+
+  // --- Vue liste ---
+  const ouvertes = (liste || []).filter(e => e.statut === "ouverte");
+  const fermees = (liste || []).filter(e => e.statut === "fermee");
+  const typeLabel = { questionnaire: "Questionnaire", investigation: "Investigation", mixte: "Questionnaire + investigation" };
+
+  function CarteEnquete({ e }) {
+    return (
+      <button onClick={() => ouvrir(e)} style={{
+        display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: 12, borderRadius: 12,
+        border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", textAlign: "left", width: "100%", marginBottom: 8 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)" }}>{e.titre}</div>
+        <div style={{ fontSize: 10.5, color: "var(--c-text-muted)" }}>{typeLabel[e.type]}{dejaRepondu.includes(e.id) ? " · déjà répondu" : ""}</div>
+      </button>
+    );
+  }
+
+  return (
+    <Screen>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Retour</button>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
+        <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 8 }}><IconSearch size={17} color="var(--c-accent)" /></div>
+        <SectionTitle sub="Questionnaires citoyens et suivi d'investigations en cours.">Enquêtes environnementales</SectionTitle>
+      </div>
+
+      {liste === null ? (
+        <div style={{ fontSize: 12, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Chargement…</div>
+      ) : liste.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Aucune enquête pour le moment.</div>
+      ) : (
+        <>
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>En cours ({ouvertes.length})</div>
+          {ouvertes.length === 0 && <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginBottom: 12 }}>Aucune enquête en cours.</div>}
+          {ouvertes.map(e => <CarteEnquete key={e.id} e={e} />)}
+          {fermees.length > 0 && (
+            <>
+              <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-text-secondary)", margin: "14px 0 8px" }}>Clôturées ({fermees.length})</div>
+              {fermees.map(e => <CarteEnquete key={e.id} e={e} />)}
+            </>
+          )}
+        </>
+      )}
+    </Screen>
+  );
+}
+
 function AssistantIA({ onBack, signalements, arbres, observations, actualites }) {
   const [messages, setMessages] = useState([
     { role: "assistant", text: "Bonjour ! Je suis l'assistant environnemental d'EcoVigil (mode simplifié, sans IA). Pose-moi une question sur le tri des déchets, le reboisement, la biodiversité, le climat, ou sur les chiffres de l'app (statistiques, ton impact, les actualités)." },
@@ -8661,6 +8882,7 @@ const ORGANISME_LABELS = Object.fromEntries(ORGANISME_OPTIONS.map(o => [o.id, o.
 const CATEGORIES_ADMIN = [
   { id: "terrain", label: "Terrain", icon: IconAlert, panels: [
     ["signalements", "Signalements", IconAlert], ["arbres", "Arbres", IconTree], ["abus", "Abus/doublons", IconAlert],
+    ["enquetes", "Enquêtes", IconSearch],
   ] },
   { id: "communaute", label: "Communauté", icon: IconUsers, panels: [
     ["benevoles", "Bénévoles", IconUsers], ["organisations", "Organisations", IconShield],
@@ -9426,6 +9648,7 @@ function AdminSpace({ signalements: signalementsProp, arbres, onUpdateStatut, on
       {panel === "publications" && <AdminVerification isSuperAdmin={isSuperAdmin} adminEmail={session.user.email} />}
       {panel === "rapports" && <AdminRapports signalements={signalements} arbres={arbres} isSuperAdmin={isSuperAdmin} centreVerrouille={centreVerrouille} onToggleCentre={toggleCentreVerrouille} />}
       {panel === "suppressions" && <AdminSuppressions isSuperAdmin={isSuperAdmin} />}
+      {panel === "enquetes" && <AdminEnquetes session={session} />}
 
       <button onClick={onExit} style={{ marginTop: 18, width: "100%", background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", padding: 8 }}>← Retour à l'app</button>
     </Screen>
@@ -10229,6 +10452,275 @@ function PreuveItem({ preuve, onStatuer, busy }) {
             <button onClick={() => setShowRejet(false)} style={{ ...secondaryBtnStyle, flex: 1, padding: "7px 0", fontSize: 11.5 }}>Annuler</button>
             <button disabled={busy} onClick={() => { onStatuer(preuve, "rejetee", motifRejet, motifDetail); setShowRejet(false); }} style={{ ...rejectBtnStyle, flex: 1 }}>Confirmer le rejet</button>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function AdminEnquetes({ session }) {
+  const email = session && session.user ? session.user.email : "";
+  const [liste, setListe] = useState(null);
+  const [selection, setSelection] = useState(null);
+  const [detail, setDetail] = useState(null);
+
+  const [showCreer, setShowCreer] = useState(false);
+  const [titre, setTitre] = useState("");
+  const [description, setDescription] = useState("");
+  const [type, setType] = useState("questionnaire");
+  const [categorie, setCategorie] = useState("");
+  const [draftQuestions, setDraftQuestions] = useState([]);
+  const [qTexte, setQTexte] = useState("");
+  const [qType, setQType] = useState("texte");
+  const [qOptions, setQOptions] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  const [noteEntree, setNoteEntree] = useState("");
+  const [photoEntree, setPhotoEntree] = useState(null);
+  const [busyEntree, setBusyEntree] = useState(false);
+  const [resultatPublic, setResultatPublic] = useState("");
+  const fileRefEntree = useRef(null);
+
+  async function charger() {
+    const { data } = await supabase.from("enquetes").select("*").order("created_at", { ascending: false }).limit(100);
+    setListe(data || []);
+  }
+  useEffect(() => { charger(); }, []);
+
+  function ajouterQuestionDraft() {
+    if (!qTexte.trim()) return;
+    setDraftQuestions(prev => [...prev, {
+      texte: qTexte.trim(), type_reponse: qType,
+      options: (qType === "choix_unique" || qType === "choix_multiple") ? qOptions.split(",").map(o => o.trim()).filter(Boolean) : null,
+    }]);
+    setQTexte(""); setQOptions("");
+  }
+  function retirerQuestionDraft(i) { setDraftQuestions(prev => prev.filter((_, idx) => idx !== i)); }
+
+  async function creerEnquete() {
+    setErreur("");
+    if (!titre.trim()) { setErreur("Le titre est requis."); return; }
+    if (type !== "investigation" && draftQuestions.length === 0) { setErreur("Ajoute au moins une question pour un questionnaire."); return; }
+    setBusy(true);
+    const { data: enq, error } = await supabase.from("enquetes").insert({
+      titre: titre.trim(), description: description.trim() || null, type, categorie: categorie.trim() || null, cree_par: email,
+    }).select().single();
+    if (error || !enq) { setBusy(false); setErreur("Échec de la création : " + (error ? error.message : "erreur inconnue")); return; }
+    if (draftQuestions.length) {
+      await supabase.from("enquete_questions").insert(draftQuestions.map((q, i) => ({ enquete_id: enq.id, ordre: i, texte: q.texte, type_reponse: q.type_reponse, options: q.options })));
+    }
+    setBusy(false);
+    setShowCreer(false);
+    setTitre(""); setDescription(""); setCategorie(""); setType("questionnaire"); setDraftQuestions([]);
+    charger();
+  }
+
+  async function ouvrirGestion(enq) {
+    setSelection(enq);
+    setDetail(null);
+    setResultatPublic(enq.resultat_public || "");
+    const [{ data: questions }, { data: participations }, { data: entrees }] = await Promise.all([
+      supabase.from("enquete_questions").select("*").eq("enquete_id", enq.id).order("ordre", { ascending: true }),
+      supabase.from("enquete_participations").select("id, enquete_reponses(question_id, valeur)").eq("enquete_id", enq.id),
+      supabase.from("enquete_entrees").select("*").eq("enquete_id", enq.id).order("created_at", { ascending: false }),
+    ]);
+    setDetail({ questions: questions || [], participations: participations || [], entrees: entrees || [] });
+  }
+
+  function statsQuestion(q) {
+    const valeurs = [];
+    (detail.participations || []).forEach(p => {
+      const r = (p.enquete_reponses || []).find(x => x.question_id === q.id);
+      if (r && r.valeur) valeurs.push(r.valeur);
+    });
+    if (q.type_reponse === "texte") return { texte: valeurs };
+    const comptage = {};
+    valeurs.forEach(v => { v.split(", ").forEach(part => { comptage[part] = (comptage[part] || 0) + 1; }); });
+    return { comptage, total: valeurs.length };
+  }
+
+  async function choisirPhotoEntree(e) {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = async () => setPhotoEntree(await compressImage(reader.result, 900, 0.7));
+    reader.readAsDataURL(f);
+  }
+
+  async function ajouterEntree() {
+    if (!noteEntree.trim() || !selection) return;
+    setBusyEntree(true);
+    const photoUrl = photoEntree ? await uploadPhotoGeneric(photoEntree, "enquetes") : null;
+    await supabase.from("enquete_entrees").insert({ enquete_id: selection.id, auteur: email, contenu: noteEntree.trim(), photo_url: photoUrl });
+    setNoteEntree(""); setPhotoEntree(null);
+    setBusyEntree(false);
+    ouvrirGestion(selection);
+  }
+
+  async function enregistrerResultat() {
+    if (!selection) return;
+    await supabase.from("enquetes").update({ resultat_public: resultatPublic.trim() || null }).eq("id", selection.id);
+  }
+
+  async function cloturer() {
+    if (!selection) return;
+    if (!confirm("Clôturer cette enquête ? Le résultat public (si renseigné) devient visible par tous, et plus personne ne pourra y répondre.")) return;
+    await supabase.from("enquetes").update({ statut: "fermee", resultat_public: resultatPublic.trim() || null, cloturee_at: new Date().toISOString() }).eq("id", selection.id);
+    charger();
+    setSelection(null); setDetail(null);
+  }
+  async function reouvrir() {
+    if (!selection) return;
+    await supabase.from("enquetes").update({ statut: "ouverte", cloturee_at: null }).eq("id", selection.id);
+    charger();
+    ouvrirGestion({ ...selection, statut: "ouverte" });
+  }
+
+  const champ = { width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" };
+  const typeLabel = { questionnaire: "Questionnaire", investigation: "Investigation", mixte: "Questionnaire + investigation" };
+
+  // --- Vue gestion d'une enquête ---
+  if (selection && detail) {
+    return (
+      <div>
+        <button onClick={() => { setSelection(null); setDetail(null); }} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Enquêtes</button>
+        <SectionTitle sub={typeLabel[selection.type]}>{selection.titre}</SectionTitle>
+        <div style={{ fontSize: 11.5, color: selection.statut === "ouverte" ? "var(--c-accent-dark)" : "var(--c-text-muted)", marginBottom: 14 }}>
+          {selection.statut === "ouverte" ? "● En cours" : "● Clôturée"}
+        </div>
+
+        {selection.type !== "questionnaire" && (
+          <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Journal d'investigation ({detail.entrees.length})</div>
+            <input ref={fileRefEntree} type="file" accept="image/*" onChange={choisirPhotoEntree} style={{ display: "none" }} />
+            <textarea value={noteEntree} onChange={e => setNoteEntree(e.target.value)} rows={2} placeholder="Ajouter une note, une preuve, une avancée…" style={{ ...champ, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <button type="button" onClick={() => fileRefEntree.current && fileRefEntree.current.click()} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: photoEntree ? "var(--c-surface-soft)" : "none", fontSize: 11.5, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                <IconCamera size={13} /> {photoEntree ? "Photo jointe" : "Ajouter une photo"}
+              </button>
+              <button onClick={ajouterEntree} disabled={busyEntree || !noteEntree.trim()} style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer", opacity: busyEntree ? 0.7 : 1 }}>
+                {busyEntree ? "…" : "Ajouter au journal"}
+              </button>
+            </div>
+            {detail.entrees.map(en => (
+              <div key={en.id} style={{ borderTop: "1px solid var(--c-border)", padding: "8px 0", fontSize: 12 }}>
+                <div style={{ color: "var(--c-text-secondary)" }}>{en.contenu}</div>
+                {en.photo_url && <img src={en.photo_url} alt="" style={{ maxWidth: "100%", borderRadius: 8, marginTop: 6 }} />}
+                <div style={{ fontSize: 10, color: "var(--c-text-muted)", marginTop: 3 }}>{en.auteur} · {new Date(en.created_at).toLocaleString("fr-FR")}</div>
+              </div>
+            ))}
+
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Résultat public (visible à la clôture)</div>
+              <textarea value={resultatPublic} onChange={e => setResultatPublic(e.target.value)} rows={2} placeholder="Conclusion communicable à tous…" style={{ ...champ, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={enregistrerResultat} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", fontSize: 11.5, cursor: "pointer" }}>Enregistrer le brouillon</button>
+                {selection.statut === "ouverte"
+                  ? <button onClick={cloturer} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>Clôturer</button>
+                  : <button onClick={reouvrir} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>Rouvrir</button>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selection.type !== "investigation" && (
+          <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Réponses ({detail.participations.length} participation{detail.participations.length > 1 ? "s" : ""})</div>
+            {detail.questions.map(q => {
+              const s = statsQuestion(q);
+              return (
+                <div key={q.id} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>{q.texte}</div>
+                  {q.type_reponse === "texte" ? (
+                    s.texte.length === 0 ? <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Aucune réponse.</div> :
+                    s.texte.slice(0, 20).map((t, i) => <div key={i} style={{ fontSize: 11.5, color: "var(--c-text-secondary)", padding: "3px 0", borderTop: i > 0 ? "1px solid var(--c-border)" : "none" }}>« {t} »</div>)
+                  ) : Object.keys(s.comptage).length === 0 ? <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Aucune réponse.</div> : (
+                    Object.entries(s.comptage).map(([opt, n]) => (
+                      <div key={opt} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <div style={{ fontSize: 11, width: 90, flexShrink: 0, color: "var(--c-text-secondary)" }}>{opt}</div>
+                        <div style={{ flex: 1, height: 8, background: "var(--c-surface-soft)", borderRadius: 4, overflow: "hidden" }}>
+                          <div style={{ width: `${(n / s.total) * 100}%`, height: "100%", background: "var(--c-accent-dark)" }} />
+                        </div>
+                        <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", width: 20 }}>{n}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Vue liste ---
+  return (
+    <div>
+      <SectionTitle sub="Questionnaires citoyens et dossiers d'investigation, créés et suivis par l'équipe.">Enquêtes</SectionTitle>
+
+      {!showCreer ? (
+        <button onClick={() => setShowCreer(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "10px 14px", borderRadius: 12, border: "1px dashed var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 13, cursor: "pointer", margin: "14px 0" }}>
+          <IconPlus size={16} /> Créer une enquête
+        </button>
+      ) : (
+        <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--c-border)", margin: "14px 0" }}>
+          <input value={titre} onChange={e => setTitre(e.target.value)} placeholder="Titre de l'enquête" style={champ} />
+          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Description (optionnel)" style={{ ...champ, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+          <input value={categorie} onChange={e => setCategorie(e.target.value)} placeholder="Catégorie liée (optionnel, ex : pollution_eau)" style={champ} />
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            {[["questionnaire", "Questionnaire"], ["investigation", "Investigation"], ["mixte", "Les deux"]].map(([v, l]) => (
+              <button key={v} type="button" onClick={() => setType(v)} style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: `1px solid ${type === v ? "var(--c-accent-dark)" : "var(--c-border)"}`, background: type === v ? "var(--c-accent-dark)" : "none", color: type === v ? "#fff" : "var(--c-text)", fontSize: 11, cursor: "pointer" }}>{l}</button>
+            ))}
+          </div>
+
+          {type !== "investigation" && (
+            <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Questions ({draftQuestions.length})</div>
+              {draftQuestions.map((q, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, padding: "4px 0" }}>
+                  <span>{q.texte} <em style={{ color: "var(--c-text-muted)" }}>({q.type_reponse})</em></span>
+                  <button type="button" onClick={() => retirerQuestionDraft(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--c-text-muted)" }}><IconX size={13} /></button>
+                </div>
+              ))}
+              <input value={qTexte} onChange={e => setQTexte(e.target.value)} placeholder="Texte de la question" style={{ ...champ, marginTop: 6 }} />
+              <select value={qType} onChange={e => setQType(e.target.value)} style={{ ...champ, background: "var(--c-surface)" }}>
+                <option value="texte">Réponse libre</option>
+                <option value="oui_non">Oui / Non</option>
+                <option value="echelle">Échelle 1 à 5</option>
+                <option value="choix_unique">Choix unique</option>
+                <option value="choix_multiple">Choix multiple</option>
+              </select>
+              {(qType === "choix_unique" || qType === "choix_multiple") && (
+                <input value={qOptions} onChange={e => setQOptions(e.target.value)} placeholder="Options séparées par des virgules" style={champ} />
+              )}
+              <button type="button" onClick={ajouterQuestionDraft} style={{ width: "100%", padding: "7px 0", borderRadius: 8, border: "1px dashed var(--c-border)", background: "none", fontSize: 11.5, cursor: "pointer" }}>+ Ajouter cette question</button>
+            </div>
+          )}
+
+          {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>{erreur}</div>}
+          <button onClick={creerEnquete} disabled={busy} style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>
+            {busy ? "…" : "Créer l'enquête"}
+          </button>
+          <button onClick={() => setShowCreer(false)} style={{ width: "100%", padding: "6px 0", background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer", marginTop: 4 }}>Annuler</button>
+        </div>
+      )}
+
+      {liste === null ? (
+        <div style={{ fontSize: 12, color: "var(--c-text-muted)", textAlign: "center", padding: 16 }}>Chargement…</div>
+      ) : liste.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "var(--c-text-muted)", textAlign: "center", padding: 16 }}>Aucune enquête créée pour le moment.</div>
+      ) : (
+        <div className="pace-grid-cards">
+          {liste.map(e => (
+            <button key={e.id} onClick={() => ouvrirGestion(e)} style={{
+              textAlign: "left", background: "var(--c-surface)", borderRadius: 12, padding: 12, border: "1px solid var(--c-border)", cursor: "pointer" }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{e.titre}</div>
+              <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>{typeLabel[e.type]} · {e.statut === "ouverte" ? "en cours" : "clôturée"}</div>
+            </button>
+          ))}
         </div>
       )}
     </div>
@@ -12637,6 +13129,8 @@ function App() {
           <Evenements onBack={() => setTab("accueil")} />
         ) : tab === "groupes_terrain" ? (
           <GroupesTerrain onBack={() => setTab("accueil")} estBenevoleValide={estBenevoleValide} />
+        ) : tab === "enquetes" ? (
+          <Enquetes onBack={() => setTab("accueil")} />
         ) : (
           <div key={tab} className="pace-fade-in">
             {tab === "accueil" && <Accueil signalements={signalements.filter(s => s.device_id === DEVICE_ID)} arbres={arbres.filter(a => a.device_id === DEVICE_ID)} notifState={notifState} onEnableNotif={enableNotif} onOpenAdmin={() => { enterAdminIdentity(); setShowAdmin(true); }} actualites={actualites} onNavigate={setTab} lang={lang} estBenevoleValide={estBenevoleValide} benevoleStatut={benevoleStatut} onBenevoleInscrit={() => { setBenevoleStatut("en_attente"); try { localStorage.setItem("pace-benevole-statut", "en_attente"); } catch (e) {} }} estOrganisationValidee={estOrganisationValidee} organisationStatut={organisationStatut} organisationEtapeDossier={organisationEtapeDossier} organisationEtapeMotif={organisationEtapeMotif} onBasculerStatutSignalement={citoyenBasculerStatutSignalement} profilInfo={profilInfo} onProfilChange={rafraichirProfil} />}
@@ -12647,7 +13141,7 @@ function App() {
           </div>
         )}
 
-        {!showAdmin && !!profilInfo && !accesBloque && tab !== "biodiversite" && tab !== "confidentialite" && tab !== "assistant" && tab !== "espace_org" && tab !== "evenements" && tab !== "groupes_terrain" && (
+        {!showAdmin && !!profilInfo && !accesBloque && tab !== "biodiversite" && tab !== "confidentialite" && tab !== "assistant" && tab !== "espace_org" && tab !== "evenements" && tab !== "groupes_terrain" && tab !== "enquetes" && (
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "var(--c-surface)", borderTop: "1px solid var(--c-border)", display: "flex", padding: "8px 6px", borderRadius: "18px 18px 0 0", boxShadow: "0 -4px 16px rgba(0,0,0,0.04)" }}>
             {TABS.map(tabItem => {
               const IconT = tabItem.icon;
