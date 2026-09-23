@@ -2680,14 +2680,15 @@ function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpenAdmin,
       </div>
 
       <div style={{ marginBottom: 18 }}>
-        <button onClick={() => onNavigate("enquetes")} style={{
+        <button onClick={() => estBenevoleValide && onNavigate("enquetes_terrain")} disabled={!estBenevoleValide} style={{
           display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 8, padding: 14, borderRadius: 14,
-          border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", textAlign: "left", width: "100%" }}>
+          border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: estBenevoleValide ? "pointer" : "default", textAlign: "left", width: "100%",
+          opacity: estBenevoleValide ? 1 : 0.6 }}>
           <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 8 }}>
-            <IconSearch size={18} color="var(--c-accent)" />
+            {estBenevoleValide ? <IconSearch size={18} color="var(--c-accent)" /> : <IconLock size={18} color="var(--c-text-muted)" />}
           </div>
-          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--c-text)" }}>Enquêtes environnementales</div>
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)" }}>Réponds à des questionnaires citoyens et suis l'avancée des investigations en cours</div>
+          <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--c-text)" }}>Enquêtes terrain</div>
+          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)" }}>{estBenevoleValide ? "Formulaires confiés par les organisations auxquelles tu es affilié" : "Réservé aux bénévoles validés"}</div>
         </button>
       </div>
 
@@ -8362,22 +8363,12 @@ function GroupesTerrain({ onBack, estBenevoleValide }) {
   );
 }
 
-function Enquetes({ onBack }) {
-  const [liste, setListe] = useState(null);
-  const [selection, setSelection] = useState(null);
-  const [questions, setQuestions] = useState(null);
-  const [reponses, setReponses] = useState({});
-  const [dejaRepondu, setDejaRepondu] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("pace-enquetes-repondues") || "[]"); } catch (e) { return []; }
-  });
-  const [busy, setBusy] = useState(false);
-  const [erreur, setErreur] = useState("");
-  const [merci, setMerci] = useState(false);
-
-  // Formulaires "terrain" : ceux que les organisations auxquelles cet appareil est affilié comme
-  // bénévole lui ont confiés. Distincts du module citoyen classique — jamais auto-déclaratifs, et
-  // remplis à répétition (un bénévole interroge de nombreux citoyens successivement).
-  const [terrainListe, setTerrainListe] = useState([]);
+// Module dédié aux bénévoles : formulaires "terrain" que les organisations auxquelles ils sont
+// affiliés leur ont confiés (créés depuis OrgEnquetes, mode_collecte "terrain"). Distinct du
+// module citoyen supprimé — jamais auto-déclaratif, et rempli à répétition (un bénévole interroge
+// de nombreux citoyens successivement, une ligne de participation par interview).
+function EnquetesTerrain({ onBack }) {
+  const [terrainListe, setTerrainListe] = useState(null);
   const [terrainSelection, setTerrainSelection] = useState(null);
   const [terrainQuestions, setTerrainQuestions] = useState(null);
   const [terrainReponses, setTerrainReponses] = useState({});
@@ -8385,12 +8376,7 @@ function Enquetes({ onBack }) {
   const [terrainMerci, setTerrainMerci] = useState(false);
   const [terrainBusy, setTerrainBusy] = useState(false);
   const [terrainErreur, setTerrainErreur] = useState("");
-
-  async function charger() {
-    const { data } = await supabase.from("enquetes").select("*").eq("mode_collecte", "citoyen").order("created_at", { ascending: false }).limit(100);
-    setListe(data || []);
-  }
-  useEffect(() => { charger(); }, []);
+  const suggestionsRef = useRef({});
 
   useEffect(() => {
     (async () => {
@@ -8402,51 +8388,6 @@ function Enquetes({ onBack }) {
     })();
   }, []);
 
-  async function ouvrir(enq) {
-    setSelection(enq);
-    setReponses({});
-    setErreur("");
-    setMerci(false);
-    setQuestions(null);
-    if (enq.type !== "investigation") {
-      const { data } = await supabase.from("enquete_questions").select("*").eq("enquete_id", enq.id).order("ordre", { ascending: true });
-      setQuestions(data || []);
-    }
-  }
-
-  async function envoyerReponses() {
-    if (!selection) return;
-    setBusy(true);
-    setErreur("");
-    // Une ligne "participation" par personne et par enquête (contrainte unique côté base) : une
-    // deuxième tentative avec le même appareil échoue proprement plutôt que de dupliquer.
-    const { data: part, error: errPart } = await supabase.from("enquete_participations")
-      .insert({ enquete_id: selection.id, device_id: DEVICE_ID }).select().single();
-    if (errPart || !part) {
-      setBusy(false);
-      setErreur("Impossible d'enregistrer ta participation — tu as peut-être déjà répondu depuis cet appareil.");
-      return;
-    }
-    const lignes = Object.entries(reponses)
-      .filter(([, v]) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0))
-      .map(([question_id, valeur]) => ({ participation_id: part.id, question_id, valeur: Array.isArray(valeur) ? valeur.join(", ") : String(valeur) }));
-    if (lignes.length) await supabase.from("enquete_reponses").insert(lignes);
-    setBusy(false);
-    setMerci(true);
-    const maj = [...dejaRepondu, selection.id];
-    setDejaRepondu(maj);
-    try { localStorage.setItem("pace-enquetes-repondues", JSON.stringify(maj)); } catch (e) {}
-  }
-
-  function setReponse(qId, val) { setReponses(prev => ({ ...prev, [qId]: val })); }
-  function toggleChoixMultiple(qId, opt) {
-    setReponses(prev => {
-      const cur = Array.isArray(prev[qId]) ? prev[qId] : [];
-      return { ...prev, [qId]: cur.includes(opt) ? cur.filter(o => o !== opt) : [...cur, opt] };
-    });
-  }
-
-  // --- Interview terrain : le bénévole encode les réponses d'un citoyen qu'il vient d'interroger ---
   async function ouvrirTerrain(enq) {
     setTerrainSelection(enq);
     setTerrainReponses({});
@@ -8455,6 +8396,15 @@ function Enquetes({ onBack }) {
     setTerrainCompte(0);
     setTerrainQuestions(null);
     const { data } = await supabase.from("enquete_questions").select("*").eq("enquete_id", enq.id).order("ordre", { ascending: true });
+    // Une question "texte" peut porter une réponse suggérée par l'organisation (stockée dans
+    // options[0]) : on pré-remplit le champ avec, mais le bénévole reste libre de la corriger
+    // si le citoyen interrogé répond différemment.
+    const suggestions = {};
+    (data || []).forEach(q => {
+      if (q.type_reponse === "texte" && Array.isArray(q.options) && q.options[0]) suggestions[q.id] = q.options[0];
+    });
+    suggestionsRef.current = suggestions;
+    setTerrainReponses(suggestions);
     setTerrainQuestions(data || []);
   }
   function setReponseTerrain(qId, val) { setTerrainReponses(prev => ({ ...prev, [qId]: val })); }
@@ -8488,7 +8438,7 @@ function Enquetes({ onBack }) {
     setTerrainBusy(false);
     setTerrainCompte(c => c + 1);
     setTerrainMerci(true);
-    setTerrainReponses({});
+    setTerrainReponses(suggestionsRef.current);
   }
 
   const champBtn = (actif) => ({
@@ -8497,15 +8447,18 @@ function Enquetes({ onBack }) {
     fontSize: 12.5, cursor: "pointer", marginRight: 6, marginBottom: 6,
   });
 
-  // Rendu des champs de question, partagé entre le questionnaire auto-déclaratif et l'interview
-  // terrain — seules les fonctions de mise à jour de l'état diffèrent entre les deux.
   function ChampsQuestions({ liste, valeurs, onSet, onToggle }) {
     return liste.map(q => (
       <div key={q.id} style={{ marginBottom: 16 }}>
         <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{q.texte}</div>
         {q.type_reponse === "texte" && (
-          <textarea value={valeurs[q.id] || ""} onChange={e => onSet(q.id, e.target.value)} rows={3}
-            style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, boxSizing: "border-box", fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+          <div>
+            {Array.isArray(q.options) && q.options[0] && (
+              <div style={{ fontSize: 10.5, color: "var(--c-accent-dark)", marginBottom: 4 }}>Réponse suggérée — modifie-la si le citoyen répond autre chose</div>
+            )}
+            <textarea value={valeurs[q.id] || ""} onChange={e => onSet(q.id, e.target.value)} rows={3}
+              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, boxSizing: "border-box", fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+          </div>
         )}
         {q.type_reponse === "oui_non" && (
           <div>{["Oui", "Non"].map(opt => (
@@ -8531,11 +8484,10 @@ function Enquetes({ onBack }) {
     ));
   }
 
-  // --- Vue interview terrain (bénévole) ---
   if (terrainSelection) {
     return (
       <Screen>
-        <button onClick={() => setTerrainSelection(null)} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Enquêtes</button>
+        <button onClick={() => setTerrainSelection(null)} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Enquêtes terrain</button>
         <SectionTitle sub="Interview de terrain — à remplir avec le citoyen que tu interroges.">{terrainSelection.titre}</SectionTitle>
         {terrainCompte > 0 && (
           <div style={{ fontSize: 11.5, color: "var(--c-accent-dark)", fontWeight: 600, marginBottom: 12 }}>{terrainCompte} interview{terrainCompte > 1 ? "s" : ""} réalisée{terrainCompte > 1 ? "s" : ""} pour l'instant</div>
@@ -8563,109 +8515,27 @@ function Enquetes({ onBack }) {
     );
   }
 
-  // --- Vue détail d'une enquête (auto-déclaratif citoyen) ---
-  if (selection) {
-    const aDejaRepondu = dejaRepondu.includes(selection.id) || merci;
-    const questionnaireVisible = selection.type !== "investigation" && selection.statut === "ouverte" && !aDejaRepondu;
-    return (
-      <Screen>
-        <button onClick={() => setSelection(null)} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Enquêtes</button>
-        <SectionTitle sub={selection.categorie || (selection.type === "investigation" ? "Dossier d'investigation" : selection.type === "mixte" ? "Investigation + questionnaire" : "Questionnaire citoyen")}>{selection.titre}</SectionTitle>
-        {selection.description && <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.6, margin: "10px 0" }}>{selection.description}</div>}
-
-        {selection.type !== "questionnaire" && (
-          <div style={{ background: "var(--c-surface-soft)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12, marginBottom: 16 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12.5, fontWeight: 600, marginBottom: selection.statut === "fermee" ? 6 : 0 }}>
-              <IconSearch size={14} color="var(--c-accent-dark)" />
-              {selection.statut === "fermee" ? "Investigation clôturée" : "Investigation en cours"}
-            </div>
-            {selection.statut === "fermee" && (
-              <div style={{ fontSize: 12, color: "var(--c-text-secondary)", lineHeight: 1.6 }}>
-                {selection.resultat_public || "Cette investigation est close ; aucune conclusion publique n'a été publiée."}
-              </div>
-            )}
-          </div>
-        )}
-
-        {questionnaireVisible && (
-          <>
-            {questions === null ? (
-              <div style={{ fontSize: 12, color: "var(--c-text-muted)" }}>Chargement du questionnaire…</div>
-            ) : (
-              <div>
-                <ChampsQuestions liste={questions} valeurs={reponses} onSet={setReponse} onToggle={toggleChoixMultiple} />
-                {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 10 }}>{erreur}</div>}
-                <button onClick={envoyerReponses} disabled={busy} style={{ width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>
-                  {busy ? "Envoi…" : "Envoyer mes réponses"}
-                </button>
-              </div>
-            )}
-          </>
-        )}
-
-        {aDejaRepondu && selection.type !== "investigation" && (
-          <div className="pace-fade-in" style={{ textAlign: "center", padding: 16, color: "var(--c-accent-dark)", fontSize: 13, fontWeight: 600 }}>
-            <IconCheck size={18} /><br />Merci pour ta participation !
-          </div>
-        )}
-      </Screen>
-    );
-  }
-
-  // --- Vue liste ---
-  const ouvertes = (liste || []).filter(e => e.statut === "ouverte");
-  const fermees = (liste || []).filter(e => e.statut === "fermee");
-  const typeLabel = { questionnaire: "Questionnaire", investigation: "Investigation", mixte: "Questionnaire + investigation" };
-
-  function CarteEnquete({ e }) {
-    return (
-      <button onClick={() => ouvrir(e)} style={{
-        display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: 12, borderRadius: 12,
-        border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", textAlign: "left", width: "100%", marginBottom: 8 }}>
-        <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)" }}>{e.titre}</div>
-        <div style={{ fontSize: 10.5, color: "var(--c-text-muted)" }}>{typeLabel[e.type]}{dejaRepondu.includes(e.id) ? " · déjà répondu" : ""}</div>
-      </button>
-    );
-  }
-
   return (
     <Screen>
       <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Retour</button>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 8 }}><IconSearch size={17} color="var(--c-accent)" /></div>
-        <SectionTitle sub="Questionnaires citoyens et suivi d'investigations en cours.">Enquêtes environnementales</SectionTitle>
+        <SectionTitle sub="Formulaires confiés par les organisations auxquelles tu es affilié comme bénévole.">Enquêtes terrain</SectionTitle>
       </div>
 
-      {terrainListe.length > 0 && (
-        <div style={{ marginBottom: 18 }}>
-          <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 8 }}>Enquêtes terrain à réaliser ({terrainListe.length})</div>
-          {terrainListe.map(e => (
-            <button key={e.id} onClick={() => ouvrirTerrain(e)} style={{
-              display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: 12, borderRadius: 12,
-              border: "1px solid var(--c-accent-dark)", background: "var(--c-surface-soft)", cursor: "pointer", textAlign: "left", width: "100%", marginBottom: 8 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)" }}>{e.titre}</div>
-              <div style={{ fontSize: 10.5, color: "var(--c-accent-dark)" }}>À réaliser sur le terrain, auprès des citoyens</div>
-            </button>
-          ))}
-        </div>
-      )}
-
-      {liste === null ? (
+      {terrainListe === null ? (
         <div style={{ fontSize: 12, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Chargement…</div>
-      ) : liste.length === 0 ? (
-        terrainListe.length === 0 && <div style={{ fontSize: 12.5, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Aucune enquête pour le moment.</div>
+      ) : terrainListe.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Aucune enquête terrain à réaliser pour le moment.</div>
       ) : (
-        <>
-          <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>En cours ({ouvertes.length})</div>
-          {ouvertes.length === 0 && <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginBottom: 12 }}>Aucune enquête en cours.</div>}
-          {ouvertes.map(e => <CarteEnquete key={e.id} e={e} />)}
-          {fermees.length > 0 && (
-            <>
-              <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-text-secondary)", margin: "14px 0 8px" }}>Clôturées ({fermees.length})</div>
-              {fermees.map(e => <CarteEnquete key={e.id} e={e} />)}
-            </>
-          )}
-        </>
+        terrainListe.map(e => (
+          <button key={e.id} onClick={() => ouvrirTerrain(e)} style={{
+            display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: 12, borderRadius: 12,
+            border: "1px solid var(--c-accent-dark)", background: "var(--c-surface-soft)", cursor: "pointer", textAlign: "left", width: "100%", marginBottom: 8 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)" }}>{e.titre}</div>
+            <div style={{ fontSize: 10.5, color: "var(--c-accent-dark)" }}>À réaliser sur le terrain, auprès des citoyens</div>
+          </button>
+        ))
       )}
     </Screen>
   );
@@ -10864,6 +10734,7 @@ function OrgEnquetes({ organisationId, email }) {
   const [qTexte, setQTexte] = useState("");
   const [qType, setQType] = useState("texte");
   const [qOptions, setQOptions] = useState("");
+  const [qReponseSuggeree, setQReponseSuggeree] = useState("");
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState("");
 
@@ -10899,7 +10770,7 @@ function OrgEnquetes({ organisationId, email }) {
     await Promise.all(benevolesOrg.map(b => supabase.from("notifications").insert({
       destinataire: b.device_id,
       message: `Nouveau formulaire d'enquête terrain à réaliser : « ${enq.titre} »`,
-      lien: "enquetes",
+      lien: "enquetes_terrain",
     })));
     setBusyPartage(false);
     setPartageMsg(`Formulaire partagé à ${benevolesOrg.length} bénévole${benevolesOrg.length > 1 ? "s" : ""} affilié${benevolesOrg.length > 1 ? "s" : ""}.`);
@@ -10907,11 +10778,15 @@ function OrgEnquetes({ organisationId, email }) {
 
   function ajouterQuestionDraft() {
     if (!qTexte.trim()) return;
-    setDraftQuestions(prev => [...prev, {
-      texte: qTexte.trim(), type_reponse: qType,
-      options: (qType === "choix_unique" || qType === "choix_multiple") ? qOptions.split(",").map(o => o.trim()).filter(Boolean) : null,
-    }]);
-    setQTexte(""); setQOptions("");
+    // "options" sert de conteneur générique par question : liste de choix pour choix_unique/multiple,
+    // ou — nouveauté — tableau à un seul élément portant la réponse suggérée par l'organisation pour
+    // une question en texte libre (accélère l'interview et limite les mauvaises interprétations côté
+    // bénévole, qui peut toujours la corriger si le citoyen répond différemment).
+    const options = (qType === "choix_unique" || qType === "choix_multiple")
+      ? qOptions.split(",").map(o => o.trim()).filter(Boolean)
+      : (qType === "texte" && qReponseSuggeree.trim() ? [qReponseSuggeree.trim()] : null);
+    setDraftQuestions(prev => [...prev, { texte: qTexte.trim(), type_reponse: qType, options }]);
+    setQTexte(""); setQOptions(""); setQReponseSuggeree("");
   }
   function retirerQuestionDraft(i) { setDraftQuestions(prev => prev.filter((_, idx) => idx !== i)); }
 
@@ -11141,7 +11016,7 @@ function OrgEnquetes({ organisationId, email }) {
               <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Questions ({draftQuestions.length})</div>
               {draftQuestions.map((q, i) => (
                 <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, padding: "4px 0" }}>
-                  <span>{q.texte} <em style={{ color: "var(--c-text-muted)" }}>({q.type_reponse})</em></span>
+                  <span>{q.texte} <em style={{ color: "var(--c-text-muted)" }}>({q.type_reponse}{q.type_reponse === "texte" && q.options && q.options[0] ? ` — suggestion : « ${q.options[0]} »` : ""})</em></span>
                   <button type="button" onClick={() => retirerQuestionDraft(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--c-text-muted)" }}><IconX size={13} /></button>
                 </div>
               ))}
@@ -11155,6 +11030,12 @@ function OrgEnquetes({ organisationId, email }) {
               </select>
               {(qType === "choix_unique" || qType === "choix_multiple") && (
                 <input value={qOptions} onChange={e => setQOptions(e.target.value)} placeholder="Options séparées par des virgules" style={champ} />
+              )}
+              {qType === "texte" && (
+                <div style={{ marginBottom: 8 }}>
+                  <input value={qReponseSuggeree} onChange={e => setQReponseSuggeree(e.target.value)} placeholder="Réponse suggérée (optionnel)" style={{ ...champ, marginBottom: 4 }} />
+                  <div style={{ fontSize: 10.5, color: "var(--c-text-muted)" }}>Si tu connais la réponse la plus probable, écris-la ici : le bénévole la verra déjà remplie pendant l'interview et n'aura qu'à la corriger si besoin — l'enquête va plus vite et les réponses sont plus précises.</div>
+                </div>
               )}
               <button type="button" onClick={ajouterQuestionDraft} style={{ width: "100%", padding: "7px 0", borderRadius: 8, border: "1px dashed var(--c-border)", background: "none", fontSize: 11.5, cursor: "pointer" }}>+ Ajouter cette question</button>
             </div>
@@ -11496,6 +11377,80 @@ function ExportRow({ label, count, getRows, columns, filenamePrefix, title }) {
   );
 }
 
+// Permet au Centre d'EcoVigil de consulter, pour n'importe quelle organisation, le même rapport
+// exportable (signalements de son domaine) que celle-ci voit dans son propre Espace Organisation —
+// même logique de filtrage par défis/codesDomaine que EspaceOrganisation.charger(), dupliquée ici
+// car calculée localement à partir de l'organisation choisie plutôt que de la session connectée.
+function AdminRapportOrganisation() {
+  const [organisations, setOrganisations] = useState(null);
+  const [orgId, setOrgId] = useState("");
+  const [chargement, setChargement] = useState(false);
+  const [rapport, setRapport] = useState(null); // { org, rows }
+
+  useEffect(() => {
+    supabase.from("organisations").select("id, nom, type, defis, statut").eq("is_deleted", false).order("nom", { ascending: true })
+      .then(({ data }) => setOrganisations(data || []));
+  }, []);
+
+  async function chargerRapport(id) {
+    setOrgId(id);
+    setRapport(null);
+    if (!id || !organisations) return;
+    const orgData = organisations.find(o => o.id === id);
+    if (!orgData) return;
+    setChargement(true);
+    const { data: problemes } = await supabase.from("env_problemes").select("code, defi_id");
+    const codesDomaine = (problemes || []).filter(p => (orgData.defis || []).includes(p.defi_id)).map(p => p.code);
+    let sigs = [];
+    if (codesDomaine.length > 0) {
+      let requete = supabase.from("signalements").select("*").in("categorie", codesDomaine).eq("is_deleted", false).order("created_at", { ascending: false }).limit(300);
+      if (orgData.type !== "gouvernement") {
+        const { data: mesB } = await supabase.from("benevoles").select("id").eq("organisation_id", orgData.id).eq("is_deleted", false);
+        const ids = (mesB || []).map(b => b.id);
+        requete = ids.length > 0 ? requete.in("benevole_id", ids) : null;
+      }
+      if (requete) { const { data } = await requete; sigs = data || []; }
+    }
+    setRapport({ org: orgData, rows: sigs });
+    setChargement(false);
+  }
+
+  const colonnes = [
+    { key: "id", label: "ID" }, { key: "categorie", label: "Catégorie" }, { key: "urgence", label: "Urgence" },
+    { key: "statut", label: "Statut" }, { key: "description", label: "Description" },
+    { key: "lat", label: "Latitude" }, { key: "lng", label: "Longitude" }, { key: "date", label: "Date" },
+    { key: "benevole_nom", label: "Bénévole — Nom" }, { key: "benevole_contact", label: "Bénévole — Contact" },
+    { key: "benevole_pays", label: "Bénévole — Pays" }, { key: "benevole_ville", label: "Bénévole — Ville" },
+    { key: "benevole_quartier", label: "Bénévole — Quartier" },
+  ];
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Rapports par organisation</div>
+      <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 10 }}>
+        Même rapport (signalements de son domaine) que celui que l'organisation exporte depuis son propre espace.
+      </div>
+      <select value={orgId} onChange={e => chargerRapport(e.target.value)} style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 10, background: "var(--c-surface)" }}>
+        <option value="">Sélectionner une organisation…</option>
+        {(organisations || []).map(o => (
+          <option key={o.id} value={o.id}>{o.nom} ({o.type === "gouvernement" ? "Gouvernement" : "ONG"}{o.statut !== "valide" ? " — non validée" : ""})</option>
+        ))}
+      </select>
+      {chargement && <div style={{ fontSize: 12, color: "var(--c-text-muted)", textAlign: "center", padding: 10 }}>Chargement…</div>}
+      {rapport && (
+        <ExportRow
+          label={`Signalements du domaine de ${rapport.org.nom}`}
+          count={rapport.rows.length}
+          columns={colonnes}
+          filenamePrefix={`pace-${rapport.org.type}-${(rapport.org.nom || "org").replace(/\s+/g, "-")}`}
+          title={`Rapport ${rapport.org.nom}`}
+          getRows={() => rapport.rows.map(s => ({ ...s, date: new Date(s.created_at).toLocaleDateString("fr-FR") }))}
+        />
+      )}
+    </div>
+  );
+}
+
 function AdminRapports({ signalements, arbres, isSuperAdmin, centreVerrouille, onToggleCentre }) {
   const [benevolesCount, setBenevolesCount] = useState(null);
 
@@ -11545,6 +11500,8 @@ function AdminRapports({ signalements, arbres, isSuperAdmin, centreVerrouille, o
         getRows={() => arbres} />
       <ExportRow label="Bénévoles" count={benevolesCount === null ? 0 : benevolesCount} columns={colonnesBenevoles} filenamePrefix="pace-benevoles" title="Rapport EcoVigil — Bénévoles"
         getRows={async () => { const { data } = await supabase.from("benevoles").select("*").eq("is_deleted", false).order("created_at", { ascending: false }); return data || []; }} />
+
+      <AdminRapportOrganisation />
 
       <AdminEquipe isSuperAdmin={isSuperAdmin} centreVerrouille={centreVerrouille} onToggleCentre={onToggleCentre} />
     </div>
@@ -13592,8 +13549,8 @@ function App() {
           <Evenements onBack={() => setTab("accueil")} />
         ) : tab === "groupes_terrain" ? (
           <GroupesTerrain onBack={() => setTab("accueil")} estBenevoleValide={estBenevoleValide} />
-        ) : tab === "enquetes" ? (
-          <Enquetes onBack={() => setTab("accueil")} />
+        ) : tab === "enquetes_terrain" ? (
+          <EnquetesTerrain onBack={() => setTab("accueil")} />
         ) : (
           <div key={tab} className="pace-fade-in">
             {tab === "accueil" && <Accueil signalements={signalements.filter(s => s.device_id === DEVICE_ID)} arbres={arbres.filter(a => a.device_id === DEVICE_ID)} notifState={notifState} onEnableNotif={enableNotif} onOpenAdmin={() => { enterAdminIdentity(); setShowAdmin(true); }} actualites={actualites} onNavigate={setTab} lang={lang} estBenevoleValide={estBenevoleValide} benevoleStatut={benevoleStatut} onBenevoleInscrit={() => { setBenevoleStatut("en_attente"); try { localStorage.setItem("pace-benevole-statut", "en_attente"); } catch (e) {} }} estOrganisationValidee={estOrganisationValidee} organisationStatut={organisationStatut} organisationEtapeDossier={organisationEtapeDossier} organisationEtapeMotif={organisationEtapeMotif} onBasculerStatutSignalement={citoyenBasculerStatutSignalement} profilInfo={profilInfo} onProfilChange={rafraichirProfil} />}
@@ -13604,7 +13561,7 @@ function App() {
           </div>
         )}
 
-        {!showAdmin && !!profilInfo && !accesBloque && tab !== "biodiversite" && tab !== "confidentialite" && tab !== "assistant" && tab !== "espace_org" && tab !== "evenements" && tab !== "groupes_terrain" && tab !== "enquetes" && (
+        {!showAdmin && !!profilInfo && !accesBloque && tab !== "biodiversite" && tab !== "confidentialite" && tab !== "assistant" && tab !== "espace_org" && tab !== "evenements" && tab !== "groupes_terrain" && tab !== "enquetes_terrain" && (
           <div style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "var(--c-surface)", borderTop: "1px solid var(--c-border)", display: "flex", padding: "8px 6px", borderRadius: "18px 18px 0 0", boxShadow: "0 -4px 16px rgba(0,0,0,0.04)" }}>
             {TABS.map(tabItem => {
               const IconT = tabItem.icon;
