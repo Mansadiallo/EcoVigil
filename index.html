@@ -7869,6 +7869,10 @@ function EspaceOrganisation({ organisationEmail, organisationUserId, onBack, coo
       <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Rapport de votre organisation</div>
       <ExportRow label="Signalements de votre domaine" count={rowsExport.length} columns={colonnes} filenamePrefix={`pace-${org.type}-${(org.nom || "org").replace(/\s+/g, "-")}`} title={`Rapport ${org.nom}`} getRows={() => rowsExport} />
 
+      <div style={{ margin: "20px 0" }}>
+        <OrgEnquetes organisationId={org.id} email={organisationEmail} />
+      </div>
+
       <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)", margin: "20px 0 10px" }}>Publier une actualité officielle</div>
       <form onSubmit={publierActualite} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 14 }}>
         <input required value={titreActu} onChange={e => setTitreActu(e.target.value)} placeholder="Titre"
@@ -8370,11 +8374,33 @@ function Enquetes({ onBack }) {
   const [erreur, setErreur] = useState("");
   const [merci, setMerci] = useState(false);
 
+  // Formulaires "terrain" : ceux que les organisations auxquelles cet appareil est affilié comme
+  // bénévole lui ont confiés. Distincts du module citoyen classique — jamais auto-déclaratifs, et
+  // remplis à répétition (un bénévole interroge de nombreux citoyens successivement).
+  const [terrainListe, setTerrainListe] = useState([]);
+  const [terrainSelection, setTerrainSelection] = useState(null);
+  const [terrainQuestions, setTerrainQuestions] = useState(null);
+  const [terrainReponses, setTerrainReponses] = useState({});
+  const [terrainCompte, setTerrainCompte] = useState(0);
+  const [terrainMerci, setTerrainMerci] = useState(false);
+  const [terrainBusy, setTerrainBusy] = useState(false);
+  const [terrainErreur, setTerrainErreur] = useState("");
+
   async function charger() {
-    const { data } = await supabase.from("enquetes").select("*").order("created_at", { ascending: false }).limit(100);
+    const { data } = await supabase.from("enquetes").select("*").eq("mode_collecte", "citoyen").order("created_at", { ascending: false }).limit(100);
     setListe(data || []);
   }
   useEffect(() => { charger(); }, []);
+
+  useEffect(() => {
+    (async () => {
+      const { data: mesAffiliations } = await supabase.from("benevoles").select("organisation_id").eq("device_id", DEVICE_ID).eq("is_deleted", false).not("organisation_id", "is", null);
+      const orgIds = [...new Set((mesAffiliations || []).map(b => b.organisation_id))];
+      if (orgIds.length === 0) { setTerrainListe([]); return; }
+      const { data } = await supabase.from("enquetes").select("*").eq("mode_collecte", "terrain").eq("statut", "ouverte").in("organisation_id", orgIds).order("created_at", { ascending: false });
+      setTerrainListe(data || []);
+    })();
+  }, []);
 
   async function ouvrir(enq) {
     setSelection(enq);
@@ -8420,13 +8446,124 @@ function Enquetes({ onBack }) {
     });
   }
 
+  // --- Interview terrain : le bénévole encode les réponses d'un citoyen qu'il vient d'interroger ---
+  async function ouvrirTerrain(enq) {
+    setTerrainSelection(enq);
+    setTerrainReponses({});
+    setTerrainErreur("");
+    setTerrainMerci(false);
+    setTerrainCompte(0);
+    setTerrainQuestions(null);
+    const { data } = await supabase.from("enquete_questions").select("*").eq("enquete_id", enq.id).order("ordre", { ascending: true });
+    setTerrainQuestions(data || []);
+  }
+  function setReponseTerrain(qId, val) { setTerrainReponses(prev => ({ ...prev, [qId]: val })); }
+  function toggleChoixMultipleTerrain(qId, opt) {
+    setTerrainReponses(prev => {
+      const cur = Array.isArray(prev[qId]) ? prev[qId] : [];
+      return { ...prev, [qId]: cur.includes(opt) ? cur.filter(o => o !== opt) : [...cur, opt] };
+    });
+  }
+  async function envoyerInterviewTerrain() {
+    if (!terrainSelection) return;
+    setTerrainBusy(true);
+    setTerrainErreur("");
+    // Le bénévole réalise de nombreuses interviews depuis le même appareil : la contrainte
+    // d'unicité (une participation par appareil et par enquête) est faite pour le mode citoyen
+    // auto-déclaratif, pas pour ça. On donne donc à chaque interview un identifiant synthétique
+    // propre, tout en traçant le véritable appareil du bénévole via benevole_device_id — c'est ce
+    // qui permet à l'organisation de voir la contribution de chacun de ses bénévoles.
+    const idInterview = `${DEVICE_ID}-terrain-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`;
+    const { data: part, error: errPart } = await supabase.from("enquete_participations")
+      .insert({ enquete_id: terrainSelection.id, device_id: idInterview, benevole_device_id: DEVICE_ID }).select().single();
+    if (errPart || !part) {
+      setTerrainBusy(false);
+      setTerrainErreur("Impossible d'enregistrer cette interview. Réessaie.");
+      return;
+    }
+    const lignes = Object.entries(terrainReponses)
+      .filter(([, v]) => v !== undefined && v !== "" && !(Array.isArray(v) && v.length === 0))
+      .map(([question_id, valeur]) => ({ participation_id: part.id, question_id, valeur: Array.isArray(valeur) ? valeur.join(", ") : String(valeur) }));
+    if (lignes.length) await supabase.from("enquete_reponses").insert(lignes);
+    setTerrainBusy(false);
+    setTerrainCompte(c => c + 1);
+    setTerrainMerci(true);
+    setTerrainReponses({});
+  }
+
   const champBtn = (actif) => ({
     padding: "8px 12px", borderRadius: 10, border: `1px solid ${actif ? "var(--c-accent-dark)" : "var(--c-border)"}`,
     background: actif ? "var(--c-accent-dark)" : "var(--c-surface)", color: actif ? "#fff" : "var(--c-text)",
     fontSize: 12.5, cursor: "pointer", marginRight: 6, marginBottom: 6,
   });
 
-  // --- Vue détail d'une enquête ---
+  // Rendu des champs de question, partagé entre le questionnaire auto-déclaratif et l'interview
+  // terrain — seules les fonctions de mise à jour de l'état diffèrent entre les deux.
+  function ChampsQuestions({ liste, valeurs, onSet, onToggle }) {
+    return liste.map(q => (
+      <div key={q.id} style={{ marginBottom: 16 }}>
+        <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{q.texte}</div>
+        {q.type_reponse === "texte" && (
+          <textarea value={valeurs[q.id] || ""} onChange={e => onSet(q.id, e.target.value)} rows={3}
+            style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, boxSizing: "border-box", fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+        )}
+        {q.type_reponse === "oui_non" && (
+          <div>{["Oui", "Non"].map(opt => (
+            <button key={opt} type="button" onClick={() => onSet(q.id, opt)} style={champBtn(valeurs[q.id] === opt)}>{opt}</button>
+          ))}</div>
+        )}
+        {q.type_reponse === "echelle" && (
+          <div>{[1, 2, 3, 4, 5].map(n => (
+            <button key={n} type="button" onClick={() => onSet(q.id, n)} style={champBtn(valeurs[q.id] === n)}>{n}</button>
+          ))}</div>
+        )}
+        {q.type_reponse === "choix_unique" && (
+          <div>{(q.options || []).map(opt => (
+            <button key={opt} type="button" onClick={() => onSet(q.id, opt)} style={champBtn(valeurs[q.id] === opt)}>{opt}</button>
+          ))}</div>
+        )}
+        {q.type_reponse === "choix_multiple" && (
+          <div>{(q.options || []).map(opt => (
+            <button key={opt} type="button" onClick={() => onToggle(q.id, opt)} style={champBtn(Array.isArray(valeurs[q.id]) && valeurs[q.id].includes(opt))}>{opt}</button>
+          ))}</div>
+        )}
+      </div>
+    ));
+  }
+
+  // --- Vue interview terrain (bénévole) ---
+  if (terrainSelection) {
+    return (
+      <Screen>
+        <button onClick={() => setTerrainSelection(null)} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Enquêtes</button>
+        <SectionTitle sub="Interview de terrain — à remplir avec le citoyen que tu interroges.">{terrainSelection.titre}</SectionTitle>
+        {terrainCompte > 0 && (
+          <div style={{ fontSize: 11.5, color: "var(--c-accent-dark)", fontWeight: 600, marginBottom: 12 }}>{terrainCompte} interview{terrainCompte > 1 ? "s" : ""} réalisée{terrainCompte > 1 ? "s" : ""} pour l'instant</div>
+        )}
+        {terrainMerci ? (
+          <div className="pace-fade-in" style={{ textAlign: "center", padding: 20 }}>
+            <IconCheck size={20} color="var(--c-accent-dark)" />
+            <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--c-accent-dark)", margin: "8px 0 16px" }}>Interview enregistrée !</div>
+            <button onClick={() => setTerrainMerci(false)} style={{ width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer" }}>
+              Interroger un(e) autre citoyen(ne)
+            </button>
+          </div>
+        ) : terrainQuestions === null ? (
+          <div style={{ fontSize: 12, color: "var(--c-text-muted)" }}>Chargement du questionnaire…</div>
+        ) : (
+          <div>
+            <ChampsQuestions liste={terrainQuestions} valeurs={terrainReponses} onSet={setReponseTerrain} onToggle={toggleChoixMultipleTerrain} />
+            {terrainErreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 10 }}>{terrainErreur}</div>}
+            <button onClick={envoyerInterviewTerrain} disabled={terrainBusy} style={{ width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", opacity: terrainBusy ? 0.7 : 1 }}>
+              {terrainBusy ? "Envoi…" : "Enregistrer cette interview"}
+            </button>
+          </div>
+        )}
+      </Screen>
+    );
+  }
+
+  // --- Vue détail d'une enquête (auto-déclaratif citoyen) ---
   if (selection) {
     const aDejaRepondu = dejaRepondu.includes(selection.id) || merci;
     const questionnaireVisible = selection.type !== "investigation" && selection.statut === "ouverte" && !aDejaRepondu;
@@ -8456,43 +8593,7 @@ function Enquetes({ onBack }) {
               <div style={{ fontSize: 12, color: "var(--c-text-muted)" }}>Chargement du questionnaire…</div>
             ) : (
               <div>
-                {questions.map(q => (
-                  <div key={q.id} style={{ marginBottom: 16 }}>
-                    <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>{q.texte}</div>
-                    {q.type_reponse === "texte" && (
-                      <textarea value={reponses[q.id] || ""} onChange={e => setReponse(q.id, e.target.value)} rows={3}
-                        style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, boxSizing: "border-box", fontFamily: "Work Sans, sans-serif", resize: "none" }} />
-                    )}
-                    {q.type_reponse === "oui_non" && (
-                      <div>
-                        {["Oui", "Non"].map(opt => (
-                          <button key={opt} type="button" onClick={() => setReponse(q.id, opt)} style={champBtn(reponses[q.id] === opt)}>{opt}</button>
-                        ))}
-                      </div>
-                    )}
-                    {q.type_reponse === "echelle" && (
-                      <div>
-                        {[1, 2, 3, 4, 5].map(n => (
-                          <button key={n} type="button" onClick={() => setReponse(q.id, n)} style={champBtn(reponses[q.id] === n)}>{n}</button>
-                        ))}
-                      </div>
-                    )}
-                    {q.type_reponse === "choix_unique" && (
-                      <div>
-                        {(q.options || []).map(opt => (
-                          <button key={opt} type="button" onClick={() => setReponse(q.id, opt)} style={champBtn(reponses[q.id] === opt)}>{opt}</button>
-                        ))}
-                      </div>
-                    )}
-                    {q.type_reponse === "choix_multiple" && (
-                      <div>
-                        {(q.options || []).map(opt => (
-                          <button key={opt} type="button" onClick={() => toggleChoixMultiple(q.id, opt)} style={champBtn(Array.isArray(reponses[q.id]) && reponses[q.id].includes(opt))}>{opt}</button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+                <ChampsQuestions liste={questions} valeurs={reponses} onSet={setReponse} onToggle={toggleChoixMultiple} />
                 {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 10 }}>{erreur}</div>}
                 <button onClick={envoyerReponses} disabled={busy} style={{ width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>
                   {busy ? "Envoi…" : "Envoyer mes réponses"}
@@ -8535,10 +8636,24 @@ function Enquetes({ onBack }) {
         <SectionTitle sub="Questionnaires citoyens et suivi d'investigations en cours.">Enquêtes environnementales</SectionTitle>
       </div>
 
+      {terrainListe.length > 0 && (
+        <div style={{ marginBottom: 18 }}>
+          <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 8 }}>Enquêtes terrain à réaliser ({terrainListe.length})</div>
+          {terrainListe.map(e => (
+            <button key={e.id} onClick={() => ouvrirTerrain(e)} style={{
+              display: "flex", flexDirection: "column", alignItems: "flex-start", gap: 4, padding: 12, borderRadius: 12,
+              border: "1px solid var(--c-accent-dark)", background: "var(--c-surface-soft)", cursor: "pointer", textAlign: "left", width: "100%", marginBottom: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)" }}>{e.titre}</div>
+              <div style={{ fontSize: 10.5, color: "var(--c-accent-dark)" }}>À réaliser sur le terrain, auprès des citoyens</div>
+            </button>
+          ))}
+        </div>
+      )}
+
       {liste === null ? (
         <div style={{ fontSize: 12, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Chargement…</div>
       ) : liste.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Aucune enquête pour le moment.</div>
+        terrainListe.length === 0 && <div style={{ fontSize: 12.5, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Aucune enquête pour le moment.</div>
       ) : (
         <>
           <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>En cours ({ouvertes.length})</div>
@@ -10719,6 +10834,354 @@ function AdminEnquetes({ session }) {
               textAlign: "left", background: "var(--c-surface)", borderRadius: 12, padding: 12, border: "1px solid var(--c-border)", cursor: "pointer" }}>
               <div style={{ fontWeight: 600, fontSize: 13 }}>{e.titre}</div>
               <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>{typeLabel[e.type]} · {e.statut === "ouverte" ? "en cours" : "clôturée"}</div>
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// Version "Espace Organisation" du module Enquêtes : même logique de création/gestion que côté
+// admin (AdminEnquetes), mais strictement scopée à l'organisation courante — elle ne voit et ne
+// gère que les enquêtes qu'elle a elle-même créées (organisation_id = son propre id), jamais
+// celles créées par l'équipe EcoVigil ni par une autre organisation. S'appuie sur la colonne
+// enquetes.organisation_id et les policies RLS existantes (déjà en place côté base), qui
+// autorisent déjà une organisation validée à créer/lire/modifier ses propres enquêtes, questions,
+// entrées de journal et réponses.
+function OrgEnquetes({ organisationId, email }) {
+  const [liste, setListe] = useState(null);
+  const [selection, setSelection] = useState(null);
+  const [detail, setDetail] = useState(null);
+
+  const [showCreer, setShowCreer] = useState(false);
+  const [titre, setTitre] = useState("");
+  const [description, setDescription] = useState("");
+  const [type, setType] = useState("questionnaire");
+  const [modeCollecte, setModeCollecte] = useState("terrain");
+  const [categorie, setCategorie] = useState("");
+  const [draftQuestions, setDraftQuestions] = useState([]);
+  const [qTexte, setQTexte] = useState("");
+  const [qType, setQType] = useState("texte");
+  const [qOptions, setQOptions] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [erreur, setErreur] = useState("");
+
+  const [noteEntree, setNoteEntree] = useState("");
+  const [photoEntree, setPhotoEntree] = useState(null);
+  const [busyEntree, setBusyEntree] = useState(false);
+  const [resultatPublic, setResultatPublic] = useState("");
+  const fileRefEntree = useRef(null);
+
+  const [benevolesOrg, setBenevolesOrg] = useState([]);
+  const [partageMsg, setPartageMsg] = useState("");
+  const [busyPartage, setBusyPartage] = useState(false);
+
+  async function charger() {
+    if (!organisationId) return;
+    const { data } = await supabase.from("enquetes").select("*").eq("organisation_id", organisationId).order("created_at", { ascending: false }).limit(100);
+    setListe(data || []);
+  }
+  useEffect(() => { charger(); }, [organisationId]);
+
+  // Bénévoles affiliés (assignés) à l'organisation — sert à la fois pour le partage du
+  // formulaire et pour afficher qui a réalisé quelles interviews dans les statistiques.
+  useEffect(() => {
+    if (!organisationId) return;
+    supabase.from("benevoles").select("device_id, nom").eq("organisation_id", organisationId).eq("is_deleted", false)
+      .then(({ data }) => setBenevolesOrg((data || []).filter(b => b.device_id)));
+  }, [organisationId]);
+
+  async function partagerAuxBenevoles(enq) {
+    if (benevolesOrg.length === 0) { setPartageMsg("Aucun bénévole affilié pour le moment — assigne d'abord des bénévoles à ton organisation."); return; }
+    setBusyPartage(true);
+    setPartageMsg("");
+    await Promise.all(benevolesOrg.map(b => supabase.from("notifications").insert({
+      destinataire: b.device_id,
+      message: `Nouveau formulaire d'enquête terrain à réaliser : « ${enq.titre} »`,
+      lien: "enquetes",
+    })));
+    setBusyPartage(false);
+    setPartageMsg(`Formulaire partagé à ${benevolesOrg.length} bénévole${benevolesOrg.length > 1 ? "s" : ""} affilié${benevolesOrg.length > 1 ? "s" : ""}.`);
+  }
+
+  function ajouterQuestionDraft() {
+    if (!qTexte.trim()) return;
+    setDraftQuestions(prev => [...prev, {
+      texte: qTexte.trim(), type_reponse: qType,
+      options: (qType === "choix_unique" || qType === "choix_multiple") ? qOptions.split(",").map(o => o.trim()).filter(Boolean) : null,
+    }]);
+    setQTexte(""); setQOptions("");
+  }
+  function retirerQuestionDraft(i) { setDraftQuestions(prev => prev.filter((_, idx) => idx !== i)); }
+
+  async function creerEnquete() {
+    setErreur("");
+    if (!titre.trim()) { setErreur("Le titre est requis."); return; }
+    if (type !== "investigation" && draftQuestions.length === 0) { setErreur("Ajoute au moins une question pour un questionnaire."); return; }
+    setBusy(true);
+    const { data: enq, error } = await supabase.from("enquetes").insert({
+      titre: titre.trim(), description: description.trim() || null, type, categorie: categorie.trim() || null, cree_par: email, organisation_id: organisationId,
+      mode_collecte: type === "investigation" ? "citoyen" : modeCollecte,
+    }).select().single();
+    if (error || !enq) { setBusy(false); setErreur("Échec de la création : " + (error ? error.message : "erreur inconnue")); return; }
+    if (draftQuestions.length) {
+      await supabase.from("enquete_questions").insert(draftQuestions.map((q, i) => ({ enquete_id: enq.id, ordre: i, texte: q.texte, type_reponse: q.type_reponse, options: q.options })));
+    }
+    setBusy(false);
+    setShowCreer(false);
+    setTitre(""); setDescription(""); setCategorie(""); setType("questionnaire"); setModeCollecte("terrain"); setDraftQuestions([]);
+    charger();
+  }
+
+  async function ouvrirGestion(enq) {
+    setSelection(enq);
+    setDetail(null);
+    setResultatPublic(enq.resultat_public || "");
+    const [{ data: questions }, { data: participations }, { data: entrees }] = await Promise.all([
+      supabase.from("enquete_questions").select("*").eq("enquete_id", enq.id).order("ordre", { ascending: true }),
+      supabase.from("enquete_participations").select("id, benevole_device_id, enquete_reponses(question_id, valeur)").eq("enquete_id", enq.id),
+      supabase.from("enquete_entrees").select("*").eq("enquete_id", enq.id).order("created_at", { ascending: false }),
+    ]);
+    setDetail({ questions: questions || [], participations: participations || [], entrees: entrees || [] });
+  }
+
+  function statsQuestion(q) {
+    const valeurs = [];
+    (detail.participations || []).forEach(p => {
+      const r = (p.enquete_reponses || []).find(x => x.question_id === q.id);
+      if (r && r.valeur) valeurs.push(r.valeur);
+    });
+    if (q.type_reponse === "texte") return { texte: valeurs };
+    const comptage = {};
+    valeurs.forEach(v => { v.split(", ").forEach(part => { comptage[part] = (comptage[part] || 0) + 1; }); });
+    return { comptage, total: valeurs.length };
+  }
+
+  async function choisirPhotoEntree(e) {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = "";
+    if (!f) return;
+    const reader = new FileReader();
+    reader.onload = async () => setPhotoEntree(await compressImage(reader.result, 900, 0.7));
+    reader.readAsDataURL(f);
+  }
+
+  async function ajouterEntree() {
+    if (!noteEntree.trim() || !selection) return;
+    setBusyEntree(true);
+    const photoUrl = photoEntree ? await uploadPhotoGeneric(photoEntree, "enquetes") : null;
+    await supabase.from("enquete_entrees").insert({ enquete_id: selection.id, auteur: email, contenu: noteEntree.trim(), photo_url: photoUrl });
+    setNoteEntree(""); setPhotoEntree(null);
+    setBusyEntree(false);
+    ouvrirGestion(selection);
+  }
+
+  async function enregistrerResultat() {
+    if (!selection) return;
+    await supabase.from("enquetes").update({ resultat_public: resultatPublic.trim() || null }).eq("id", selection.id);
+  }
+
+  async function cloturer() {
+    if (!selection) return;
+    if (!confirm("Clôturer cette enquête ? Le résultat public (si renseigné) devient visible par tous, et plus personne ne pourra y répondre.")) return;
+    await supabase.from("enquetes").update({ statut: "fermee", resultat_public: resultatPublic.trim() || null, cloturee_at: new Date().toISOString() }).eq("id", selection.id);
+    charger();
+    setSelection(null); setDetail(null);
+  }
+  async function reouvrir() {
+    if (!selection) return;
+    await supabase.from("enquetes").update({ statut: "ouverte", cloturee_at: null }).eq("id", selection.id);
+    charger();
+    ouvrirGestion({ ...selection, statut: "ouverte" });
+  }
+
+  const champ = { width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" };
+  const typeLabel = { questionnaire: "Questionnaire", investigation: "Investigation", mixte: "Questionnaire + investigation" };
+
+  // --- Vue gestion d'une enquête ---
+  if (selection && detail) {
+    return (
+      <div>
+        <button onClick={() => { setSelection(null); setDetail(null); }} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Enquêtes</button>
+        <SectionTitle sub={typeLabel[selection.type]}>{selection.titre}</SectionTitle>
+        <div style={{ fontSize: 11.5, color: selection.statut === "ouverte" ? "var(--c-accent-dark)" : "var(--c-text-muted)", marginBottom: 14 }}>
+          {selection.statut === "ouverte" ? "● En cours" : "● Clôturée"}
+        </div>
+
+        {selection.mode_collecte === "terrain" && selection.statut === "ouverte" && (
+          <div style={{ background: "var(--c-surface-soft)", borderRadius: 12, padding: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Partager ce formulaire</div>
+            <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 8 }}>
+              Envoie une notification à tes {benevolesOrg.length} bénévole{benevolesOrg.length > 1 ? "s" : ""} affilié{benevolesOrg.length > 1 ? "s" : ""} pour qu'ils commencent à réaliser des interviews sur le terrain.
+            </div>
+            <button onClick={() => partagerAuxBenevoles(selection)} disabled={busyPartage} style={{ width: "100%", padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 12, cursor: "pointer", opacity: busyPartage ? 0.7 : 1 }}>
+              {busyPartage ? "Envoi…" : "Partager aux bénévoles affiliés"}
+            </button>
+            {partageMsg && <div style={{ fontSize: 11, color: "var(--c-text-secondary)", marginTop: 6 }}>{partageMsg}</div>}
+          </div>
+        )}
+
+        {selection.type !== "questionnaire" && (
+          <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12, marginBottom: 16 }}>
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Journal d'investigation ({detail.entrees.length})</div>
+            <input ref={fileRefEntree} type="file" accept="image/*" onChange={choisirPhotoEntree} style={{ display: "none" }} />
+            <textarea value={noteEntree} onChange={e => setNoteEntree(e.target.value)} rows={2} placeholder="Ajouter une note, une preuve, une avancée…" style={{ ...champ, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+            <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+              <button type="button" onClick={() => fileRefEntree.current && fileRefEntree.current.click()} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: photoEntree ? "var(--c-surface-soft)" : "none", fontSize: 11.5, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+                <IconCamera size={13} /> {photoEntree ? "Photo jointe" : "Ajouter une photo"}
+              </button>
+              <button onClick={ajouterEntree} disabled={busyEntree || !noteEntree.trim()} style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer", opacity: busyEntree ? 0.7 : 1 }}>
+                {busyEntree ? "…" : "Ajouter au journal"}
+              </button>
+            </div>
+            {detail.entrees.map(en => (
+              <div key={en.id} style={{ borderTop: "1px solid var(--c-border)", padding: "8px 0", fontSize: 12 }}>
+                <div style={{ color: "var(--c-text-secondary)" }}>{en.contenu}</div>
+                {en.photo_url && <img src={en.photo_url} alt="" style={{ maxWidth: "100%", borderRadius: 8, marginTop: 6 }} />}
+                <div style={{ fontSize: 10, color: "var(--c-text-muted)", marginTop: 3 }}>{en.auteur} · {new Date(en.created_at).toLocaleString("fr-FR")}</div>
+              </div>
+            ))}
+
+            <div style={{ marginTop: 14 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Résultat public (visible à la clôture)</div>
+              <textarea value={resultatPublic} onChange={e => setResultatPublic(e.target.value)} rows={2} placeholder="Conclusion communicable à tous…" style={{ ...champ, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={enregistrerResultat} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", fontSize: 11.5, cursor: "pointer" }}>Enregistrer le brouillon</button>
+                {selection.statut === "ouverte"
+                  ? <button onClick={cloturer} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>Clôturer</button>
+                  : <button onClick={reouvrir} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>Rouvrir</button>}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {selection.type !== "investigation" && (
+          <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12 }}>
+            {selection.mode_collecte === "terrain" && detail.participations.length > 0 && (
+              <div style={{ marginBottom: 14, paddingBottom: 12, borderBottom: "1px solid var(--c-border)" }}>
+                <div style={{ fontSize: 11.5, fontWeight: 600, marginBottom: 6, color: "var(--c-text-secondary)" }}>Par bénévole</div>
+                {Object.entries(detail.participations.reduce((acc, p) => {
+                  const nomBenevole = (benevolesOrg.find(b => b.device_id === p.benevole_device_id) || {}).nom || "Bénévole non identifié";
+                  acc[nomBenevole] = (acc[nomBenevole] || 0) + 1;
+                  return acc;
+                }, {})).map(([nom, n]) => (
+                  <div key={nom} style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "var(--c-text-secondary)", padding: "2px 0" }}>
+                    <span>{nom}</span><span>{n} interview{n > 1 ? "s" : ""}</span>
+                  </div>
+                ))}
+              </div>
+            )}
+            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Réponses ({detail.participations.length} participation{detail.participations.length > 1 ? "s" : ""})</div>
+            {detail.questions.map(q => {
+              const s = statsQuestion(q);
+              return (
+                <div key={q.id} style={{ marginBottom: 14 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>{q.texte}</div>
+                  {q.type_reponse === "texte" ? (
+                    s.texte.length === 0 ? <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Aucune réponse.</div> :
+                    s.texte.slice(0, 20).map((t, i) => <div key={i} style={{ fontSize: 11.5, color: "var(--c-text-secondary)", padding: "3px 0", borderTop: i > 0 ? "1px solid var(--c-border)" : "none" }}>« {t} »</div>)
+                  ) : Object.keys(s.comptage).length === 0 ? <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Aucune réponse.</div> : (
+                    Object.entries(s.comptage).map(([opt, n]) => (
+                      <div key={opt} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
+                        <div style={{ fontSize: 11, width: 90, flexShrink: 0, color: "var(--c-text-secondary)" }}>{opt}</div>
+                        <div style={{ flex: 1, height: 8, background: "var(--c-surface-soft)", borderRadius: 4, overflow: "hidden" }}>
+                          <div style={{ width: `${(n / s.total) * 100}%`, height: "100%", background: "var(--c-accent-dark)" }} />
+                        </div>
+                        <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", width: 20 }}>{n}</div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // --- Vue liste ---
+  return (
+    <div>
+      <SectionTitle sub="Vos questionnaires citoyens et dossiers d'investigation, créés et gérés par votre organisation — visibles uniquement par vous.">Enquêtes de votre organisation</SectionTitle>
+
+      {!showCreer ? (
+        <button onClick={() => setShowCreer(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "10px 14px", borderRadius: 12, border: "1px dashed var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 13, cursor: "pointer", margin: "14px 0" }}>
+          <IconPlus size={16} /> Créer une enquête
+        </button>
+      ) : (
+        <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--c-border)", margin: "14px 0" }}>
+          <input value={titre} onChange={e => setTitre(e.target.value)} placeholder="Titre de l'enquête" style={champ} />
+          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Description (optionnel)" style={{ ...champ, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+          <input value={categorie} onChange={e => setCategorie(e.target.value)} placeholder="Catégorie liée (optionnel, ex : pollution_eau)" style={champ} />
+          <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
+            {[["questionnaire", "Questionnaire"], ["investigation", "Investigation"], ["mixte", "Les deux"]].map(([v, l]) => (
+              <button key={v} type="button" onClick={() => setType(v)} style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: `1px solid ${type === v ? "var(--c-accent-dark)" : "var(--c-border)"}`, background: type === v ? "var(--c-accent-dark)" : "none", color: type === v ? "#fff" : "var(--c-text)", fontSize: 11, cursor: "pointer" }}>{l}</button>
+            ))}
+          </div>
+
+          {type !== "investigation" && (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Qui remplit le formulaire ?</div>
+              <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
+                <button type="button" onClick={() => setModeCollecte("terrain")} style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: `1px solid ${modeCollecte === "terrain" ? "var(--c-accent-dark)" : "var(--c-border)"}`, background: modeCollecte === "terrain" ? "var(--c-accent-dark)" : "none", color: modeCollecte === "terrain" ? "#fff" : "var(--c-text)", fontSize: 11, cursor: "pointer" }}>Vos bénévoles, sur le terrain</button>
+                <button type="button" onClick={() => setModeCollecte("citoyen")} style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: `1px solid ${modeCollecte === "citoyen" ? "var(--c-accent-dark)" : "var(--c-border)"}`, background: modeCollecte === "citoyen" ? "var(--c-accent-dark)" : "none", color: modeCollecte === "citoyen" ? "#fff" : "var(--c-text)", fontSize: 11, cursor: "pointer" }}>Les citoyens eux-mêmes</button>
+              </div>
+              <div style={{ fontSize: 11, color: "var(--c-text-muted)", lineHeight: 1.5 }}>
+                {modeCollecte === "terrain"
+                  ? "Vos bénévoles affiliés remplissent ce formulaire en interrogeant des citoyens sur le terrain — une fois par personne interrogée. Invisible dans le module Enquêtes public."
+                  : "Le formulaire apparaît dans le module Enquêtes public ; chaque citoyen y répond lui-même une seule fois depuis son appareil."}
+              </div>
+            </div>
+          )}
+
+          {type !== "investigation" && (
+            <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 10, marginBottom: 10 }}>
+              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Questions ({draftQuestions.length})</div>
+              {draftQuestions.map((q, i) => (
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, padding: "4px 0" }}>
+                  <span>{q.texte} <em style={{ color: "var(--c-text-muted)" }}>({q.type_reponse})</em></span>
+                  <button type="button" onClick={() => retirerQuestionDraft(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--c-text-muted)" }}><IconX size={13} /></button>
+                </div>
+              ))}
+              <input value={qTexte} onChange={e => setQTexte(e.target.value)} placeholder="Texte de la question" style={{ ...champ, marginTop: 6 }} />
+              <select value={qType} onChange={e => setQType(e.target.value)} style={{ ...champ, background: "var(--c-surface)" }}>
+                <option value="texte">Réponse libre</option>
+                <option value="oui_non">Oui / Non</option>
+                <option value="echelle">Échelle 1 à 5</option>
+                <option value="choix_unique">Choix unique</option>
+                <option value="choix_multiple">Choix multiple</option>
+              </select>
+              {(qType === "choix_unique" || qType === "choix_multiple") && (
+                <input value={qOptions} onChange={e => setQOptions(e.target.value)} placeholder="Options séparées par des virgules" style={champ} />
+              )}
+              <button type="button" onClick={ajouterQuestionDraft} style={{ width: "100%", padding: "7px 0", borderRadius: 8, border: "1px dashed var(--c-border)", background: "none", fontSize: 11.5, cursor: "pointer" }}>+ Ajouter cette question</button>
+            </div>
+          )}
+
+          {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>{erreur}</div>}
+          <button onClick={creerEnquete} disabled={busy} style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>
+            {busy ? "…" : "Créer l'enquête"}
+          </button>
+          <button onClick={() => setShowCreer(false)} style={{ width: "100%", padding: "6px 0", background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer", marginTop: 4 }}>Annuler</button>
+        </div>
+      )}
+
+      {liste === null ? (
+        <div style={{ fontSize: 12, color: "var(--c-text-muted)", textAlign: "center", padding: 16 }}>Chargement…</div>
+      ) : liste.length === 0 ? (
+        <div style={{ fontSize: 12.5, color: "var(--c-text-muted)", textAlign: "center", padding: 16 }}>Aucune enquête créée pour le moment.</div>
+      ) : (
+        <div className="pace-grid-cards">
+          {liste.map(e => (
+            <button key={e.id} onClick={() => ouvrirGestion(e)} style={{
+              textAlign: "left", background: "var(--c-surface)", borderRadius: 12, padding: 12, border: "1px solid var(--c-border)", cursor: "pointer" }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{e.titre}</div>
+              <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>{typeLabel[e.type]} · {e.statut === "ouverte" ? "en cours" : "clôturée"}</div>
+              {e.mode_collecte === "terrain" && (
+                <div style={{ fontSize: 10, color: "var(--c-accent-dark)", marginTop: 3, fontWeight: 600 }}>Rempli par vos bénévoles</div>
+              )}
             </button>
           ))}
         </div>
