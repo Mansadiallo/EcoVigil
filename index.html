@@ -2602,6 +2602,15 @@ function ExemplesProblemesCarousel({ lang, onNavigate, accesEtendu }) {
   );
 }
 
+// Bascule entre l'espace bénévole et l'espace organisation (visible si les deux sont disponibles)
+function EspaceSwitch({ actif, onBenevole, onOrganisation }) {
+  const b = (id, lab, fn) => <button type="button" onClick={actif === id ? undefined : fn} aria-pressed={actif === id}
+    style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", cursor: actif === id ? "default" : "pointer", fontSize: 13, fontWeight: 600,
+      background: actif === id ? "var(--c-accent-dark)" : "transparent", color: actif === id ? "#fff" : "var(--c-text)" }}>{lab}</button>;
+  return <div role="group" aria-label="Changer d'espace" style={{ display: "flex", gap: 4, padding: 4, background: "var(--c-surface-soft)", border: "1px solid var(--c-border-soft)", borderRadius: 14, marginBottom: 14 }}>
+    {b("benevole", "Espace bénévole", onBenevole)}{b("organisation", "Espace organisation", onOrganisation)}</div>;
+}
+
 function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpenAdmin, actualites, onNavigate, lang, estBenevoleValide, benevoleStatut, onBenevoleInscrit, estOrganisationValidee, organisationStatut, organisationEtapeDossier, organisationEtapeMotif, onBasculerStatutSignalement, profilInfo, onProfilChange }) {
   const resolus = signalements.filter(s => s.statut === "resolu").length;
   const co2 = arbres.reduce((sum, a) => sum + co2EstimeParArbre(a), 0);
@@ -2609,6 +2618,7 @@ function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpenAdmin,
   return (
     <Screen>
       <SectionTitle sub={t(lang, "sub_accueil")}>{t(lang, "title_accueil")}</SectionTitle>
+      {estBenevoleValide && estOrganisationValidee && <EspaceSwitch actif="benevole" onBenevole={() => {}} onOrganisation={() => onNavigate("espace_org")} />}
 
       {notifState === "default" && (
         <button onClick={onEnableNotif} style={{
@@ -2636,10 +2646,10 @@ function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpenAdmin,
           </div>
         </div>
       )}
-      {!accesEtendu && <VolunteerCard lang={lang} benevoleStatut={benevoleStatut} onInscrit={onBenevoleInscrit} profilInfo={profilInfo} onProfilChange={onProfilChange} />}
-      {!accesEtendu && <OrganisationCard lang={lang} organisationStatut={organisationStatut} organisationEtapeDossier={organisationEtapeDossier} organisationEtapeMotif={organisationEtapeMotif} profilInfo={profilInfo} onProfilChange={onProfilChange} />}
+      {!estBenevoleValide && <VolunteerCard lang={lang} benevoleStatut={benevoleStatut} onInscrit={onBenevoleInscrit} profilInfo={profilInfo} onProfilChange={onProfilChange} />}
+      {!estOrganisationValidee && <OrganisationCard lang={lang} organisationStatut={organisationStatut} organisationEtapeDossier={organisationEtapeDossier} organisationEtapeMotif={organisationEtapeMotif} profilInfo={profilInfo} onProfilChange={onProfilChange} />}
 
-      {estOrganisationValidee && (
+      {estOrganisationValidee && !estBenevoleValide && (
         <button onClick={() => onNavigate("espace_org")} style={{
           display: "flex", alignItems: "center", gap: 10, width: "100%", textAlign: "left",
           background: "linear-gradient(120deg,var(--c-accent-dark),var(--c-accent))", border: "none", borderRadius: 14, padding: "13px 14px",
@@ -6700,7 +6710,7 @@ function ZoneReboisementMap({ points, superficieAffichee, hauteur = 210 }) {
   return <div ref={containerRef} style={{ width: "100%", height: hauteur, borderRadius: 12, overflow: "hidden", border: "1px solid var(--c-border)", marginBottom: 10 }} />;
 }
 
-function EspaceOrganisation({ organisationEmail, organisationUserId, onBack, coordFormat }) {
+function EspaceOrganisation({ organisationEmail, organisationUserId, onBack, coordFormat, peutBasculerBenevole }) {
   const [org, setOrg] = useState(null);
   const [signalements, setSignalements] = useState(null);
   const [defisNoms, setDefisNoms] = useState({});
@@ -7251,6 +7261,7 @@ function EspaceOrganisation({ organisationEmail, organisationUserId, onBack, coo
 
   return (
     <Screen>
+      {peutBasculerBenevole && <EspaceSwitch actif="organisation" onBenevole={onBack} onOrganisation={() => {}} />}
       <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 4 }}>
         <button onClick={onBack} style={{ padding: 8, borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer" }}><IconChevronLeft size={16} /></button>
         <SectionTitle sub={org.type === "ong" ? "Espace ONG" : "Espace Gouvernement"}>{org.nom}</SectionTitle>
@@ -8522,6 +8533,8 @@ function EnquetesTerrain({ onBack }) {
         <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 8 }}><IconSearch size={17} color="var(--c-accent)" /></div>
         <SectionTitle sub="Formulaires confiés par les organisations auxquelles tu es affilié comme bénévole.">Enquêtes terrain</SectionTitle>
       </div>
+
+      <EnquetesStandard email="" organisationId={null} source="benevole" deviceId={DEVICE_ID} />
 
       {terrainListe === null ? (
         <div style={{ fontSize: 12, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Chargement…</div>
@@ -10443,6 +10456,347 @@ function PreuveItem({ preuve, onStatuer, busy }) {
   );
 }
 
+// ===== Enquête environnementale standard (dossiers) — s'ajoute au constructeur libre, ne le remplace pas =====
+const ENQ_TYPES = [["decharge","Décharge sauvage"],["deforestation","Déforestation"],["mine","Exploitation minière illégale"],["deversement","Déversement polluant"],["pollution","Pollution des cours d'eau"],["dechets_dangereux","Déchets médicaux ou dangereux"],["assechement","Assèchement d'un point d'eau"],["erosion","Érosion / dégradation des sols"],["pollution_air","Pollution atmosphérique"],["pollution_sonore","Pollution sonore"],["autre","Autre"]];
+const ENQ_IMPACTS = ["Eau","Sol","Air","Végétation","Faune","Agriculture","Santé publique","Habitations / infrastructures","Activités économiques","Autre"];
+const ENQ_ACTIONS = ["Aucune","Sensibilisation","Signalement","Intervention","Mise en sécurité","Autre"];
+const ENQ_NIVEAUX = [["faible","Faible"],["modere","Modéré"],["important","Important"],["critique","Critique"],["a_determiner","À déterminer"]];
+const ENQ_NATURES = [["observe","Observé"],["declare","Déclaré par un tiers"],["suppose","Supposé"],["a_verifier","À vérifier"]];
+const ENQ_STATUTS = { brouillon: "Brouillon", en_cours: "En cours", terminee: "Terminée", verifiee: "Vérifiée" };
+const ENQ_ETAPES = ["Identification", "Localisation", "Constat", "Impacts & acteurs", "Preuves", "Niveau & actions", "Aperçu"];
+const ENQ_PREUVES = [["photo","Photo"],["video","Vidéo"],["document","Document"],["temoignage","Témoignage"],["releve_gps","Relevé GPS"],["mesure","Mesure"],["materiel","Matériel utilisé"]];
+
+// Carte cliquable : toucher la carte place ou corrige la position du constat
+function PositionPicker({ lat, lng, onPick }) {
+  const el = useRef(null), map = useRef(null), mk = useRef(null), cb = useRef(onPick); cb.current = onPick;
+  useEffect(() => {
+    if (!el.current || !window.L) return;
+    const ok = lat !== "" && lng !== "" && !isNaN(Number(lat)) && !isNaN(Number(lng));
+    map.current = L.map(el.current, { maxZoom: 19 }).setView(ok ? [Number(lat), Number(lng)] : [9.5, -12], ok ? 16 : 6);
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", { maxZoom: 19, attribution: "© OpenStreetMap" }).addTo(map.current);
+    map.current.on("click", ev => cb.current(ev.latlng.lat.toFixed(6), ev.latlng.lng.toFixed(6)));
+    setTimeout(() => map.current && map.current.invalidateSize(), 200);
+    return () => { map.current && map.current.remove(); map.current = null; mk.current = null; };
+  }, []);
+  useEffect(() => {
+    if (!map.current || lat === "" || lng === "" || isNaN(Number(lat)) || isNaN(Number(lng))) return;
+    const pt = [Number(lat), Number(lng)];
+    if (mk.current) mk.current.setLatLng(pt); else mk.current = L.circleMarker(pt, { radius: 9, color: "#fff", weight: 2, fillColor: "#B5451B", fillOpacity: 1 }).addTo(map.current);
+    map.current.setView(pt, Math.max(map.current.getZoom(), 15));
+  }, [lat, lng]);
+  return <div ref={el} style={{ width: "100%", height: 240, borderRadius: 10, border: "1px solid var(--c-border)", marginBottom: 6 }} />;
+}
+
+function EnquetesStandard({ email, organisationId, source, deviceId }) {
+  const [liste, setListe] = useState(null);
+  const [dossier, setDossier] = useState(null);
+  const [ouvert, setOuvert] = useState(false);
+  const [d, setD] = useState({});
+  const [f, setF] = useState({ titre: "", categorie: "", profil_enqueteur: "", lat: "", lng: "", precision_gps_m: "", niveau_constat: "a_determiner", statut: "brouillon" });
+  const [etape, setEtape] = useState(0);
+  const [preuves, setPreuves] = useState([]);
+  const [np, setNp] = useState({ type: "photo", description: "", nature: "observe", fichier: null });
+  const [sync, setSync] = useState("");
+  const [erreur, setErreur] = useState("");
+  const [busy, setBusy] = useState(false);
+  const latest = useRef({}); latest.current = { d, f, dossier };
+  const saving = useRef(false);
+  const cle = "ecovigil_dossier_draft_" + email;
+
+  const champStyle = { width: "100%", padding: 12, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 14, marginBottom: 10, boxSizing: "border-box", background: "var(--c-surface)", color: "var(--c-text)", fontFamily: "Work Sans, sans-serif" };
+  const label = { fontSize: 12, fontWeight: 600, marginBottom: 4, display: "block" };
+  const btn = (bg) => ({ flex: 1, padding: "12px 0", borderRadius: 10, border: bg ? "none" : "1px solid var(--c-border)", background: bg || "none", color: bg ? "#fff" : "var(--c-text)", fontWeight: 600, fontSize: 13.5, cursor: "pointer" });
+
+  async function charger() {
+    if (deviceId) { const r = await supabase.rpc("benevole_dossiers_assignes", { p_device: deviceId }); setListe(r.data || []); return; }
+    const { data } = await supabase.from("enquete_dossiers").select("id, numero, titre, statut, created_at").order("created_at", { ascending: false }).limit(50);
+    setListe(data || []);
+  }
+  useEffect(() => { charger(); }, []);
+
+  // Sauvegarde : copie locale immédiate (connexion instable), puis synchronisation dès que possible
+  async function sauver() {
+    const { d: dd, f: ff, dossier: dos } = latest.current;
+    try { localStorage.setItem(cle, JSON.stringify({ d: dd, f: ff, id: dos ? dos.id : null })); } catch (e) {}
+    if (saving.current || !ff.titre.trim() || (deviceId && !dos)) return;
+    saving.current = true;
+    const num = (v) => (v === "" || v == null || isNaN(Number(v)) ? null : Number(v));
+    const cols = { titre: ff.titre.trim(), categorie: ff.categorie || null, profil_enqueteur: ff.profil_enqueteur || null, enqueteur: email,
+      lat: num(ff.lat), lng: num(ff.lng), precision_gps_m: num(ff.precision_gps_m), niveau_constat: ff.niveau_constat, statut: ff.statut, donnees: dd };
+    try {
+      let res;
+      if (deviceId) { res = await supabase.rpc("benevole_dossier_maj", { p_device: deviceId, p_dossier: dos.id, p_donnees: dd, p_lat: cols.lat, p_lng: cols.lng, p_precision: cols.precision_gps_m, p_niveau: cols.niveau_constat, p_statut: cols.statut }).single(); if (!res.error) setDossier(res.data); }
+      else if (dos) res = await supabase.from("enquete_dossiers").update(cols).eq("id", dos.id).select().single();
+      else res = await supabase.from("enquete_dossiers").insert({ ...cols, statut: "brouillon", source, organisation_id: organisationId || null, cree_par: email }).select().single();
+      if (res.error) throw res.error;
+      if (!dos) setDossier(res.data);
+      setSync("Enregistré ✓");
+    } catch (e) { setSync(navigator.onLine ? "Erreur : " + (e.message || "sauvegarde") : "Hors ligne — brouillon conservé sur l'appareil"); }
+    saving.current = false;
+  }
+  useEffect(() => { if (!ouvert) return; const t = setTimeout(sauver, 1500); return () => clearTimeout(t); }, [d, f, ouvert]);
+  useEffect(() => { const h = () => { if (latest.current.dossier || latest.current.f.titre) sauver(); }; window.addEventListener("online", h); return () => window.removeEventListener("online", h); }, []);
+
+  function nouveau() {
+    setDossier(null); setPreuves([]); setEtape(0); setErreur(""); setSync("");
+    setD({ date_heure: new Date().toISOString().slice(0, 16) });
+    setF({ titre: "", categorie: "", profil_enqueteur: "", lat: "", lng: "", precision_gps_m: "", niveau_constat: "a_determiner", statut: "brouillon" });
+    setOuvert(true);
+  }
+  async function ouvrir(id) {
+    const data = deviceId ? (liste || []).find(x => x.id === id) : (await supabase.from("enquete_dossiers").select("*").eq("id", id).single()).data;
+    if (!data) return;
+    const { data: pr } = deviceId ? await supabase.rpc("benevole_dossier_preuves", { p_device: deviceId, p_dossier: id })
+      : await supabase.from("enquete_dossier_preuves").select("*").eq("dossier_id", id).order("created_at");
+    setDossier(data); setD(data.donnees || {}); setPreuves(pr || []); setEtape(0); setErreur(""); setSync("");
+    setF({ titre: data.titre, categorie: data.categorie || "", profil_enqueteur: data.profil_enqueteur || "", lat: data.lat ?? "", lng: data.lng ?? "", precision_gps_m: data.precision_gps_m ?? "", niveau_constat: data.niveau_constat, statut: data.statut });
+    setOuvert(true);
+  }
+  function reprendreLocal() {
+    try { const s = JSON.parse(localStorage.getItem(cle)); if (s) { setDossier(null); setD(s.d || {}); setF(s.f); setPreuves([]); setEtape(0); setOuvert(true); } } catch (e) {}
+  }
+
+  const val = (k) => (d[k] && d[k].valeur !== undefined ? d[k].valeur : (typeof d[k] === "string" ? d[k] : ""));
+  const setVal = (k, v) => setD(p => ({ ...p, [k]: { ...(p[k] && typeof p[k] === "object" ? p[k] : {}), valeur: v, nature: (p[k] && p[k].nature) || "observe" } }));
+  const setNature = (k, n) => setD(p => ({ ...p, [k]: { ...(p[k] || {}), nature: n } }));
+  const setSimple = (k, v) => setD(p => ({ ...p, [k]: v }));
+  const champ = (k, lab, rows, avecNature) => (
+    <div key={k}>
+      <label style={label}>{lab}</label>
+      {rows ? <textarea value={val(k)} onChange={e => setVal(k, e.target.value)} rows={rows} style={{ ...champStyle, resize: "vertical" }} />
+            : <input value={val(k)} onChange={e => setVal(k, e.target.value)} style={champStyle} />}
+      {avecNature && <select value={(d[k] && d[k].nature) || "observe"} onChange={e => setNature(k, e.target.value)} style={{ ...champStyle, padding: 8, fontSize: 12, marginTop: -4 }}>
+        {ENQ_NATURES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}
+    </div>
+  );
+  const multi = (k, options) => {
+    const cur = d[k] || [];
+    return <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>{options.map(o => {
+      const on = cur.includes(o);
+      return <button key={o} type="button" onClick={() => setSimple(k, on ? cur.filter(x => x !== o) : [...cur, o])}
+        style={{ padding: "10px 12px", borderRadius: 20, border: `1px solid ${on ? "var(--c-accent-dark)" : "var(--c-border)"}`, background: on ? "var(--c-accent-dark)" : "none", color: on ? "#fff" : "var(--c-text)", fontSize: 12.5, cursor: "pointer" }}>{o}</button>;
+    })}</div>;
+  };
+
+  function localiser() {
+    if (!navigator.geolocation) { setErreur("La géolocalisation n'est pas disponible sur cet appareil."); return; }
+    navigator.geolocation.getCurrentPosition(
+      p => setF(x => ({ ...x, lat: p.coords.latitude.toFixed(6), lng: p.coords.longitude.toFixed(6), precision_gps_m: Math.round(p.coords.accuracy) })),
+      () => setErreur("Position refusée ou indisponible : saisis les coordonnées manuellement."), { enableHighAccuracy: true, timeout: 15000 });
+  }
+
+  async function ajouterPreuve() {
+    if (!dossier) { setErreur("Le dossier doit d'abord être enregistré (renseigne le titre)."); return; }
+    if (!np.description.trim() && !np.fichier) return;
+    setBusy(true);
+    let url = null;
+    try { if (np.fichier) { const img = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(np.fichier); }); url = np.type === "photo" ? await uploadPhotoGeneric(await compressImage(img, 1000, 0.7), "enquetes") : null; } } catch (e) {}
+    const lat0 = f.lat === "" ? null : Number(f.lat), lng0 = f.lng === "" ? null : Number(f.lng), desc0 = np.description.trim() || null, cap0 = new Date().toISOString();
+    const { data, error } = deviceId
+      ? await supabase.rpc("benevole_preuve_ajout", { p_device: deviceId, p_dossier: dossier.id, p_type: np.type, p_description: desc0, p_url: url, p_nature: np.nature, p_capture_at: cap0, p_lat: lat0, p_lng: lng0 }).single()
+      : await supabase.from("enquete_dossier_preuves").insert({ dossier_id: dossier.id, type: np.type, description: desc0, url, nature: np.nature, capture_at: cap0, lat: lat0, lng: lng0, ajoute_par: email }).select().single();
+    setBusy(false);
+    if (error) { setErreur("Preuve non ajoutée : " + error.message); return; }
+    setPreuves(p => [...p, data]); setNp({ type: np.type, description: "", nature: "observe", fichier: null });
+  }
+
+  async function valider(statut) {
+    setErreur("");
+    if (statut === "terminee" && (!f.titre.trim() || !f.categorie || !val("description"))) { setErreur("Pour terminer : titre, type de problème et description du constat sont requis."); return; }
+    latest.current = { ...latest.current, f: { ...latest.current.f, statut } }; setF(x => ({ ...x, statut }));
+    await sauver(); charger();
+  }
+
+  const nomType = (id) => (ENQ_TYPES.find(t => t[0] === id) || [])[1] || "—";
+  const nomNature = (n) => (ENQ_NATURES.find(t => t[0] === n) || [])[1] || "";
+  const ligne = (l, v, n) => v ? <div style={{ fontSize: 12.5, padding: "5px 0", borderTop: "1px solid var(--c-border)" }}><b>{l}</b> : {v} {n && <em style={{ color: "var(--c-text-muted)" }}>({nomNature(n)})</em>}</div> : null;
+  const carte = f.lat !== "" && f.lng !== "" && !isNaN(Number(f.lat)) && !isNaN(Number(f.lng));
+
+  // ---- Rapport (ouvert dans un nouvel onglet, imprimable / enregistrable en PDF) ----
+  async function rapport() {
+    const w = window.open("", "_blank");
+    if (!w) { setErreur("Autorise l'ouverture de fenêtres pour générer le rapport."); return; }
+    w.document.write("<p style='font-family:sans-serif'>Génération du rapport…</p>");
+    const { data: h } = await supabase.from("enquete_dossier_historique").select("*").eq("dossier_id", dossier.id).order("created_at");
+    const e = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+    const dt = (x) => x ? new Date(x).toLocaleString("fr-FR") : "";
+    const nat = (n) => n ? ` <small class="n">[${e(nomNature(n))}]</small>` : "";
+    const lieu = [val("quartier"), val("commune"), val("sous_prefecture"), val("prefecture"), val("region")].filter(Boolean).join(", ");
+    const niveau = (ENQ_NIVEAUX.find(n => n[0] === f.niveau_constat) || [])[1];
+    const gps = carte ? `${f.lat}, ${f.lng}${f.precision_gps_m !== "" ? " (± " + f.precision_gps_m + " m)" : ""}` : "";
+    const lignes = [["Type de problème", nomType(f.categorie), ""], ["Date et heure", dt(d.date_heure), ""], ["Lieu", lieu, ""], ["Coordonnées GPS", gps, ""],
+      ["Description", val("description"), d.description && d.description.nature], ["Période d'apparition", val("periode"), ""], ["Étendue", val("etendue"), ""], ["Fréquence", val("frequence"), ""],
+      ["Évolution observée", val("evolution"), d.evolution && d.evolution.nature], ["Causes présumées (non établies)", val("causes"), "suppose"], ["Impacts observés", (d.impacts || []).join(", "), ""],
+      ["Personnes / structures concernées (responsabilité non établie)", val("acteurs"), d.acteurs && d.acteurs.nature], ["Niveau du constat (appréciation environnementale)", niveau, ""],
+      ["Actions réalisées", (d.actions || []).join(", "), ""], ["Mesures proposées", val("mesures"), ""], ["Actions prioritaires", val("priorites"), ""], ["Autorité à saisir", val("autorite"), ""], ["Besoin de suivi", val("suivi"), ""], ["Observations complémentaires", val("observations"), ""]].filter(l => l[1]);
+    const events = [{ t: dossier.created_at, l: "Création du dossier" }, ...(h || []).filter(x => x.action !== "creation").map(x => ({ t: x.created_at, l: (x.action === "changement_statut" ? `Statut : ${ENQ_STATUTS[x.ancien_statut]} → ${ENQ_STATUTS[x.nouveau_statut]}` : "Modification") + (x.auteur ? " par " + x.auteur : "") })),
+      ...preuves.map(p => ({ t: p.capture_at || p.created_at, l: `Preuve (${(ENQ_PREUVES.find(t => t[0] === p.type) || [])[1]}) : ${p.description || ""}` })),
+      ...(dossier.verifie_at ? [{ t: dossier.verifie_at, l: "Vérification par " + dossier.verificateur }] : [])].sort((a, b) => new Date(a.t) - new Date(b.t));
+    const imgs = preuves.filter(p => p.url);
+    const html = `<!doctype html><html lang="fr"><head><meta charset="utf-8"><title>${e(dossier.numero)} — ${e(f.titre)}</title><style>
+body{font-family:Georgia,serif;max-width:800px;margin:24px auto;padding:0 16px;color:#1b2a1f;line-height:1.5}h1{font-size:22px;margin:0}h2{font-size:15px;border-bottom:2px solid #2E7D4F;padding-bottom:3px;margin-top:26px;color:#1F5C38}
+table{width:100%;border-collapse:collapse;font-size:13px}td,th{border:1px solid #cfd8d2;padding:6px 8px;text-align:left;vertical-align:top}th{background:#eef4f0;width:32%}.n{color:#666}.fiche{background:#eef4f0;padding:10px 14px;border-radius:8px;font-size:13px}
+.gal{display:flex;flex-wrap:wrap;gap:10px}.gal figure{margin:0;width:230px;font-size:11px}.gal img{width:100%;border-radius:6px}iframe{width:100%;height:260px;border:1px solid #cfd8d2}
+button{padding:8px 14px;margin-bottom:10px}@media print{button{display:none}}</style></head><body>
+<button onclick="print()">Imprimer / Enregistrer en PDF</button>
+<h1>${e(f.titre)}</h1><div class="fiche"><b>${e(dossier.numero)}</b> · ${e(ENQ_STATUTS[dossier.statut] || "")} · Niveau du constat : ${e(niveau)} · ${e(nomType(f.categorie))}<br>${e(lieu)}${gps ? " · GPS " + e(gps) : ""}<br>Enquêteur : ${e(email)}${organisationId ? " (organisation)" : ""} · Créé le ${e(dt(dossier.created_at))}${dossier.verificateur ? " · Vérifié par " + e(dossier.verificateur) + " le " + e(dt(dossier.verifie_at)) : ""}</div>
+<h2>Rapport narratif</h2>
+<p>Le ${e(dt(d.date_heure) || dt(dossier.created_at))}, ${e(email)} a documenté un constat de type « ${e(nomType(f.categorie))} »${lieu ? " à " + e(lieu) : ""}.</p>
+${val("description") ? `<p><b>Constat</b>${nat(d.description && d.description.nature)} : ${e(val("description"))}</p>` : ""}${val("evolution") ? `<p><b>Évolution</b>${nat(d.evolution && d.evolution.nature)} : ${e(val("evolution"))}</p>` : ""}
+${val("causes") ? `<p><b>Causes présumées</b> <small class="n">[Supposé — non établi]</small> : ${e(val("causes"))}</p>` : ""}${(d.impacts || []).length ? `<p><b>Impacts observés</b> : ${e(d.impacts.join(", "))}.</p>` : ""}
+${val("acteurs") ? `<p><b>Personnes ou structures concernées</b>${nat(d.acteurs && d.acteurs.nature)} : ${e(val("acteurs"))}. Cette mention n'établit aucune responsabilité.</p>` : ""}<p>Niveau du constat : <b>${e(niveau)}</b> (appréciation environnementale, non qualification juridique).</p>${val("mesures") ? `<p><b>Recommandations</b> : ${e(val("mesures"))}</p>` : ""}
+<h2>Tableau structuré</h2><table>${lignes.map(l => `<tr><th>${e(l[0])}</th><td>${e(l[1])}${nat(l[2])}</td></tr>`).join("")}</table>
+${carte ? `<h2>Carte de localisation</h2><iframe src="https://www.openstreetmap.org/export/embed.html?bbox=${Number(f.lng) - 0.005}%2C${Number(f.lat) - 0.003}%2C${Number(f.lng) + 0.005}%2C${Number(f.lat) + 0.003}&layer=mapnik&marker=${f.lat}%2C${f.lng}"></iframe><p><small>${e(gps)}</small></p>` : ""}
+<h2>Éléments de preuve</h2>${preuves.length ? `<table>${preuves.map(p => `<tr><th>${e((ENQ_PREUVES.find(t => t[0] === p.type) || [])[1])}</th><td>${e(p.description)}${nat(p.nature)}<br><small class="n">${e(dt(p.capture_at || p.created_at))}${p.lat != null ? " · " + p.lat + ", " + p.lng : ""}</small></td></tr>`).join("")}</table>` : "<p>Aucune preuve enregistrée.</p>"}
+${imgs.length ? `<h2>Galerie</h2><div class="gal">${imgs.map(p => `<figure><img src="${e(p.url)}"><figcaption>${e(p.description)}${nat(p.nature)}</figcaption></figure>`).join("")}</div>` : ""}
+<h2>Chronologie</h2><table>${events.map(x => `<tr><th>${e(dt(x.t))}</th><td>${e(x.l)}</td></tr>`).join("")}</table>
+<p><small class="n">Légende : Observé = constaté directement · Déclaré = rapporté par un tiers · Supposé = hypothèse · À vérifier = non confirmé.</small></p></body></html>`;
+    w.document.open(); w.document.write(html); w.document.close();
+  }
+
+  const [hist, setHist] = useState([]);
+  useEffect(() => { if (etape === 6 && dossier && !deviceId) supabase.from("enquete_dossier_historique").select("*").eq("dossier_id", dossier.id).order("created_at", { ascending: false }).limit(30).then(r => setHist(r.data || [])); }, [etape, dossier && dossier.id, sync]);
+  const [bens, setBens] = useState([]); const [assignes, setAssignes] = useState([]); const [choix, setChoix] = useState("");
+  async function chargerAssign() {
+    if (deviceId || !dossier) return;
+    const { data: a } = await supabase.from("enquete_dossier_assignations").select("id, benevole_id").eq("dossier_id", dossier.id);
+    const { data: b } = await supabase.from("benevoles").select("id, nom, ville").eq("statut", "valide").eq("is_deleted", false);
+    setBens(b || []); setAssignes(a || []);
+  }
+  useEffect(() => { chargerAssign(); }, [dossier && dossier.id, ouvert]);
+  async function assigner() {
+    if (!choix) return;
+    const { error } = await supabase.from("enquete_dossier_assignations").insert({ dossier_id: dossier.id, benevole_id: choix, assigne_par: email });
+    if (error) setErreur("Assignation impossible : " + error.message); else { setChoix(""); chargerAssign(); }
+  }
+  async function retirer(id) { await supabase.from("enquete_dossier_assignations").delete().eq("id", id); chargerAssign(); }
+
+  // ---- Liste ----
+  if (!ouvert) {
+    const brouillonLocal = (() => { try { return !!localStorage.getItem(cle); } catch (e) { return false; } })();
+    return (
+      <div style={{ margin: "14px 0" }}>
+        {!deviceId && <button onClick={nouveau} style={{ ...btn("var(--c-accent-dark)"), width: "100%", flex: "none" }}>+ Enquête environnementale standard</button>}
+        {deviceId && liste && liste.length > 0 && <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Dossiers d'enquête qui vous sont assignés</div>}
+        {!deviceId && brouillonLocal && <button onClick={reprendreLocal} style={{ width: "100%", background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer", marginTop: 6 }}>Reprendre le brouillon local non synchronisé</button>}
+        {liste && liste.length > 0 && <div style={{ marginTop: 10 }}>{liste.map(x => (
+          <button key={x.id} onClick={() => ouvrir(x.id)} style={{ display: "block", width: "100%", textAlign: "left", background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12, marginBottom: 8, cursor: "pointer" }}>
+            <div style={{ fontWeight: 600, fontSize: 13 }}>{x.titre}</div>
+            <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>{x.numero} · {ENQ_STATUTS[x.statut]}</div>
+          </button>))}</div>}
+      </div>
+    );
+  }
+
+  // ---- Formulaire par étapes ----
+  const verrou = dossier && (dossier.statut === "verifiee" ? source !== "admin" : (deviceId && dossier.statut === "terminee"));
+  return (
+    <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--c-border)", margin: "14px 0" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+        <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>{dossier ? dossier.numero : "Nouveau dossier"} · {sync}</div>
+        <button onClick={() => { setOuvert(false); charger(); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--c-text-muted)" }}>Fermer</button>
+      </div>
+      <div style={{ height: 6, background: "var(--c-surface-soft)", borderRadius: 3, overflow: "hidden", marginBottom: 6 }}>
+        <div style={{ width: `${((etape + 1) / ENQ_ETAPES.length) * 100}%`, height: "100%", background: "var(--c-accent-dark)", transition: "width .2s" }} />
+      </div>
+      <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>Étape {etape + 1}/{ENQ_ETAPES.length} — {ENQ_ETAPES[etape]}</div>
+      {verrou && <div style={{ fontSize: 12, color: "#B5451B", marginBottom: 8 }}>Dossier vérifié : lecture seule.</div>}
+
+      <fieldset disabled={verrou} style={{ border: "none", padding: 0, margin: 0 }}>
+      {etape === 0 && <div>
+        <label style={label}>Titre *</label>
+        <input value={f.titre} onChange={e => setF(x => ({ ...x, titre: e.target.value }))} style={champStyle} />
+        <label style={label}>Type de problème *</label>
+        <select value={f.categorie} onChange={e => setF(x => ({ ...x, categorie: e.target.value }))} style={champStyle}><option value="">Choisir…</option>{ENQ_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        <label style={label}>Date et heure</label>
+        <input type="datetime-local" value={d.date_heure || ""} onChange={e => setSimple("date_heure", e.target.value)} style={champStyle} />
+        <label style={label}>Profil de l'enquêteur</label>
+        <select value={f.profil_enqueteur} onChange={e => setF(x => ({ ...x, profil_enqueteur: e.target.value }))} style={champStyle}><option value="">Choisir…</option>{[["benevole","Bénévole"],["ong","ONG"],["agent_public","Agent public"],["autre","Autre"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Enquêteur : {email}{organisationId ? " · rattaché à votre organisation" : ""}</div>
+      </div>}
+
+      {etape === 1 && <div>
+        {champ("region", "Région")}{champ("prefecture", "Préfecture")}{champ("sous_prefecture", "Sous-préfecture")}{champ("commune", "Commune")}{champ("quartier", "Quartier / village / secteur")}
+        <button type="button" onClick={localiser} style={{ ...btn("var(--c-accent-dark)"), width: "100%", flex: "none", marginBottom: 6 }}>Utiliser ma position (GPS)</button>
+        <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 8 }}>Votre appareil vous demandera votre accord avant de partager la position. Vous pouvez aussi corriger les coordonnées à la main.</div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <input placeholder="Latitude" value={f.lat} onChange={e => setF(x => ({ ...x, lat: e.target.value }))} style={champStyle} inputMode="decimal" />
+          <input placeholder="Longitude" value={f.lng} onChange={e => setF(x => ({ ...x, lng: e.target.value }))} style={champStyle} inputMode="decimal" />
+        </div>
+        {f.precision_gps_m !== "" && <div style={{ fontSize: 12, marginBottom: 8 }}>Précision GPS : ± {f.precision_gps_m} m</div>}
+        <PositionPicker lat={f.lat} lng={f.lng} onPick={(la, ln) => setF(x => ({ ...x, lat: la, lng: ln, precision_gps_m: "" }))} />
+        <div style={{ fontSize: 11, color: "var(--c-text-muted)" }}>Touchez la carte pour placer ou corriger la position (la précision GPS est alors effacée).</div>
+      </div>}
+
+      {etape === 2 && <div>
+        {champ("description", "Description détaillée *", 4, true)}{champ("periode", "Date ou période d'apparition")}{champ("etendue", "Étendue de la zone affectée")}{champ("frequence", "Fréquence")}{champ("evolution", "Évolution observée", 2, true)}
+        {champ("causes", "Causes présumées (à distinguer des faits établis)", 3)}
+        <div style={{ fontSize: 11, color: "var(--c-text-muted)" }}>Les causes présumées sont enregistrées comme « supposé ».</div>
+      </div>}
+
+      {etape === 3 && <div>
+        <label style={label}>Impacts observés</label>{multi("impacts", ENQ_IMPACTS)}
+        {champ("acteurs", "Personnes ou structures concernées", 3, true)}
+        <div style={{ fontSize: 11, color: "var(--c-text-muted)" }}>Leur mention n'établit aucune responsabilité.</div>
+      </div>}
+
+      {etape === 4 && <div>
+        {!dossier && <div style={{ fontSize: 12, color: "#B5451B", marginBottom: 8 }}>Renseigne d'abord un titre (étape 1) pour enregistrer le dossier.</div>}
+        {preuves.map(p => <div key={p.id} style={{ fontSize: 12, padding: "6px 0", borderTop: "1px solid var(--c-border)" }}>
+          {p.url && <img src={p.url} alt="" style={{ maxWidth: 120, borderRadius: 8, display: "block", marginBottom: 4 }} />}
+          <b>{(ENQ_PREUVES.find(t => t[0] === p.type) || [])[1]}</b> — {p.description} <em style={{ color: "var(--c-text-muted)" }}>({nomNature(p.nature)} · {new Date(p.capture_at || p.created_at).toLocaleString("fr-FR")})</em></div>)}
+        <select value={np.type} onChange={e => setNp(x => ({ ...x, type: e.target.value }))} style={champStyle}>{ENQ_PREUVES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        <textarea value={np.description} onChange={e => setNp(x => ({ ...x, description: e.target.value }))} rows={2} placeholder="Description, mesure, propos recueillis…" style={{ ...champStyle, resize: "vertical" }} />
+        {np.type === "photo" && <input type="file" accept="image/*" capture="environment" onChange={e => setNp(x => ({ ...x, fichier: e.target.files[0] || null }))} style={{ marginBottom: 10, fontSize: 12 }} />}
+        <select value={np.nature} onChange={e => setNp(x => ({ ...x, nature: e.target.value }))} style={champStyle}>{ENQ_NATURES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        <button type="button" onClick={ajouterPreuve} disabled={busy} style={{ ...btn(), width: "100%", flex: "none" }}>{busy ? "…" : "+ Ajouter cet élément de preuve"}</button>
+        <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 6 }}>Date, heure et position du dossier sont associées à chaque élément.</div>
+      </div>}
+
+      {etape === 5 && <div>
+        <label style={label}>Niveau du constat (appréciation environnementale, pas une qualification juridique)</label>
+        <select value={f.niveau_constat} onChange={e => setF(x => ({ ...x, niveau_constat: e.target.value }))} style={champStyle}>{ENQ_NIVEAUX.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        <label style={label}>Actions réalisées</label>{multi("actions", ENQ_ACTIONS)}
+        {champ("mesures", "Mesures proposées", 3)}{champ("priorites", "Actions prioritaires", 2)}{champ("autorite", "Autorité ou organisme à saisir")}{champ("suivi", "Besoin de suivi")}{champ("observations", "Observations complémentaires", 2)}
+      </div>}
+
+      {etape === 6 && <div>
+        <div style={{ fontSize: 13, fontWeight: 700 }}>{f.titre || "Sans titre"}</div>
+        {ligne("Type", nomType(f.categorie))}{ligne("Date", d.date_heure ? new Date(d.date_heure).toLocaleString("fr-FR") : "")}
+        {ligne("Lieu", [val("quartier"), val("commune"), val("sous_prefecture"), val("prefecture"), val("region")].filter(Boolean).join(", "))}
+        {carte && ligne("GPS", `${f.lat}, ${f.lng}${f.precision_gps_m !== "" ? " (± " + f.precision_gps_m + " m)" : ""}`)}
+        {ligne("Constat", val("description"), d.description && d.description.nature)}{ligne("Évolution", val("evolution"), d.evolution && d.evolution.nature)}
+        {ligne("Causes présumées", val("causes"), "suppose")}{ligne("Impacts", (d.impacts || []).join(", "))}{ligne("Acteurs concernés", val("acteurs"), d.acteurs && d.acteurs.nature)}
+        {ligne("Niveau du constat", (ENQ_NIVEAUX.find(n => n[0] === f.niveau_constat) || [])[1])}{ligne("Actions réalisées", (d.actions || []).join(", "))}
+        {ligne("Recommandations", val("mesures"))}{ligne("Preuves", preuves.length ? preuves.length + " élément(s)" : "")}
+        {!deviceId && dossier && <div style={{ marginTop: 10 }}>
+          <label style={label}>Bénévoles assignés (accès à ce dossier uniquement)</label>
+          {assignes.map(a => { const b = bens.find(x => x.id === a.benevole_id); return <div key={a.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "4px 0" }}><span>{b ? b.nom : "Bénévole"}{b && b.ville ? " · " + b.ville : ""}</span><button type="button" onClick={() => retirer(a.id)} style={{ background: "none", border: "none", color: "#B5451B", cursor: "pointer", fontSize: 12 }}>Retirer</button></div>; })}
+          <div style={{ display: "flex", gap: 8 }}><select value={choix} onChange={e => setChoix(e.target.value)} style={{ ...champStyle, marginBottom: 0 }}><option value="">Choisir un bénévole…</option>{bens.filter(b => !assignes.some(a => a.benevole_id === b.id)).map(b => <option key={b.id} value={b.id}>{b.nom}{b.ville ? " · " + b.ville : ""}</option>)}</select>
+          <button type="button" onClick={assigner} style={{ ...btn("var(--c-accent-dark)"), flex: "none", padding: "0 14px" }}>Assigner</button></div>
+        </div>}
+        {!deviceId && hist.length > 0 && <div style={{ marginTop: 10 }}><label style={label}>Historique des modifications</label>
+          {hist.map(h => <div key={h.id} style={{ fontSize: 11.5, padding: "4px 0", borderTop: "1px solid var(--c-border)" }}>{new Date(h.created_at).toLocaleString("fr-FR")} · {h.action === "creation" ? "Création" : h.action === "changement_statut" ? `Statut : ${ENQ_STATUTS[h.ancien_statut]} → ${ENQ_STATUTS[h.nouveau_statut]}` : "Modification" + (h.champs_modifies ? " (" + h.champs_modifies.filter(c => c !== "donnees" || true).join(", ") + ")" : "")}{h.auteur ? " · " + h.auteur : ""}</div>)}</div>}
+        <label style={{ ...label, marginTop: 10 }}>Statut</label>
+        <select value={f.statut} onChange={e => setF(x => ({ ...x, statut: e.target.value }))} style={champStyle}>{Object.entries(ENQ_STATUTS).filter(([k]) => k !== "verifiee" || source === "admin").map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
+        {dossier && dossier.verificateur && <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Vérifié par {dossier.verificateur} le {new Date(dossier.verifie_at).toLocaleDateString("fr-FR")}</div>}
+        <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+          <button type="button" onClick={() => valider(f.statut === "terminee" || f.statut === "verifiee" ? f.statut : "brouillon")} style={btn()}>Enregistrer</button>
+          <button type="button" onClick={() => valider("terminee")} style={btn("var(--c-accent-dark)")}>Valider (terminée)</button>
+        </div>
+        {dossier && (f.statut === "terminee" || f.statut === "verifiee") && dossier.statut !== "brouillon" && dossier.statut !== "en_cours" && <button type="button" onClick={rapport} style={{ ...btn("#1F5C38"), width: "100%", flex: "none", marginTop: 8 }}>Générer le rapport</button>}
+      </div>}
+      </fieldset>
+
+      {erreur && <div role="alert" style={{ fontSize: 12, color: "#B5451B", marginTop: 8 }}>{erreur}</div>}
+      <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+        <button type="button" disabled={etape === 0} onClick={() => { setErreur(""); setEtape(etape - 1); }} style={{ ...btn(), opacity: etape === 0 ? 0.4 : 1 }}>Précédent</button>
+        {etape < ENQ_ETAPES.length - 1 && <button type="button" onClick={() => { setErreur(""); setEtape(etape + 1); }} style={btn("var(--c-accent-dark)")}>Suivant</button>}
+      </div>
+    </div>
+  );
+}
+
 function AdminEnquetes({ session }) {
   const email = session && session.user ? session.user.email : "";
   const [liste, setListe] = useState(null);
@@ -10646,6 +11000,7 @@ function AdminEnquetes({ session }) {
     <div>
       <SectionTitle sub="Questionnaires citoyens et dossiers d'investigation, créés et suivis par l'équipe.">Enquêtes</SectionTitle>
 
+      <EnquetesStandard email={email} organisationId={null} source="admin" />
       {!showCreer ? (
         <button onClick={() => setShowCreer(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "10px 14px", borderRadius: 12, border: "1px dashed var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 13, cursor: "pointer", margin: "14px 0" }}>
           <IconPlus size={16} /> Créer une enquête
@@ -10981,6 +11336,7 @@ function OrgEnquetes({ organisationId, email }) {
     <div>
       <SectionTitle sub="Vos questionnaires citoyens et dossiers d'investigation, créés et gérés par votre organisation — visibles uniquement par vous.">Enquêtes de votre organisation</SectionTitle>
 
+      <EnquetesStandard email={email} organisationId={organisationId} source="organisation" />
       {!showCreer ? (
         <button onClick={() => setShowCreer(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "10px 14px", borderRadius: 12, border: "1px dashed var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 13, cursor: "pointer", margin: "14px 0" }}>
           <IconPlus size={16} /> Créer une enquête
@@ -13544,7 +13900,7 @@ function App() {
         ) : tab === "assistant" && accesEtendu ? (
           <AssistantIA onBack={() => setTab("accueil")} signalements={signalements} arbres={arbres} observations={observations} actualites={actualites} />
         ) : tab === "espace_org" && estOrganisationValidee ? (
-          <EspaceOrganisation organisationEmail={citoyenSession && citoyenSession.user && citoyenSession.user.email} organisationUserId={citoyenSession && citoyenSession.user && citoyenSession.user.id} onBack={() => setTab("accueil")} coordFormat={coordFormat} />
+          <EspaceOrganisation organisationEmail={citoyenSession && citoyenSession.user && citoyenSession.user.email} organisationUserId={citoyenSession && citoyenSession.user && citoyenSession.user.id} onBack={() => setTab("accueil")} coordFormat={coordFormat}  peutBasculerBenevole={estBenevoleValide} />
         ) : tab === "evenements" ? (
           <Evenements onBack={() => setTab("accueil")} />
         ) : tab === "groupes_terrain" ? (
