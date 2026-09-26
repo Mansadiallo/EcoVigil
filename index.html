@@ -10705,10 +10705,34 @@ function EnquetesStandard({ email, organisationId, source, deviceId }) {
 
   async function charger() {
     if (deviceId) { const r = await supabase.rpc("benevole_dossiers_assignes", { p_device: deviceId }); setListe(r.data || []); return; }
-    const { data } = await supabase.from("enquete_dossiers").select("id, numero, titre, statut, categorie, niveau_constat, donnees, created_at").order("created_at", { ascending: false }).limit(50);
+    const { data } = await supabase.from("enquete_dossiers").select("id, numero, titre, statut, categorie, niveau_constat, donnees, created_at").eq("is_deleted", false).order("created_at", { ascending: false }).limit(50);
     setListe(data || []);
   }
   useEffect(() => { charger(); }, []);
+
+  const [corbeille, setCorbeille] = useState(null);
+  const [showCorbeille, setShowCorbeille] = useState(false);
+  async function chargerCorbeille() {
+    const { data } = await supabase.from("enquete_dossiers").select("id, numero, titre, statut, deleted_at, deleted_by").eq("is_deleted", true).order("deleted_at", { ascending: false }).limit(50);
+    setCorbeille(data || []);
+  }
+  async function supprimerDossier() {
+    if (!dossier || !dossier.id) return;
+    if (!window.confirm("Supprimer ce dossier d'enquête ? " + (source === "admin" ? "" : "Il pourra être restauré par le Centre d'EcoVigil si besoin."))) return;
+    const { error } = await supabase.from("enquete_dossiers").update({ is_deleted: true }).eq("id", dossier.id);
+    if (error) { setErreur("Suppression impossible : " + error.message); return; }
+    if (localId) removeOfflineEnquete(localId);
+    setOuvert(false); charger();
+  }
+  async function restaurerDossier(id) {
+    const { error } = await supabase.from("enquete_dossiers").update({ is_deleted: false }).eq("id", id);
+    if (!error) chargerCorbeille();
+  }
+  async function supprimerDefinitivement(id) {
+    if (!window.confirm("Supprimer définitivement ce dossier ? Cette action est irréversible.")) return;
+    const { error } = await supabase.from("enquete_dossiers").delete().eq("id", id);
+    if (!error) chargerCorbeille();
+  }
 
   // Sauvegarde : toujours écrite d'abord dans la file d'attente locale (persiste hors connexion,
   // survit à la fermeture de l'app), puis synchronisée immédiatement si une connexion est
@@ -11044,7 +11068,26 @@ ${imgs.length ? `<h2>Galerie</h2><div class="gal">${imgs.map(p => `<figure><img 
           <button key={x.id} onClick={() => ouvrir(x.id)} style={{ display: "block", width: "100%", textAlign: "left", background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12, marginBottom: 8, cursor: "pointer" }}>
             <div style={{ fontWeight: 600, fontSize: 13 }}>{x.titre}</div>
             <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>{x.numero} · {ENQ_STATUTS[x.statut]}{x.categorie ? " · " + nomType(x.categorie) : ""}{x.niveau_constat && x.niveau_constat !== "a_determiner" ? " · " + (ENQ_NIVEAUX.find(n => n[0] === x.niveau_constat) || [])[1] : ""}</div>
-          </button>))}</div>}
+          </button>))}
+          {source === "admin" && !deviceId && <div style={{ marginTop: 12 }}>
+            <button type="button" onClick={() => { const next = !showCorbeille; setShowCorbeille(next); if (next) chargerCorbeille(); }} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer", padding: 0 }}>{showCorbeille ? "Masquer la corbeille" : "Voir la corbeille"}</button>
+            {showCorbeille && (
+              <div style={{ marginTop: 8 }}>
+                {corbeille === null && <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Chargement…</div>}
+                {corbeille && corbeille.length === 0 && <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Corbeille vide.</div>}
+                {corbeille && corbeille.map(x => (
+                  <div key={x.id} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 10, marginBottom: 6 }}>
+                    <div style={{ fontWeight: 600, fontSize: 12.5 }}>{x.titre}</div>
+                    <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>{x.numero} · supprimé par {x.deleted_by || "?"} le {x.deleted_at ? new Date(x.deleted_at).toLocaleDateString("fr-FR") : "?"}</div>
+                    <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
+                      <button type="button" onClick={() => restaurerDossier(x.id)} style={{ ...btn(), padding: "6px 10px", fontSize: 12 }}>Restaurer</button>
+                      <button type="button" onClick={() => supprimerDefinitivement(x.id)} style={{ ...btn(), padding: "6px 10px", fontSize: 12, color: "#B5451B", borderColor: "#B5451B" }}>Supprimer définitivement</button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>}</div>}
       </div>
     );
   }
@@ -11241,6 +11284,7 @@ ${imgs.length ? `<h2>Galerie</h2><div class="gal">${imgs.map(p => `<figure><img 
           <button type="button" onClick={() => valider("terminee")} style={btn("var(--c-accent-dark)")}>Valider (terminée)</button>
         </div>
         {dossier && dossier.id && (f.statut === "terminee" || f.statut === "verifiee") && <button type="button" onClick={rapport} style={{ ...btn("#1F5C38"), width: "100%", flex: "none", marginTop: 8 }}>Générer le rapport</button>}
+        {!deviceId && dossier && dossier.id && <button type="button" onClick={supprimerDossier} style={{ ...btn(), width: "100%", flex: "none", marginTop: 8, color: "#B5451B", borderColor: "#B5451B" }}>Supprimer ce dossier</button>}
       </div>}
       </fieldset>
 
