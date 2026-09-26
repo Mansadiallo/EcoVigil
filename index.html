@@ -1041,6 +1041,92 @@ function dequeuePendingAction(tempId) {
   try { window.dispatchEvent(new Event("pace-queue-updated")); } catch (e) {}
 }
 
+// ---- Enquêtes hors-ligne : dossiers éditables avant synchronisation, sur le même principe que
+// PENDING_QUEUE_KEY ci-dessus, mais avec un contenu qu'on peut continuer à modifier (plusieurs
+// sauvegardes locales successives) plutôt qu'une action figée à rejouer telle quelle.
+const ENQ_OFFLINE_KEY = "ecovigil-enquetes-offline";
+function loadOfflineEnquetes() {
+  try { return JSON.parse(localStorage.getItem(ENQ_OFFLINE_KEY) || "{}"); } catch (e) { return {}; }
+}
+function saveOfflineEnquetes(map) {
+  try { localStorage.setItem(ENQ_OFFLINE_KEY, JSON.stringify(map)); } catch (e) {
+    // Quota localStorage dépassé (photos en attente) : on retire le dossier le plus ancien
+    // déjà synchronisé plutôt que de perdre silencieusement la sauvegarde en cours.
+    try {
+      const entries = Object.entries(map).filter(([, r]) => r.statutSync === "synced").sort((a, b) => (a[1].updatedLocalAt || 0) - (b[1].updatedLocalAt || 0));
+      const trimmed = { ...map }; if (entries[0]) delete trimmed[entries[0][0]];
+      localStorage.setItem(ENQ_OFFLINE_KEY, JSON.stringify(trimmed));
+    } catch (e2) {}
+  }
+  try { window.dispatchEvent(new Event("pace-enquetes-offline-updated")); } catch (e) {}
+}
+function getOfflineEnquete(localId) { return loadOfflineEnquetes()[localId] || null; }
+function putOfflineEnquete(rec) { const m = loadOfflineEnquetes(); m[rec.localId] = rec; saveOfflineEnquetes(m); }
+function removeOfflineEnquete(localId) { const m = loadOfflineEnquetes(); delete m[localId]; saveOfflineEnquetes(m); }
+
+// Une seule entrée de file par dossier : évite les doublons si plusieurs sauvegardes locales
+// s'enchaînent avant la prochaine synchronisation.
+function enqueuePendingEnquete(localId) {
+  const q = loadPendingQueue();
+  if (q.some(it => it.type === "enquete" && it.payload && it.payload.localId === localId)) return;
+  q.push({ id: "pending-" + uid() + uid(), type: "enquete", payload: { localId }, queued_at: Date.now() });
+  savePendingQueue(q);
+  try { window.dispatchEvent(new Event("pace-queue-updated")); } catch (e) {}
+}
+
+// Synchronise un dossier d'enquête hors-ligne (création ou mise à jour) puis ses preuves en
+// attente. Ne synchronise jamais silencieusement par-dessus une modification faite ailleurs :
+// si la version distante a changé depuis la dernière synchronisation locale, le dossier est
+// marqué "conflit" et la synchronisation automatique s'arrête pour lui — seule une résolution
+// manuelle (dans EnquetesStandard) peut la reprendre.
+async function syncOneDossierEnquete(localId) {
+  const rec = getOfflineEnquete(localId);
+  if (!rec) return { remoteId: null, numero: null, conflict: false };
+  if (rec.statutSync === "conflit") return { remoteId: rec.remoteId, numero: rec.numero, conflict: true };
+  const num = (v) => (v === "" || v == null || isNaN(Number(v)) ? null : Number(v));
+  const cols = { ...rec.cols, lat: num(rec.cols.lat), lng: num(rec.cols.lng), precision_gps_m: num(rec.cols.precision_gps_m), donnees: rec.donnees };
+  let remoteId = rec.remoteId, baseUpdatedAt = rec.baseUpdatedAt;
+  if (!remoteId) {
+    const { data, error } = await supabase.from("enquete_dossiers").insert({ ...cols, statut: "brouillon", source: rec.source, organisation_id: rec.organisationId || null, cree_par: rec.creePar }).select().single();
+    if (error) throw error;
+    remoteId = data.id; baseUpdatedAt = data.updated_at;
+    putOfflineEnquete({ ...getOfflineEnquete(localId), remoteId, baseUpdatedAt, numero: data.numero, statutSync: "synced" });
+  } else {
+    const { data: courant, error: e0 } = await supabase.from("enquete_dossiers").select("updated_at").eq("id", remoteId).single();
+    if (e0) throw e0;
+    if (baseUpdatedAt && courant.updated_at !== baseUpdatedAt) {
+      const { data: distant } = await supabase.from("enquete_dossiers").select("*").eq("id", remoteId).single();
+      putOfflineEnquete({ ...getOfflineEnquete(localId), statutSync: "conflit", conflitDistant: distant || null });
+      try { window.dispatchEvent(new CustomEvent("pace-enquete-conflit", { detail: { localId } })); } catch (e) {}
+      return { remoteId, numero: rec.numero, conflict: true }; // on s'arrête ici : ne jamais écraser silencieusement, une résolution humaine est requise
+    }
+    let res;
+    if (rec.deviceId) res = await supabase.rpc("benevole_dossier_maj", { p_device: rec.deviceId, p_dossier: remoteId, p_donnees: rec.donnees, p_lat: cols.lat, p_lng: cols.lng, p_precision: cols.precision_gps_m, p_niveau: cols.niveau_constat, p_statut: cols.statut }).single();
+    else res = await supabase.from("enquete_dossiers").update(cols).eq("id", remoteId).select().single();
+    if (res.error) throw res.error;
+    baseUpdatedAt = res.data.updated_at;
+    putOfflineEnquete({ ...getOfflineEnquete(localId), remoteId, baseUpdatedAt, statutSync: "synced" });
+  }
+  // Preuves ajoutées hors connexion, pas encore associées côté serveur
+  const enCours = getOfflineEnquete(localId);
+  const restantes = [];
+  for (const p of (enCours.preuvesLocales || [])) {
+    try {
+      let url = null;
+      if (p.dataUrl) url = await uploadPhotoGeneric(await compressImage(p.dataUrl, 1000, 0.7), "enquetes");
+      if (p.deviceId) { const r = await supabase.rpc("benevole_preuve_ajout", { p_device: p.deviceId, p_dossier: remoteId, p_type: p.type, p_description: p.description, p_url: url, p_nature: p.nature, p_capture_at: p.capture_at, p_lat: p.lat, p_lng: p.lng }); if (r.error) throw r.error; }
+      else { const r = await supabase.from("enquete_dossier_preuves").insert({ dossier_id: remoteId, type: p.type, description: p.description, url, nature: p.nature, capture_at: p.capture_at, lat: p.lat, lng: p.lng, ajoute_par: p.ajoutePar }); if (r.error) throw r.error; }
+    } catch (e) { restantes.push(p); }
+  }
+  const finRec = getOfflineEnquete(localId);
+  const numero = finRec ? finRec.numero : rec.numero;
+  if (finRec) putOfflineEnquete({ ...finRec, preuvesLocales: restantes });
+  if (restantes.length > 0) throw new Error("Certaines preuves n'ont pas pu être synchronisées");
+  // Entièrement synchronisé : plus besoin de la copie locale, la lecture se fait désormais côté serveur.
+  removeOfflineEnquete(localId);
+  return { remoteId, numero, conflict: false };
+}
+
 
 async function logActivity(action, table, id, detail) {
   try {
@@ -3040,6 +3126,12 @@ function markerHtml(color, kind, borderColor) {
         <path d="M11 20A7 7 0 0 1 9.8 6.1C15.5 5 17 4.48 19 2c1 2 2 4.18 2 8 0 5.5-4.78 10-10 10z"/><path d="M2 21c0-3 1.85-5.36 5.08-6C9.5 14.52 12 13 13 12"/>
       </svg></div>`;
   }
+  if (kind === "search") {
+    return `<div style="width:30px;height:30px;border-radius:6px;background:#fff;border:2px solid ${color};display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,0.25)">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="11" cy="11" r="7"/><path d="M21 21l-4.35-4.35"/>
+      </svg></div>`;
+  }
   return `<div style="width:30px;height:30px;border-radius:50% 50% 50% 0;background:${color};transform:rotate(-45deg);box-shadow:0 2px 6px rgba(0,0,0,0.25);border:3px solid ${borderColor || "#fff"}"></div>`;
 }
 
@@ -3357,7 +3449,7 @@ function tuilesIdentiques(buf1, buf2) {
   return true;
 }
 
-function Carte({ signalements, arbres, observations, onAddSignalement, onAddArbre, onAddObservation, online, pendingQueueCount, onFlushQueue, lang, coordFormat }) {
+function Carte({ signalements, arbres, observations, enquetesCarte, onAddSignalement, onAddArbre, onAddObservation, online, pendingQueueCount, onFlushQueue, lang, coordFormat }) {
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -3447,15 +3539,16 @@ function Carte({ signalements, arbres, observations, onAddSignalement, onAddArbr
   }, [anneesSentinelVerifiees]);
 
   // Couches — toutes désactivées par défaut, seul le fond de carte est actif.
-  const [layersOn, setLayersOn] = useState({ arbres: true, signalements: true, dechets: true, pollution: true, biodiversite: true, deforestation: true, mine: true, pollution_eau: true, assechement: true, deversement: true });
+  const [layersOn, setLayersOn] = useState({ arbres: true, signalements: true, dechets: true, pollution: true, biodiversite: true, deforestation: true, mine: true, pollution_eau: true, assechement: true, deversement: true, enquetes: true });
   const [showLayers, setShowLayers] = useState(false);
+  const [filtreGraviteEnquete, setFiltreGraviteEnquete] = useState("");
 
   // Filtres intelligents combinables.
   const [filtreCategorie, setFiltreCategorie] = useState("");
   const [filtreStatut, setFiltreStatut] = useState("");
   const [filtreDepuis, setFiltreDepuis] = useState("");
   const [showFilters, setShowFilters] = useState(false);
-  const filtresActifs = !!(filtreCategorie || filtreStatut || filtreDepuis);
+  const filtresActifs = !!(filtreCategorie || filtreStatut || filtreDepuis || filtreGraviteEnquete);
 
   const [visibleCount, setVisibleCount] = useState({ arbres: 0, dechets: 0, pollution: 0, signalements: 0, biodiversite: 0, deforestation: 0, mine: 0, pollution_eau: 0, assechement: 0, deversement: 0 });
 
@@ -3853,7 +3946,7 @@ function Carte({ signalements, arbres, observations, onAddSignalement, onAddArbr
   }
 
   function toggleLayer(id) { setLayersOn(prev => ({ ...prev, [id]: !prev[id] })); }
-  function resetFiltres() { setFiltreCategorie(""); setFiltreStatut(""); setFiltreDepuis(""); }
+  function resetFiltres() { setFiltreCategorie(""); setFiltreStatut(""); setFiltreDepuis(""); setFiltreGraviteEnquete(""); }
 
   function passeFiltrePeriode(dateIso) {
     if (!filtreDepuis || !dateIso) return true;
@@ -4252,8 +4345,22 @@ function Carte({ signalements, arbres, observations, onAddSignalement, onAddArbr
       });
     }
 
+    if (layersOn.enquetes) {
+      (enquetesCarte || []).forEach((e) => {
+        if (!e.lat || !e.lng) return;
+        if (filtreGraviteEnquete && e.niveau_constat !== filtreGraviteEnquete) return;
+        if (!passeFiltrePeriode(e.created_at)) return;
+        counts.enquetes = (counts.enquetes || 0) + 1;
+        const color = ENQ_NIVEAU_COULEUR[e.niveau_constat] || "#6B7A8F";
+        const icon = L.divIcon({ html: markerHtml(color, "search"), className: "", iconSize: [30, 30], iconAnchor: [15, 30] });
+        L.marker([e.lat, e.lng], { icon }).addTo(layerRef.current)
+          .on("click", () => setSelected({ type: "enquete", data: e }))
+          .bindPopup(`<b>${escapeHtml(e.titre)}</b><br/>${escapeHtml(nomTypeEnqueteCarte(e.categorie))}<br/><span style="color:${color};font-weight:600">${escapeHtml((ENQ_NIVEAUX.find(n => n[0] === e.niveau_constat) || [])[1] || "")}</span> · ${e.numero}`);
+      });
+    }
+
     setVisibleCount(counts);
-  }, [signalements, arbres, observations, layersOn, filtreCategorie, filtreStatut, filtreDepuis, origineParGroupe]);
+  }, [signalements, arbres, observations, enquetesCarte, layersOn, filtreCategorie, filtreStatut, filtreDepuis, filtreGraviteEnquete, origineParGroupe]);
 
   // Rendu des zones locales et des parcours enregistrés (7. interaction avec les données EcoVigil).
   useEffect(() => {
@@ -4278,7 +4385,7 @@ function Carte({ signalements, arbres, observations, onAddSignalement, onAddArbr
 
   const totalVisible = visibleCount.arbres + visibleCount.dechets + visibleCount.pollution + visibleCount.signalements + visibleCount.biodiversite + visibleCount.deforestation + visibleCount.mine + visibleCount.pollution_eau + visibleCount.assechement + visibleCount.deversement;
   const COUCHES_SIGNALEMENT = ["signalements", "dechets", "pollution", "deforestation", "mine", "pollution_eau", "assechement", "deversement"];
-  const aucuneCoucheActive = !layersOn.arbres && !layersOn.biodiversite && COUCHES_SIGNALEMENT.every(c => !layersOn[c]);
+  const aucuneCoucheActive = !layersOn.arbres && !layersOn.biodiversite && !layersOn.enquetes && COUCHES_SIGNALEMENT.every(c => !layersOn[c]);
 
   const LAYER_DEFS = [
     { id: "arbres", label: "Arbres", labelKey: "layer_arbres", icon: IconTree, color: "var(--c-accent)" },
@@ -4291,6 +4398,7 @@ function Carte({ signalements, arbres, observations, onAddSignalement, onAddArbr
     { id: "deversement", label: "Déversements polluants", labelKey: "layer_deversement", icon: IconAlert, color: "#B5451B" },
     { id: "signalements", label: "Autres atteintes environnementales", labelKey: "layer_signalements", icon: IconGlobe, color: "#6B7A8F" },
     { id: "biodiversite", label: "Biodiversité", labelKey: "layer_biodiversite", icon: IconSprout, color: "var(--c-sky)" },
+    { id: "enquetes", label: "Enquêtes validées", labelKey: "layer_enquetes", icon: IconSearch, color: "#7A1F1F" },
   ];
 
   // Sources externes prévues par le cahier des charges mais pas encore
@@ -4310,6 +4418,19 @@ function Carte({ signalements, arbres, observations, onAddSignalement, onAddArbr
           <div style={{ fontWeight: 600, fontSize: 14 }}>{categorieLabel(lang, s.data.categorie)}</div>
           <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 3 }}>{s.data.date}{s.data.statut ? ` · ${s.data.statut}` : ""}</div>
           <div style={{ fontSize: 13, color: "var(--c-text-secondary)", marginTop: 6 }}>{s.data.description || t(lang, "aucune_description")}</div>
+        </>
+      );
+    }
+    if (s.type === "enquete") {
+      const niveauT = ENQ_NIVEAUX.find(n => n[0] === s.data.niveau_constat) || [];
+      const color = ENQ_NIVEAU_COULEUR[s.data.niveau_constat] || "#6B7A8F";
+      return (
+        <>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{s.data.titre}</div>
+          <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 3 }}>{nomTypeEnqueteCarte(s.data.categorie)} · {s.data.numero}</div>
+          <div style={{ fontSize: 13, fontWeight: 600, color, marginTop: 6 }}>{niveauT[1] || ""}</div>
+          {niveauT[2] && <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginTop: 4 }}>{niveauT[2]}</div>}
+          <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginTop: 6 }}>Enquête {s.data.statut === "verifiee" ? "vérifiée" : "terminée"} le {new Date(s.data.updated_at).toLocaleDateString("fr-FR")}</div>
         </>
       );
     }
@@ -4734,6 +4855,10 @@ function Carte({ signalements, arbres, observations, onAddSignalement, onAddArbr
               <label style={{ fontSize: 11, color: "var(--c-text-muted)", display: "block", marginBottom: 4 }}>{t(lang, "depuis_le")}</label>
               <input type="date" value={filtreDepuis} onChange={e => setFiltreDepuis(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }} />
             </div>
+            {layersOn.enquetes && <select value={filtreGraviteEnquete} onChange={e => setFiltreGraviteEnquete(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }}>
+              <option value="">Enquêtes — toutes gravités</option>
+              {ENQ_NIVEAUX.filter(n => n[0] !== "a_determiner").map(([v, l]) => <option key={v} value={v}>Enquêtes — {l}</option>)}
+            </select>}
             {filtresActifs && (
               <button onClick={resetFiltres} style={{ padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{t(lang, "reinitialiser_filtres")}</button>
             )}
@@ -10457,14 +10582,45 @@ function PreuveItem({ preuve, onStatuer, busy }) {
 }
 
 // ===== Enquête environnementale standard (dossiers) — s'ajoute au constructeur libre, ne le remplace pas =====
-const ENQ_TYPES = [["decharge","Décharge sauvage"],["deforestation","Déforestation"],["mine","Exploitation minière illégale"],["deversement","Déversement polluant"],["pollution","Pollution des cours d'eau"],["dechets_dangereux","Déchets médicaux ou dangereux"],["assechement","Assèchement d'un point d'eau"],["erosion","Érosion / dégradation des sols"],["pollution_air","Pollution atmosphérique"],["pollution_sonore","Pollution sonore"],["autre","Autre"]];
-const ENQ_IMPACTS = ["Eau","Sol","Air","Végétation","Faune","Agriculture","Santé publique","Habitations / infrastructures","Activités économiques","Autre"];
+const ENQ_TYPE_ENQUETE = [["observation","Observation environnementale"],["communautaire","Enquête communautaire"],["controle","Contrôle environnemental"],["suivi_signalement","Suivi d'un signalement"],["evaluation_site","Évaluation d'un site"],["suivi_enquete","Suivi d'une enquête précédente"],["autre","Autre"]];
+const ENQ_CATEGORIES = [
+  ["dechets", "Déchets et pollution", [["dechets_menagers","Déchets ménagers"],["plastiques","Plastiques"],["dechets_electroniques","Déchets électroniques"],["dechets_medicaux","Déchets médicaux"],["dechets_dangereux","Déchets dangereux"],["decharge_sauvage","Décharge sauvage"],["brulage_dechets","Brûlage de déchets"],["deversement_dechets","Déversement de déchets"]]],
+  ["eau", "Eau", [["pollution_riviere","Pollution de rivière"],["pollution_lac","Pollution de lac"],["pollution_source","Pollution de source"],["pollution_puits","Pollution de puits"],["pollution_eaux_souterraines","Pollution des eaux souterraines"],["deversement_eau","Déversement dans l'eau"],["assechement","Assèchement d'un point d'eau"],["eutrophisation","Eutrophisation"],["mortalite_poissons","Mortalité de poissons"],["degradation_zones_humides","Dégradation des zones humides"]]],
+  ["forets", "Forêts et végétation", [["deforestation","Déforestation"],["coupe_abusive","Coupe abusive de bois"],["defrichement","Défrichement"],["feu_brousse","Feu de brousse"],["destruction_mangrove","Destruction de mangrove"],["destruction_vegetation","Destruction de végétation"]]],
+  ["sols", "Sols et terres", [["erosion","Érosion"],["pollution_sols","Pollution des sols"],["degradation_terres","Dégradation des terres"],["extraction_sable","Extraction de sable"],["carriere","Carrière"],["desertification","Désertification"]]],
+  ["mines", "Mines et ressources naturelles", [["exploitation_miniere","Exploitation minière"],["orpaillage","Orpaillage"],["exploitation_carriere","Exploitation de carrière"],["pollution_miniere","Pollution minière"],["degradation_site_minier","Dégradation d'un site minier"],["substances_dangereuses","Utilisation de substances dangereuses"]]],
+  ["biodiversite", "Biodiversité", [["destruction_habitat","Destruction d'habitat"],["braconnage","Braconnage"],["capture_especes","Capture d'espèces"],["mortalite_animale","Mortalité animale"],["menace_espece","Menace sur une espèce"],["destruction_zone_reproduction","Destruction de zone de reproduction"]]],
+  ["air", "Air", [["pollution_atmospherique","Pollution atmosphérique"],["fumees","Fumées"],["poussieres","Poussières"],["emissions_industrielles","Émissions industrielles"],["odeurs_polluantes","Odeurs polluantes"],["brulage_ciel_ouvert","Brûlage à ciel ouvert"]]],
+  ["risques", "Risques industriels et chimiques", [["fuite_chimique","Fuite chimique"],["deversement_hydrocarbures","Déversement d'hydrocarbures"],["fuite_carburant","Fuite de carburant"],["accident_industriel","Accident industriel"],["stockage_dangereux","Stockage dangereux"],["incendie_impact","Incendie à impact environnemental"]]],
+  ["littoral", "Littoral et milieux marins", [["pollution_marine","Pollution marine"],["dechets_littoral","Déchets sur le littoral"],["erosion_cotiere","Érosion côtière"],["degradation_mangrove_littoral","Dégradation de mangrove"],["destruction_habitat_marin","Destruction d'habitat marin"]]],
+  ["climat", "Climat et phénomènes extrêmes", [["secheresse","Sécheresse"],["inondation","Inondation"],["evenement_climatique","Événement climatique extrême"],["degradation_climatique","Dégradation liée au changement climatique"]]],
+  ["urbanisation", "Urbanisation", [["occupation_zone_sensible","Occupation d'une zone sensible"],["construction_zone_naturelle","Construction dans une zone naturelle"],["destruction_espace_vert","Destruction d'espace vert"],["artificialisation_sols","Artificialisation des sols"]]],
+  ["autre_groupe", "Autre problème environnemental", [["autre","Autre (préciser)"]]],
+];
+const ENQ_CAT_FLAT = ENQ_CATEGORIES.flatMap(([gk, gl, subs]) => subs.map(([sk, sl]) => [sk, sl, gk, gl]));
+const ENQ_IMPACTS = ["Eau","Sol","Air","Végétation","Faune","Agriculture","Santé publique","Habitations / infrastructures","Activités économiques","Autre"]; // conservé pour compatibilité, non utilisé par le nouvel écran d'impacts
 const ENQ_ACTIONS = ["Aucune","Sensibilisation","Signalement","Intervention","Mise en sécurité","Autre"];
-const ENQ_NIVEAUX = [["faible","Faible"],["modere","Modéré"],["important","Important"],["critique","Critique"],["a_determiner","À déterminer"]];
+const ENQ_NIVEAUX = [
+  ["mineur","Mineur","Impact limité et réversible rapidement, sans risque pour la population."],
+  ["modere","Modéré","Impact localisé et réversible, risque limité."],
+  ["majeur","Majeur","Impact significatif, zone étendue ou risque notable pour les ressources naturelles."],
+  ["grave","Grave","Impact important, dégradation durable ou risque réel pour la population."],
+  ["tres_grave","Très grave","Impact sévère et étendu, ou risque important et immédiat."],
+  ["critique","Critique","Danger immédiat pour la population, les écosystèmes ou les ressources naturelles ; intervention urgente."],
+  ["a_determiner","À déterminer",""],
+];
+const ENQ_GRAVITE_PREUVE_OBLIGATOIRE = ["grave","tres_grave","critique"];
+// Couleurs pour la cartographie EcoVigil (marqueurs des dossiers d'enquête validés), du moins
+// grave au plus grave — cohérent avec les teintes déjà utilisées ailleurs pour l'urgence.
+const ENQ_NIVEAU_COULEUR = { mineur: "#4CAF50", modere: "#8A9A1B", majeur: "#D4A017", grave: "#E3A73B", tres_grave: "#B5451B", critique: "#7A1F1F", a_determiner: "#6B7A8F" };
+function nomTypeEnqueteCarte(id) { return (ENQ_CAT_FLAT.find(t => t[0] === id) || [])[1] || "—"; }
+const ENQ_IMPACT_DOMAINES = ["Eau","Sols","Air","Végétation","Faune","Biodiversité","Habitats naturels","Population","Activités économiques locales"];
+const ENQ_IMPACT_NIVEAUX = [["aucun","Aucun"],["faible","Faible"],["moyen","Moyen"],["eleve","Élevé"],["critique","Critique"]];
+const ENQ_IMPACT_JUSTIF_REQUISE = ["eleve","critique"];
 const ENQ_NATURES = [["observe","Observé"],["declare","Déclaré par un tiers"],["suppose","Supposé"],["a_verifier","À vérifier"]];
 const ENQ_STATUTS = { brouillon: "Brouillon", en_cours: "En cours", terminee: "Terminée", verifiee: "Vérifiée" };
 const ENQ_ETAPES = ["Identification", "Localisation", "Constat", "Impacts & acteurs", "Preuves", "Niveau & actions", "Aperçu"];
-const ENQ_PREUVES = [["photo","Photo"],["video","Vidéo"],["document","Document"],["temoignage","Témoignage"],["releve_gps","Relevé GPS"],["mesure","Mesure"],["materiel","Matériel utilisé"]];
+const ENQ_PREUVES = [["photo","Photo"],["video","Vidéo"],["document","Document"],["temoignage","Témoignage"],["releve_gps","Relevé GPS"],["mesure","Mesure"],["materiel","Matériel utilisé"],["autre","Autre"]];
 
 // Carte cliquable : toucher la carte place ou corrige la position du constat
 function PositionPicker({ lat, lng, onPick }) {
@@ -10487,21 +10643,61 @@ function PositionPicker({ lat, lng, onPick }) {
   return <div ref={el} style={{ width: "100%", height: 240, borderRadius: 10, border: "1px solid var(--c-border)", marginBottom: 6 }} />;
 }
 
+// Indicateur de connexion et de synchronisation pour les enquêtes hors-ligne (🟢/🔴/🟠/🔵),
+// alimenté par les mêmes événements que la file d'attente générique de l'application.
+function IndicateurConnexionEnquetes({ email, deviceId }) {
+  const [, force] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+  const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
+  useEffect(() => {
+    const maj = () => force(t => t + 1);
+    const onSync = (ev) => setSyncing(!!(ev && ev.detail && ev.detail.syncing));
+    const onOff = () => setOnline(navigator.onLine);
+    window.addEventListener("pace-enquetes-offline-updated", maj);
+    window.addEventListener("pace-queue-updated", maj);
+    window.addEventListener("pace-queue-syncing", onSync);
+    window.addEventListener("online", onOff); window.addEventListener("offline", onOff);
+    const t = setInterval(maj, 5000);
+    return () => { window.removeEventListener("pace-enquetes-offline-updated", maj); window.removeEventListener("pace-queue-updated", maj); window.removeEventListener("pace-queue-syncing", onSync); window.removeEventListener("online", onOff); window.removeEventListener("offline", onOff); clearInterval(t); };
+  }, []);
+  const mine = Object.values(loadOfflineEnquetes()).filter(r => (deviceId ? r.deviceId === deviceId : r.creePar === email));
+  const enAttente = mine.filter(r => r.statutSync !== "conflit").length;
+  const conflits = mine.filter(r => r.statutSync === "conflit").length;
+  const echecs = loadPendingQueue().filter(it => it.type === "enquete" && it._failed).length;
+  return (
+    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", fontSize: 11.5, marginBottom: 10, color: "var(--c-text-muted)" }}>
+      <span>{online ? "🟢 En ligne" : "🔴 Hors connexion"}</span>
+      {syncing && <span>🟠 Synchronisation en cours…</span>}
+      {enAttente > 0 && <span>🔵 {enAttente} enquête(s) en attente de synchronisation</span>}
+      {conflits > 0 && <span style={{ color: "#B5451B" }}>⚠️ {conflits} conflit(s) à résoudre</span>}
+      {echecs > 0 && <span style={{ color: "#B5451B" }}>🔴 {echecs} échec(s) — nouvelle tentative automatique</span>}
+    </div>
+  );
+}
+
 function EnquetesStandard({ email, organisationId, source, deviceId }) {
   const [liste, setListe] = useState(null);
   const [dossier, setDossier] = useState(null);
   const [ouvert, setOuvert] = useState(false);
   const [d, setD] = useState({});
-  const [f, setF] = useState({ titre: "", categorie: "", profil_enqueteur: "", lat: "", lng: "", precision_gps_m: "", niveau_constat: "a_determiner", statut: "brouillon" });
+  const [f, setF] = useState({ titre: "", type_enquete: "", categorie: "", profil_enqueteur: "", lat: "", lng: "", precision_gps_m: "", niveau_constat: "a_determiner", statut: "brouillon", signalement_id: "" });
   const [etape, setEtape] = useState(0);
+  const [localId, setLocalId] = useState(null);
+  const [conflit, setConflit] = useState(null); // instantané distant quand une modification concurrente est détectée
+  const [preuvesLocales, setPreuvesLocales] = useState([]); // preuves ajoutées hors connexion, pas encore sur le serveur
   const [preuves, setPreuves] = useState([]);
   const [np, setNp] = useState({ type: "photo", description: "", nature: "observe", fichier: null });
   const [sync, setSync] = useState("");
   const [erreur, setErreur] = useState("");
   const [busy, setBusy] = useState(false);
-  const latest = useRef({}); latest.current = { d, f, dossier };
-  const saving = useRef(false);
-  const cle = "ecovigil_dossier_draft_" + email;
+  const [filtreListeGroupe, setFiltreListeGroupe] = useState("");
+  const [filtreListeGravite, setFiltreListeGravite] = useState("");
+  const [filtreListeStatut, setFiltreListeStatut] = useState("");
+  const [signalementLie, setSignalementLie] = useState(null);
+  const [rechSignalement, setRechSignalement] = useState("");
+  const [resultatsSignalement, setResultatsSignalement] = useState(null);
+  const [rechBusy, setRechBusy] = useState(false);
+  const latest = useRef({}); latest.current = { d, f, localId };
 
   const champStyle = { width: "100%", padding: 12, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 14, marginBottom: 10, boxSizing: "border-box", background: "var(--c-surface)", color: "var(--c-text)", fontFamily: "Work Sans, sans-serif" };
   const label = { fontSize: 12, fontWeight: 600, marginBottom: 4, display: "block" };
@@ -10509,38 +10705,53 @@ function EnquetesStandard({ email, organisationId, source, deviceId }) {
 
   async function charger() {
     if (deviceId) { const r = await supabase.rpc("benevole_dossiers_assignes", { p_device: deviceId }); setListe(r.data || []); return; }
-    const { data } = await supabase.from("enquete_dossiers").select("id, numero, titre, statut, created_at").order("created_at", { ascending: false }).limit(50);
+    const { data } = await supabase.from("enquete_dossiers").select("id, numero, titre, statut, categorie, niveau_constat, donnees, created_at").order("created_at", { ascending: false }).limit(50);
     setListe(data || []);
   }
   useEffect(() => { charger(); }, []);
 
-  // Sauvegarde : copie locale immédiate (connexion instable), puis synchronisation dès que possible
-  async function sauver() {
-    const { d: dd, f: ff, dossier: dos } = latest.current;
-    try { localStorage.setItem(cle, JSON.stringify({ d: dd, f: ff, id: dos ? dos.id : null })); } catch (e) {}
-    if (saving.current || !ff.titre.trim() || (deviceId && !dos)) return;
-    saving.current = true;
+  // Sauvegarde : toujours écrite d'abord dans la file d'attente locale (persiste hors connexion,
+  // survit à la fermeture de l'app), puis synchronisée immédiatement si une connexion est
+  // disponible — sinon elle attendra le retour du réseau (voir flushPendingQueue dans App).
+  function sauverLocal() {
+    const { d: dd, f: ff, localId: lid } = latest.current;
+    if (!lid || !ff.titre.trim()) return;
     const num = (v) => (v === "" || v == null || isNaN(Number(v)) ? null : Number(v));
-    const cols = { titre: ff.titre.trim(), categorie: ff.categorie || null, profil_enqueteur: ff.profil_enqueteur || null, enqueteur: email,
-      lat: num(ff.lat), lng: num(ff.lng), precision_gps_m: num(ff.precision_gps_m), niveau_constat: ff.niveau_constat, statut: ff.statut, donnees: dd };
-    try {
-      let res;
-      if (deviceId) { res = await supabase.rpc("benevole_dossier_maj", { p_device: deviceId, p_dossier: dos.id, p_donnees: dd, p_lat: cols.lat, p_lng: cols.lng, p_precision: cols.precision_gps_m, p_niveau: cols.niveau_constat, p_statut: cols.statut }).single(); if (!res.error) setDossier(res.data); }
-      else if (dos) res = await supabase.from("enquete_dossiers").update(cols).eq("id", dos.id).select().single();
-      else res = await supabase.from("enquete_dossiers").insert({ ...cols, statut: "brouillon", source, organisation_id: organisationId || null, cree_par: email }).select().single();
-      if (res.error) throw res.error;
-      if (!dos) setDossier(res.data);
-      setSync("Enregistré ✓");
-    } catch (e) { setSync(navigator.onLine ? "Erreur : " + (e.message || "sauvegarde") : "Hors ligne — brouillon conservé sur l'appareil"); }
-    saving.current = false;
+    const existant = getOfflineEnquete(lid);
+    if (!existant) return; // dossier déjà entièrement synchronisé et retiré de la file locale
+    const rec = { ...existant, cols: { titre: ff.titre.trim(), type_enquete: ff.type_enquete || null, categorie: ff.categorie || null, profil_enqueteur: ff.profil_enqueteur || null,
+      lat: num(ff.lat), lng: num(ff.lng), precision_gps_m: num(ff.precision_gps_m), niveau_constat: ff.niveau_constat, statut: ff.statut, signalement_id: ff.signalement_id || null }, donnees: dd,
+      statutSync: existant.statutSync === "conflit" ? "conflit" : "attente", updatedLocalAt: Date.now() };
+    putOfflineEnquete(rec);
+    declencherSync(lid);
   }
-  useEffect(() => { if (!ouvert) return; const t = setTimeout(sauver, 1500); return () => clearTimeout(t); }, [d, f, ouvert]);
-  useEffect(() => { const h = () => { if (latest.current.dossier || latest.current.f.titre) sauver(); }; window.addEventListener("online", h); return () => window.removeEventListener("online", h); }, []);
+  async function declencherSync(lid) {
+    if (!navigator.onLine) { enqueuePendingEnquete(lid); setSync("Hors ligne — dossier conservé sur l'appareil"); return; }
+    try {
+      const res = await syncOneDossierEnquete(lid);
+      if (res && res.conflict) { const r = getOfflineEnquete(lid); setConflit(r ? r.conflitDistant : null); setSync("Conflit détecté — résolution nécessaire"); return; }
+      if (res && res.remoteId) setDossier(d0 => ({ ...(d0 || {}), id: res.remoteId, numero: res.numero || (d0 && d0.numero), created_at: (d0 && d0.created_at) || new Date().toISOString() }));
+      setSync("Enregistré ✓");
+    } catch (e) {
+      enqueuePendingEnquete(lid);
+      setSync("Synchronisation impossible pour l'instant — nouvelle tentative automatique dès que possible");
+    }
+  }
+  useEffect(() => { if (!ouvert || !localId) return; const t = setTimeout(sauverLocal, 1500); return () => clearTimeout(t); }, [d, f, ouvert, localId]);
+  useEffect(() => {
+    const onConflit = (ev) => { if (ev && ev.detail && ev.detail.localId === localId) { const r = getOfflineEnquete(localId); if (r) setConflit(r.conflitDistant); } };
+    window.addEventListener("pace-enquete-conflit", onConflit);
+    return () => window.removeEventListener("pace-enquete-conflit", onConflit);
+  }, [localId]);
 
   function nouveau() {
-    setDossier(null); setPreuves([]); setEtape(0); setErreur(""); setSync("");
+    const lid = uid() + uid();
+    putOfflineEnquete({ localId: lid, remoteId: null, cols: { titre: "", type_enquete: "", categorie: "", profil_enqueteur: "", lat: "", lng: "", precision_gps_m: "", niveau_constat: "a_determiner", statut: "brouillon", signalement_id: "" },
+      donnees: { date_heure: new Date().toISOString().slice(0, 16) }, preuvesLocales: [], baseUpdatedAt: null, statutSync: "attente", creePar: email, source, organisationId: organisationId || null, deviceId: deviceId || null, updatedLocalAt: Date.now() });
+    setLocalId(lid); setDossier(null); setPreuves([]); setPreuvesLocales([]); setConflit(null); setEtape(0); setErreur(""); setSync("");
     setD({ date_heure: new Date().toISOString().slice(0, 16) });
-    setF({ titre: "", categorie: "", profil_enqueteur: "", lat: "", lng: "", precision_gps_m: "", niveau_constat: "a_determiner", statut: "brouillon" });
+    setF({ titre: "", type_enquete: "", categorie: "", profil_enqueteur: "", lat: "", lng: "", precision_gps_m: "", niveau_constat: "a_determiner", statut: "brouillon", signalement_id: "" });
+    setSignalementLie(null); setResultatsSignalement(null); setRechSignalement("");
     setOuvert(true);
   }
   async function ouvrir(id) {
@@ -10548,12 +10759,71 @@ function EnquetesStandard({ email, organisationId, source, deviceId }) {
     if (!data) return;
     const { data: pr } = deviceId ? await supabase.rpc("benevole_dossier_preuves", { p_device: deviceId, p_dossier: id })
       : await supabase.from("enquete_dossier_preuves").select("*").eq("dossier_id", id).order("created_at");
-    setDossier(data); setD(data.donnees || {}); setPreuves(pr || []); setEtape(0); setErreur(""); setSync("");
-    setF({ titre: data.titre, categorie: data.categorie || "", profil_enqueteur: data.profil_enqueteur || "", lat: data.lat ?? "", lng: data.lng ?? "", precision_gps_m: data.precision_gps_m ?? "", niveau_constat: data.niveau_constat, statut: data.statut });
+    // On rejoue l'édition sur une copie locale (même mécanisme que hors connexion) : si le réseau
+    // coupe pendant la modification, rien n'est perdu et la synchronisation reprendra automatiquement.
+    const existant = getOfflineEnquete(id);
+    putOfflineEnquete({ localId: id, remoteId: id, cols: { titre: data.titre, type_enquete: data.type_enquete || "", categorie: data.categorie || "", profil_enqueteur: data.profil_enqueteur || "",
+      lat: data.lat ?? "", lng: data.lng ?? "", precision_gps_m: data.precision_gps_m ?? "", niveau_constat: data.niveau_constat, statut: data.statut, signalement_id: data.signalement_id || "" },
+      donnees: data.donnees || {}, preuvesLocales: (existant && existant.preuvesLocales) || [], baseUpdatedAt: data.updated_at, numero: data.numero,
+      statutSync: (existant && existant.statutSync === "conflit") ? "conflit" : "synced", conflitDistant: existant && existant.conflitDistant,
+      creePar: data.cree_par, source, organisationId: data.organisation_id, deviceId: deviceId || null, updatedLocalAt: Date.now() });
+    setLocalId(id); setDossier(data); setD(data.donnees || {}); setPreuves(pr || []); setPreuvesLocales((existant && existant.preuvesLocales) || []);
+    setConflit(existant && existant.statutSync === "conflit" ? existant.conflitDistant : null); setEtape(0); setErreur(""); setSync("");
+    setF({ titre: data.titre, type_enquete: data.type_enquete || "", categorie: data.categorie || "", profil_enqueteur: data.profil_enqueteur || "", lat: data.lat ?? "", lng: data.lng ?? "", precision_gps_m: data.precision_gps_m ?? "", niveau_constat: data.niveau_constat, statut: data.statut, signalement_id: data.signalement_id || "" });
+    setSignalementLie(null); setResultatsSignalement(null); setRechSignalement("");
     setOuvert(true);
   }
-  function reprendreLocal() {
-    try { const s = JSON.parse(localStorage.getItem(cle)); if (s) { setDossier(null); setD(s.d || {}); setF(s.f); setPreuves([]); setEtape(0); setOuvert(true); } } catch (e) {}
+  function reprendreLocal(lid) {
+    const r = getOfflineEnquete(lid);
+    if (!r) return;
+    setLocalId(lid); setDossier(r.remoteId ? { id: r.remoteId, numero: r.numero } : null); setD(r.donnees || {}); setPreuves([]); setPreuvesLocales(r.preuvesLocales || []);
+    setConflit(r.statutSync === "conflit" ? r.conflitDistant : null); setEtape(0); setErreur(""); setSync("");
+    setF({ titre: r.cols.titre, type_enquete: r.cols.type_enquete || "", categorie: r.cols.categorie || "", profil_enqueteur: r.cols.profil_enqueteur || "", lat: r.cols.lat ?? "", lng: r.cols.lng ?? "", precision_gps_m: r.cols.precision_gps_m ?? "", niveau_constat: r.cols.niveau_constat, statut: r.cols.statut, signalement_id: r.cols.signalement_id || "" });
+    setSignalementLie(null); setResultatsSignalement(null); setRechSignalement("");
+    setOuvert(true);
+  }
+  // Recherche puis liaison/déliaison d'un signalement citoyen à l'origine du dossier — la relation
+  // est facultative dans les deux sens : un dossier fonctionne très bien sans signalement, et
+  // inversement.
+  async function rechercherSignalements() {
+    const q = rechSignalement.trim();
+    if (!q) { setResultatsSignalement([]); return; }
+    setRechBusy(true);
+    let query = supabase.from("signalements").select("id, categorie, description, urgence, lat, lng, statut, created_at").eq("is_deleted", false).order("created_at", { ascending: false }).limit(6);
+    query = /^[0-9a-f-]{6,}$/i.test(q) ? query.ilike("id", q + "%") : query.ilike("description", "%" + q + "%");
+    const { data, error } = await query;
+    setRechBusy(false);
+    setResultatsSignalement(error ? [] : (data || []));
+  }
+  function lierSignalement(s) {
+    setF(x => ({ ...x, signalement_id: s.id })); setSignalementLie(s); setResultatsSignalement(null); setRechSignalement("");
+  }
+  function delierSignalement() { setF(x => ({ ...x, signalement_id: "" })); setSignalementLie(null); }
+  function reprendrePositionSignalement() {
+    if (!signalementLie || signalementLie.lat == null) return;
+    setF(x => ({ ...x, lat: signalementLie.lat, lng: signalementLie.lng, precision_gps_m: "" }));
+  }
+  useEffect(() => {
+    if (!f.signalement_id) { setSignalementLie(null); return; }
+    if (signalementLie && signalementLie.id === f.signalement_id) return;
+    supabase.from("signalements").select("id, categorie, description, urgence, lat, lng, statut, created_at").eq("id", f.signalement_id).single()
+      .then(({ data }) => setSignalementLie(data || null));
+  }, [f.signalement_id]);
+  // Résolution de conflit : soit on impose la version locale (écrase la version serveur), soit on
+  // adopte la version serveur (la modification locale concurrente est abandonnée, mais reste dans
+  // l'historique du serveur puisque quelqu'un d'autre l'a bien enregistrée).
+  function resoudreGarderMaVersion() {
+    const r = getOfflineEnquete(localId); if (!r) return;
+    putOfflineEnquete({ ...r, baseUpdatedAt: conflit ? conflit.updated_at : r.baseUpdatedAt, statutSync: "attente", conflitDistant: null });
+    setConflit(null); declencherSync(localId);
+  }
+  function resoudreGarderVersionServeur() {
+    if (!conflit) return;
+    setD(conflit.donnees || {}); setF({ titre: conflit.titre, type_enquete: conflit.type_enquete || "", categorie: conflit.categorie || "", profil_enqueteur: conflit.profil_enqueteur || "",
+      lat: conflit.lat ?? "", lng: conflit.lng ?? "", precision_gps_m: conflit.precision_gps_m ?? "", niveau_constat: conflit.niveau_constat, statut: conflit.statut });
+    const r = getOfflineEnquete(localId);
+    if (r) putOfflineEnquete({ ...r, cols: { titre: conflit.titre, type_enquete: conflit.type_enquete, categorie: conflit.categorie, profil_enqueteur: conflit.profil_enqueteur, lat: conflit.lat, lng: conflit.lng, precision_gps_m: conflit.precision_gps_m, niveau_constat: conflit.niveau_constat, statut: conflit.statut }, donnees: conflit.donnees || {}, baseUpdatedAt: conflit.updated_at, statutSync: "synced", conflitDistant: null });
+    setConflit(null); setSync("Version du serveur adoptée");
   }
 
   const val = (k) => (d[k] && d[k].valeur !== undefined ? d[k].valeur : (typeof d[k] === "string" ? d[k] : ""));
@@ -10577,37 +10847,70 @@ function EnquetesStandard({ email, organisationId, source, deviceId }) {
         style={{ padding: "10px 12px", borderRadius: 20, border: `1px solid ${on ? "var(--c-accent-dark)" : "var(--c-border)"}`, background: on ? "var(--c-accent-dark)" : "none", color: on ? "#fff" : "var(--c-text)", fontSize: 12.5, cursor: "pointer" }}>{o}</button>;
     })}</div>;
   };
+  // Évaluation d'impact par domaine : niveau + justification obligatoire si Élevé/Critique
+  const setImpact = (dom, patch) => setD(p => ({ ...p, impacts_eval: { ...(p.impacts_eval || {}), [dom]: { ...((p.impacts_eval || {})[dom] || {}), ...patch } } }));
+  const impactsRenseignes = () => Object.values(d.impacts_eval || {}).filter(x => x && x.niveau);
+  const impactsJustifManquante = () => Object.entries(d.impacts_eval || {}).filter(([, v]) => v && ENQ_IMPACT_JUSTIF_REQUISE.includes(v.niveau) && !(v.justification || "").trim()).map(([k]) => k);
 
   function localiser() {
     if (!navigator.geolocation) { setErreur("La géolocalisation n'est pas disponible sur cet appareil."); return; }
     navigator.geolocation.getCurrentPosition(
       p => setF(x => ({ ...x, lat: p.coords.latitude.toFixed(6), lng: p.coords.longitude.toFixed(6), precision_gps_m: Math.round(p.coords.accuracy) })),
-      () => setErreur("Position refusée ou indisponible : saisis les coordonnées manuellement."), { enableHighAccuracy: true, timeout: 15000 });
+      () => setErreur("Position refusée ou indisponible : saisis les coordonnées manuellement, ou coche « position GPS indisponible »."), { enableHighAccuracy: true, timeout: 15000 });
   }
 
   async function ajouterPreuve() {
-    if (!dossier) { setErreur("Le dossier doit d'abord être enregistré (renseigne le titre)."); return; }
+    if (!localId) { setErreur("Le dossier doit d'abord être créé (retourne à l'étape Identification)."); return; }
     if (!np.description.trim() && !np.fichier) return;
     setBusy(true);
-    let url = null;
-    try { if (np.fichier) { const img = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(np.fichier); }); url = np.type === "photo" ? await uploadPhotoGeneric(await compressImage(img, 1000, 0.7), "enquetes") : null; } } catch (e) {}
+    let dataUrl = null;
+    try { if (np.fichier) dataUrl = await new Promise(r => { const fr = new FileReader(); fr.onload = () => r(fr.result); fr.readAsDataURL(np.fichier); }); } catch (e) {}
     const lat0 = f.lat === "" ? null : Number(f.lat), lng0 = f.lng === "" ? null : Number(f.lng), desc0 = np.description.trim() || null, cap0 = new Date().toISOString();
-    const { data, error } = deviceId
-      ? await supabase.rpc("benevole_preuve_ajout", { p_device: deviceId, p_dossier: dossier.id, p_type: np.type, p_description: desc0, p_url: url, p_nature: np.nature, p_capture_at: cap0, p_lat: lat0, p_lng: lng0 }).single()
-      : await supabase.from("enquete_dossier_preuves").insert({ dossier_id: dossier.id, type: np.type, description: desc0, url, nature: np.nature, capture_at: cap0, lat: lat0, lng: lng0, ajoute_par: email }).select().single();
+    // La preuve est d'abord posée dans la file locale (fonctionne hors connexion) ; l'envoi de la
+    // photo et son association au dossier se font lors de la synchronisation (voir syncOneDossierEnquete).
+    const item = { id: uid() + uid(), type: np.type, description: desc0, nature: np.nature, capture_at: cap0, lat: lat0, lng: lng0, ajoutePar: email, dataUrl: np.type === "photo" ? dataUrl : null, deviceId: deviceId || null };
+    const rec = getOfflineEnquete(localId);
+    if (rec) putOfflineEnquete({ ...rec, preuvesLocales: [...(rec.preuvesLocales || []), item], updatedLocalAt: Date.now() });
+    setPreuvesLocales(p => [...p, item]);
     setBusy(false);
-    if (error) { setErreur("Preuve non ajoutée : " + error.message); return; }
-    setPreuves(p => [...p, data]); setNp({ type: np.type, description: "", nature: "observe", fichier: null });
+    setNp({ type: np.type, description: "", nature: "observe", fichier: null });
+    declencherSync(localId);
+  }
+
+  // ---- Contrôle des champs obligatoires avant soumission définitive (ne bloque jamais l'enregistrement en brouillon) ----
+  function champsManquants() {
+    const m = [];
+    if (!f.titre.trim()) m.push("le titre (étape Identification)");
+    if (!f.type_enquete) m.push("le type d'enquête (étape Identification)");
+    if (!f.categorie) m.push("le type de problème (étape Identification)");
+    if (f.categorie === "autre" && !val("type_probleme_precision").trim()) m.push("la précision du problème « Autre » (étape Identification)");
+    if (!val("localite").trim() && !val("quartier").trim() && !val("commune").trim()) m.push("la localité / zone (étape Localisation)");
+    const gpsOk = (f.lat !== "" && f.lng !== "" && !isNaN(Number(f.lat)) && !isNaN(Number(f.lng)));
+    if (!gpsOk && !d.gps_indisponible) m.push("les coordonnées GPS, ou à défaut la case « position GPS indisponible » avec son motif (étape Localisation)");
+    if (d.gps_indisponible && !val("gps_indisponible_motif").trim()) m.push("le motif d'indisponibilité du GPS (étape Localisation)");
+    if (!val("faits_observes").trim()) m.push("la description des faits observés (étape Constat)");
+    if (impactsRenseignes().length === 0) m.push("au moins une évaluation d'impact (étape Impacts)");
+    if (impactsJustifManquante().length > 0) m.push("la justification des impacts Élevé/Critique : " + impactsJustifManquante().join(", ") + " (étape Impacts)");
+    if (f.niveau_constat === "a_determiner") m.push("un niveau de gravité déterminé, autre que « à déterminer » (étape Niveau & actions)");
+    if (ENQ_GRAVITE_PREUVE_OBLIGATOIRE.includes(f.niveau_constat) && (preuves.length + preuvesLocales.length) === 0 && !(d.preuve_absente && val("preuve_absente_motif").trim())) {
+      m.push("au moins une preuve, ou à défaut la case « aucune preuve disponible » avec son motif (étape Preuves) — obligatoire pour un niveau Grave, Très grave ou Critique");
+    }
+    return m;
   }
 
   async function valider(statut) {
     setErreur("");
-    if (statut === "terminee" && (!f.titre.trim() || !f.categorie || !val("description"))) { setErreur("Pour terminer : titre, type de problème et description du constat sont requis."); return; }
+    if (statut === "terminee") {
+      const m = champsManquants();
+      if (m.length > 0) { setErreur("Impossible de valider, il manque : " + m.join(" ; ") + "."); return; }
+    }
     latest.current = { ...latest.current, f: { ...latest.current.f, statut } }; setF(x => ({ ...x, statut }));
-    await sauver(); charger();
+    sauverLocal(); await declencherSync(localId); charger();
   }
 
-  const nomType = (id) => (ENQ_TYPES.find(t => t[0] === id) || [])[1] || "—";
+  const nomType = (id) => (ENQ_CAT_FLAT.find(t => t[0] === id) || [])[1] || "—";
+  const nomGroupe = (id) => (ENQ_CAT_FLAT.find(t => t[0] === id) || [])[3] || "";
+  const nomTypeEnquete = (id) => (ENQ_TYPE_ENQUETE.find(t => t[0] === id) || [])[1] || "—";
   const nomNature = (n) => (ENQ_NATURES.find(t => t[0] === n) || [])[1] || "";
   const ligne = (l, v, n) => v ? <div style={{ fontSize: 12.5, padding: "5px 0", borderTop: "1px solid var(--c-border)" }}><b>{l}</b> : {v} {n && <em style={{ color: "var(--c-text-muted)" }}>({nomNature(n)})</em>}</div> : null;
   const carte = f.lat !== "" && f.lng !== "" && !isNaN(Number(f.lat)) && !isNaN(Number(f.lng));
@@ -10621,13 +10924,16 @@ function EnquetesStandard({ email, organisationId, source, deviceId }) {
     const e = (x) => String(x == null ? "" : x).replace(/[&<>"]/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
     const dt = (x) => x ? new Date(x).toLocaleString("fr-FR") : "";
     const nat = (n) => n ? ` <small class="n">[${e(nomNature(n))}]</small>` : "";
-    const lieu = [val("quartier"), val("commune"), val("sous_prefecture"), val("prefecture"), val("region")].filter(Boolean).join(", ");
-    const niveau = (ENQ_NIVEAUX.find(n => n[0] === f.niveau_constat) || [])[1];
-    const gps = carte ? `${f.lat}, ${f.lng}${f.precision_gps_m !== "" ? " (± " + f.precision_gps_m + " m)" : ""}` : "";
-    const lignes = [["Type de problème", nomType(f.categorie), ""], ["Date et heure", dt(d.date_heure), ""], ["Lieu", lieu, ""], ["Coordonnées GPS", gps, ""],
-      ["Description", val("description"), d.description && d.description.nature], ["Période d'apparition", val("periode"), ""], ["Étendue", val("etendue"), ""], ["Fréquence", val("frequence"), ""],
-      ["Évolution observée", val("evolution"), d.evolution && d.evolution.nature], ["Causes présumées (non établies)", val("causes"), "suppose"], ["Impacts observés", (d.impacts || []).join(", "), ""],
-      ["Personnes / structures concernées (responsabilité non établie)", val("acteurs"), d.acteurs && d.acteurs.nature], ["Niveau du constat (appréciation environnementale)", niveau, ""],
+    const lieu = [val("localite"), val("quartier"), val("commune"), val("sous_prefecture"), val("prefecture"), val("region")].filter(Boolean).join(", ");
+    const niveauT = ENQ_NIVEAUX.find(n => n[0] === f.niveau_constat) || [];
+    const niveau = niveauT[1] || "";
+    const gps = carte ? `${f.lat}, ${f.lng}${f.precision_gps_m !== "" ? " (± " + f.precision_gps_m + " m)" : ""}` : (d.gps_indisponible ? "Non disponible — " + val("gps_indisponible_motif") : "");
+    const impactsLignes = Object.entries(d.impacts_eval || {}).filter(([, v]) => v && v.niveau).map(([k, v]) => `${k} : ${(ENQ_IMPACT_NIVEAUX.find(n => n[0] === v.niveau) || [])[1]}${v.justification ? " — " + v.justification : ""}`);
+    const lignes = [["Type d'enquête", nomTypeEnquete(f.type_enquete), ""], ["Type de problème", nomGroupe(f.categorie) + " > " + nomType(f.categorie), ""], ["Signalement lié", signalementLie ? ((signalementLie.categorie || "Signalement") + " du " + dt(signalementLie.created_at)) : "", ""], ["Date et heure", dt(d.date_heure), ""], ["Lieu", lieu, ""], ["Coordonnées GPS", gps, ""],
+      ["Faits observés", val("faits_observes"), "observe"], ["Période d'apparition", val("periode"), ""], ["Étendue", val("etendue"), ""], ["Fréquence", val("frequence"), ""],
+      ["Causes observables", val("causes_observables"), d.causes_observables && d.causes_observables.nature], ["Informations recueillies (tiers)", val("informations_recueillies"), "declare"],
+      ["Analyse et recommandations de l'enquêteur", val("analyse_recommandations"), ""], ["Impacts évalués", impactsLignes.join(" ; "), ""],
+      ["Personnes / structures concernées (responsabilité non établie)", val("acteurs"), d.acteurs && d.acteurs.nature], ["Niveau de gravité", niveau, ""],
       ["Actions réalisées", (d.actions || []).join(", "), ""], ["Mesures proposées", val("mesures"), ""], ["Actions prioritaires", val("priorites"), ""], ["Autorité à saisir", val("autorite"), ""], ["Besoin de suivi", val("suivi"), ""], ["Observations complémentaires", val("observations"), ""]].filter(l => l[1]);
     const events = [{ t: dossier.created_at, l: "Création du dossier" }, ...(h || []).filter(x => x.action !== "creation").map(x => ({ t: x.created_at, l: (x.action === "changement_statut" ? `Statut : ${ENQ_STATUTS[x.ancien_statut]} → ${ENQ_STATUTS[x.nouveau_statut]}` : "Modification") + (x.auteur ? " par " + x.auteur : "") })),
       ...preuves.map(p => ({ t: p.capture_at || p.created_at, l: `Preuve (${(ENQ_PREUVES.find(t => t[0] === p.type) || [])[1]}) : ${p.description || ""}` })),
@@ -10639,15 +10945,17 @@ table{width:100%;border-collapse:collapse;font-size:13px}td,th{border:1px solid 
 .gal{display:flex;flex-wrap:wrap;gap:10px}.gal figure{margin:0;width:230px;font-size:11px}.gal img{width:100%;border-radius:6px}iframe{width:100%;height:260px;border:1px solid #cfd8d2}
 button{padding:8px 14px;margin-bottom:10px}@media print{button{display:none}}</style></head><body>
 <button onclick="print()">Imprimer / Enregistrer en PDF</button>
-<h1>${e(f.titre)}</h1><div class="fiche"><b>${e(dossier.numero)}</b> · ${e(ENQ_STATUTS[dossier.statut] || "")} · Niveau du constat : ${e(niveau)} · ${e(nomType(f.categorie))}<br>${e(lieu)}${gps ? " · GPS " + e(gps) : ""}<br>Enquêteur : ${e(email)}${organisationId ? " (organisation)" : ""} · Créé le ${e(dt(dossier.created_at))}${dossier.verificateur ? " · Vérifié par " + e(dossier.verificateur) + " le " + e(dt(dossier.verifie_at)) : ""}</div>
+<h1>${e(f.titre)}</h1><div class="fiche"><b>${e(dossier.numero)}</b> · ${e(ENQ_STATUTS[f.statut] || "")} · ${e(nomTypeEnquete(f.type_enquete))} · Gravité : ${e(niveau)} · ${e(nomGroupe(f.categorie))} — ${e(nomType(f.categorie))}<br>${e(lieu)}${gps ? " · GPS " + e(gps) : ""}<br>Enquêteur : ${e(email)}${organisationId ? " (organisation)" : ""} · Créé le ${e(dt(dossier.created_at))}${dossier.verificateur ? " · Vérifié par " + e(dossier.verificateur) + " le " + e(dt(dossier.verifie_at)) : ""}</div>
 <h2>Rapport narratif</h2>
-<p>Le ${e(dt(d.date_heure) || dt(dossier.created_at))}, ${e(email)} a documenté un constat de type « ${e(nomType(f.categorie))} »${lieu ? " à " + e(lieu) : ""}.</p>
-${val("description") ? `<p><b>Constat</b>${nat(d.description && d.description.nature)} : ${e(val("description"))}</p>` : ""}${val("evolution") ? `<p><b>Évolution</b>${nat(d.evolution && d.evolution.nature)} : ${e(val("evolution"))}</p>` : ""}
-${val("causes") ? `<p><b>Causes présumées</b> <small class="n">[Supposé — non établi]</small> : ${e(val("causes"))}</p>` : ""}${(d.impacts || []).length ? `<p><b>Impacts observés</b> : ${e(d.impacts.join(", "))}.</p>` : ""}
-${val("acteurs") ? `<p><b>Personnes ou structures concernées</b>${nat(d.acteurs && d.acteurs.nature)} : ${e(val("acteurs"))}. Cette mention n'établit aucune responsabilité.</p>` : ""}<p>Niveau du constat : <b>${e(niveau)}</b> (appréciation environnementale, non qualification juridique).</p>${val("mesures") ? `<p><b>Recommandations</b> : ${e(val("mesures"))}</p>` : ""}
+<p>Le ${e(dt(d.date_heure) || dt(dossier.created_at))}, ${e(email)} a mené une ${e(nomTypeEnquete(f.type_enquete)).toLowerCase()} concernant un problème de type « ${e(nomType(f.categorie))} »${lieu ? " à " + e(lieu) : ""}.</p>
+${val("faits_observes") ? `<p><b>Faits observés</b> <small class="n">[Observé]</small> : ${e(val("faits_observes"))}</p>` : ""}${val("causes_observables") ? `<p><b>Causes observables</b>${nat(d.causes_observables && d.causes_observables.nature)} : ${e(val("causes_observables"))}</p>` : ""}
+${val("informations_recueillies") ? `<p><b>Informations recueillies auprès de tiers</b> <small class="n">[Déclaré — non vérifié directement]</small> : ${e(val("informations_recueillies"))}</p>` : ""}
+${impactsLignes.length ? `<p><b>Impacts évalués</b> : ${e(impactsLignes.join(" ; "))}.</p>` : ""}
+${val("acteurs") ? `<p><b>Personnes ou structures concernées</b>${nat(d.acteurs && d.acteurs.nature)} : ${e(val("acteurs"))}. Cette mention n'établit aucune responsabilité.</p>` : ""}<p>Niveau de gravité : <b>${e(niveau)}</b>${niveauT[2] ? " — " + e(niveauT[2]) : ""}</p>
+${val("analyse_recommandations") ? `<p><b>Analyse et recommandations de l'enquêteur</b> : ${e(val("analyse_recommandations"))}</p>` : ""}${val("mesures") ? `<p><b>Mesures proposées</b> : ${e(val("mesures"))}</p>` : ""}
 <h2>Tableau structuré</h2><table>${lignes.map(l => `<tr><th>${e(l[0])}</th><td>${e(l[1])}${nat(l[2])}</td></tr>`).join("")}</table>
 ${carte ? `<h2>Carte de localisation</h2><iframe src="https://www.openstreetmap.org/export/embed.html?bbox=${Number(f.lng) - 0.005}%2C${Number(f.lat) - 0.003}%2C${Number(f.lng) + 0.005}%2C${Number(f.lat) + 0.003}&layer=mapnik&marker=${f.lat}%2C${f.lng}"></iframe><p><small>${e(gps)}</small></p>` : ""}
-<h2>Éléments de preuve</h2>${preuves.length ? `<table>${preuves.map(p => `<tr><th>${e((ENQ_PREUVES.find(t => t[0] === p.type) || [])[1])}</th><td>${e(p.description)}${nat(p.nature)}<br><small class="n">${e(dt(p.capture_at || p.created_at))}${p.lat != null ? " · " + p.lat + ", " + p.lng : ""}</small></td></tr>`).join("")}</table>` : "<p>Aucune preuve enregistrée.</p>"}
+<h2>Éléments de preuve</h2>${preuves.length ? `<table>${preuves.map(p => `<tr><th>${e((ENQ_PREUVES.find(t => t[0] === p.type) || [])[1])}</th><td>${e(p.description)}${nat(p.nature)}<br><small class="n">${e(dt(p.capture_at || p.created_at))}${p.lat != null ? " · " + p.lat + ", " + p.lng : ""}</small></td></tr>`).join("")}</table>` : `<p>Aucune preuve enregistrée.${d.preuve_absente ? " Motif : " + e(val("preuve_absente_motif")) : ""}</p>`}
 ${imgs.length ? `<h2>Galerie</h2><div class="gal">${imgs.map(p => `<figure><img src="${e(p.url)}"><figcaption>${e(p.description)}${nat(p.nature)}</figcaption></figure>`).join("")}</div>` : ""}
 <h2>Chronologie</h2><table>${events.map(x => `<tr><th>${e(dt(x.t))}</th><td>${e(x.l)}</td></tr>`).join("")}</table>
 <p><small class="n">Légende : Observé = constaté directement · Déclaré = rapporté par un tiers · Supposé = hypothèse · À vérifier = non confirmé.</small></p></body></html>`;
@@ -10671,31 +10979,93 @@ ${imgs.length ? `<h2>Galerie</h2><div class="gal">${imgs.map(p => `<figure><img 
   }
   async function retirer(id) { await supabase.from("enquete_dossier_assignations").delete().eq("id", id); chargerAssign(); }
 
+  function listeFiltree() {
+    return (liste || []).filter(x => (!filtreListeGroupe || (ENQ_CAT_FLAT.find(t => t[0] === x.categorie) || [])[2] === filtreListeGroupe) && (!filtreListeGravite || x.niveau_constat === filtreListeGravite) && (!filtreListeStatut || x.statut === filtreListeStatut));
+  }
+
   // ---- Liste ----
   if (!ouvert) {
-    const brouillonLocal = (() => { try { return !!localStorage.getItem(cle); } catch (e) { return false; } })();
+    const enAttenteLoc = Object.values(loadOfflineEnquetes()).filter(r => (deviceId ? r.deviceId === deviceId : r.creePar === email) && r.statutSync !== "synced");
     return (
       <div style={{ margin: "14px 0" }}>
+        <IndicateurConnexionEnquetes email={email} deviceId={deviceId} />
         {!deviceId && <button onClick={nouveau} style={{ ...btn("var(--c-accent-dark)"), width: "100%", flex: "none" }}>+ Enquête environnementale standard</button>}
         {deviceId && liste && liste.length > 0 && <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Dossiers d'enquête qui vous sont assignés</div>}
-        {!deviceId && brouillonLocal && <button onClick={reprendreLocal} style={{ width: "100%", background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer", marginTop: 6 }}>Reprendre le brouillon local non synchronisé</button>}
-        {liste && liste.length > 0 && <div style={{ marginTop: 10 }}>{liste.map(x => (
+        {enAttenteLoc.length > 0 && <div style={{ marginTop: 10 }}>
+          <div style={{ fontSize: 12, fontWeight: 700, marginBottom: 6 }}>Enquêtes en attente de synchronisation</div>
+          {enAttenteLoc.map(r => (
+            <button key={r.localId} onClick={() => reprendreLocal(r.localId)} style={{ display: "block", width: "100%", textAlign: "left", background: "var(--c-surface)", border: `1px solid ${r.statutSync === "conflit" ? "#B5451B" : "var(--c-border)"}`, borderRadius: 12, padding: 12, marginBottom: 8, cursor: "pointer" }}>
+              <div style={{ fontWeight: 600, fontSize: 13 }}>{r.cols.titre || "Sans titre"}</div>
+              <div style={{ fontSize: 11, color: r.statutSync === "conflit" ? "#B5451B" : "var(--c-text-muted)", marginTop: 2 }}>{r.statutSync === "conflit" ? "⚠️ Conflit à résoudre" : "🔵 En attente" + (r.remoteId ? " (modifications non envoyées)" : " (jamais synchronisée)")}</div>
+            </button>))}
+        </div>}
+        {liste && liste.length > 0 && <div style={{ marginTop: 10 }}>
+          {!deviceId && <>
+            <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginBottom: 8 }}>
+              <select value={filtreListeGroupe} onChange={e => setFiltreListeGroupe(e.target.value)} style={{ ...champStyle, marginBottom: 0, width: "auto", fontSize: 12, padding: "6px 8px" }}>
+                <option value="">Toutes catégories</option>{ENQ_CATEGORIES.map(([gk, gl]) => <option key={gk} value={gk}>{gl}</option>)}
+              </select>
+              <select value={filtreListeGravite} onChange={e => setFiltreListeGravite(e.target.value)} style={{ ...champStyle, marginBottom: 0, width: "auto", fontSize: 12, padding: "6px 8px" }}>
+                <option value="">Toutes gravités</option>{ENQ_NIVEAUX.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
+              </select>
+              <select value={filtreListeStatut} onChange={e => setFiltreListeStatut(e.target.value)} style={{ ...champStyle, marginBottom: 0, width: "auto", fontSize: 12, padding: "6px 8px" }}>
+                <option value="">Tous statuts</option>{Object.entries(ENQ_STATUTS).map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </div>
+            {(() => {
+              const lf = listeFiltree();
+              const zoneDe = (x) => { const dd = x.donnees || {}; const v = (k) => (dd[k] && dd[k].valeur) || (typeof dd[k] === "string" ? dd[k] : ""); return v("commune") || v("quartier") || v("localite") || ""; };
+              const parGroupe = {}; lf.forEach(x => { const g = nomGroupe(x.categorie) || "Non classé"; parGroupe[g] = (parGroupe[g] || 0) + 1; });
+              const parZone = {}; lf.forEach(x => { const z = zoneDe(x); if (z) parZone[z] = (parZone[z] || 0) + 1; });
+              const topZones = Object.entries(parZone).sort((a, b) => b[1] - a[1]).slice(0, 5);
+              function exporter() {
+                const cols = [{ key: "numero", label: "Numéro" }, { key: "titre", label: "Titre" }, { key: "categorie", label: "Catégorie" }, { key: "sous_categorie", label: "Sous-catégorie" }, { key: "gravite", label: "Gravité" }, { key: "statut", label: "Statut" }, { key: "zone", label: "Localité" }, { key: "date", label: "Date de création" }];
+                const rows = lf.map(x => ({ numero: x.numero, titre: x.titre, categorie: nomGroupe(x.categorie), sous_categorie: nomType(x.categorie), gravite: (ENQ_NIVEAUX.find(n => n[0] === x.niveau_constat) || [])[1] || "", statut: ENQ_STATUTS[x.statut], zone: zoneDe(x), date: new Date(x.created_at).toLocaleDateString("fr-FR") }));
+                exportExcel(`ecovigil-enquetes-${new Date().toISOString().slice(0, 10)}.xlsx`, rows, cols, "Tableau de suivi des enquêtes");
+              }
+              return (
+                <>
+                  <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11, color: "var(--c-text-muted)", marginBottom: 6 }}>
+                    <span style={{ fontWeight: 700, color: "var(--c-text)" }}>{lf.length} dossier(s)</span>
+                    {ENQ_NIVEAUX.filter(n => n[0] !== "a_determiner").map(([v, l]) => { const n = lf.filter(x => x.niveau_constat === v).length; return n > 0 ? <span key={v}>{l} : {n}</span> : null; })}
+                  </div>
+                  {Object.keys(parGroupe).length > 0 && <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11, color: "var(--c-text-muted)", marginBottom: 6 }}>
+                    {Object.entries(parGroupe).sort((a, b) => b[1] - a[1]).map(([g, n]) => <span key={g}>{g} : {n}</span>)}
+                  </div>}
+                  {topZones.length > 0 && <div style={{ display: "flex", gap: 10, flexWrap: "wrap", fontSize: 11, color: "var(--c-text-muted)", marginBottom: 8 }}>
+                    <span>Principales zones :</span>{topZones.map(([z, n]) => <span key={z}>{z} ({n})</span>)}
+                  </div>}
+                  <button type="button" onClick={exporter} style={{ ...btn(), width: "100%", flex: "none", marginBottom: 10, fontSize: 12.5, padding: "8px 0" }}>Exporter le tableau de suivi (Excel)</button>
+                </>
+              );
+            })()}
+          </>}
+          {listeFiltree().map(x => (
           <button key={x.id} onClick={() => ouvrir(x.id)} style={{ display: "block", width: "100%", textAlign: "left", background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12, marginBottom: 8, cursor: "pointer" }}>
             <div style={{ fontWeight: 600, fontSize: 13 }}>{x.titre}</div>
-            <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>{x.numero} · {ENQ_STATUTS[x.statut]}</div>
+            <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>{x.numero} · {ENQ_STATUTS[x.statut]}{x.categorie ? " · " + nomType(x.categorie) : ""}{x.niveau_constat && x.niveau_constat !== "a_determiner" ? " · " + (ENQ_NIVEAUX.find(n => n[0] === x.niveau_constat) || [])[1] : ""}</div>
           </button>))}</div>}
       </div>
     );
   }
 
   // ---- Formulaire par étapes ----
-  const verrou = dossier && (dossier.statut === "verifiee" ? source !== "admin" : (deviceId && dossier.statut === "terminee"));
+  const verrou = (f.statut === "verifiee" ? source !== "admin" : (deviceId && f.statut === "terminee")) && !conflit;
+  const grp = ENQ_CATEGORIES.find(([gk]) => (ENQ_CAT_FLAT.find(t => t[0] === f.categorie) || [])[2] === gk);
   return (
     <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--c-border)", margin: "14px 0" }}>
+      <IndicateurConnexionEnquetes email={email} deviceId={deviceId} />
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
         <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>{dossier ? dossier.numero : "Nouveau dossier"} · {sync}</div>
         <button onClick={() => { setOuvert(false); charger(); }} style={{ background: "none", border: "none", cursor: "pointer", fontSize: 12, color: "var(--c-text-muted)" }}>Fermer</button>
       </div>
+      {conflit && <div style={{ background: "var(--c-warning-bg)", border: "1px solid var(--c-warning-border-soft)", borderRadius: 10, padding: 10, marginBottom: 10, fontSize: 12 }}>
+        <b>⚠️ Conflit détecté</b> — ce dossier a été modifié ailleurs (par {conflit.enqueteur || conflit.cree_par || "une autre personne"}) le {new Date(conflit.updated_at).toLocaleString("fr-FR")}, après votre dernière synchronisation. Votre modification n'a pas été écrasée : choisissez comment continuer.
+        <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+          <button type="button" onClick={resoudreGarderMaVersion} style={{ ...btn("var(--c-accent-dark)"), padding: "8px 0" }}>Garder ma version</button>
+          <button type="button" onClick={resoudreGarderVersionServeur} style={{ ...btn(), padding: "8px 0" }}>Garder celle du serveur</button>
+        </div>
+      </div>}
       <div style={{ height: 6, background: "var(--c-surface-soft)", borderRadius: 3, overflow: "hidden", marginBottom: 6 }}>
         <div style={{ width: `${((etape + 1) / ENQ_ETAPES.length) * 100}%`, height: "100%", background: "var(--c-accent-dark)", transition: "width .2s" }} />
       </div>
@@ -10705,18 +11075,65 @@ ${imgs.length ? `<h2>Galerie</h2><div class="gal">${imgs.map(p => `<figure><img 
       <fieldset disabled={verrou} style={{ border: "none", padding: 0, margin: 0 }}>
       {etape === 0 && <div>
         <label style={label}>Titre *</label>
-        <input value={f.titre} onChange={e => setF(x => ({ ...x, titre: e.target.value }))} style={champStyle} />
-        <label style={label}>Type de problème *</label>
-        <select value={f.categorie} onChange={e => setF(x => ({ ...x, categorie: e.target.value }))} style={champStyle}><option value="">Choisir…</option>{ENQ_TYPES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        {deviceId
+          ? <div style={{ ...champStyle, background: "var(--c-surface-soft)", color: "var(--c-text-muted)" }}>{f.titre || "—"}</div>
+          : <input value={f.titre} onChange={e => setF(x => ({ ...x, titre: e.target.value }))} style={champStyle} />}
+        <label style={label}>Type d'enquête *</label>
+        {deviceId
+          ? <div style={{ ...champStyle, background: "var(--c-surface-soft)", color: "var(--c-text-muted)" }}>{nomTypeEnquete(f.type_enquete)}</div>
+          : <select value={f.type_enquete} onChange={e => setF(x => ({ ...x, type_enquete: e.target.value }))} style={champStyle}><option value="">Choisir…</option>{ENQ_TYPE_ENQUETE.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>}
+        <label style={label}>Grande catégorie du problème *</label>
+        {deviceId
+          ? <div style={{ ...champStyle, background: "var(--c-surface-soft)", color: "var(--c-text-muted)" }}>{nomGroupe(f.categorie)}</div>
+          : <select value={grp ? grp[0] : ""} onChange={e => { const g = ENQ_CATEGORIES.find(([gk]) => gk === e.target.value); setF(x => ({ ...x, categorie: g && g[2].length === 1 ? g[2][0][0] : "" })); }} style={champStyle}>
+              <option value="">Choisir…</option>{ENQ_CATEGORIES.map(([gk, gl]) => <option key={gk} value={gk}>{gl}</option>)}
+            </select>}
+        {!deviceId && grp && grp[2].length > 1 && <>
+          <label style={label}>Sous-catégorie *</label>
+          <select value={f.categorie} onChange={e => setF(x => ({ ...x, categorie: e.target.value }))} style={champStyle}><option value="">Choisir…</option>{grp[2].map(([sk, sl]) => <option key={sk} value={sk}>{sl}</option>)}</select>
+        </>}
+        {deviceId && grp && grp[2].length > 1 && <div style={{ ...champStyle, background: "var(--c-surface-soft)", color: "var(--c-text-muted)" }}>{nomType(f.categorie)}</div>}
+        {f.categorie === "autre" && champ("type_probleme_precision", "Préciser le problème environnemental *")}
+        {deviceId && <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: -6, marginBottom: 10 }}>Titre, type d'enquête et type de problème sont fixés par la personne qui a créé le dossier.</div>}
+        {!deviceId && <div style={{ marginBottom: 10 }}>
+          <label style={label}>Signalement citoyen à l'origine (facultatif)</label>
+          {signalementLie ? (
+            <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 10, fontSize: 12.5 }}>
+              <div><b>{signalementLie.categorie || "Signalement"}</b> · {new Date(signalementLie.created_at).toLocaleDateString("fr-FR")}</div>
+              {signalementLie.description && <div style={{ color: "var(--c-text-muted)", marginTop: 4 }}>{signalementLie.description.slice(0, 140)}</div>}
+              <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
+                {signalementLie.lat != null && <button type="button" onClick={reprendrePositionSignalement} style={{ ...btn(), padding: "6px 10px", fontSize: 12 }}>Reprendre sa position</button>}
+                <button type="button" onClick={delierSignalement} style={{ ...btn(), padding: "6px 10px", fontSize: 12, color: "#B5451B" }}>Délier</button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <div style={{ display: "flex", gap: 8 }}>
+                <input value={rechSignalement} onChange={e => setRechSignalement(e.target.value)} onKeyDown={e => e.key === "Enter" && rechercherSignalements()} placeholder="Référence ou mots-clés du signalement" style={{ ...champStyle, marginBottom: 0 }} />
+                <button type="button" onClick={rechercherSignalements} disabled={rechBusy} style={{ ...btn(), flex: "none", padding: "0 14px" }}>{rechBusy ? "…" : "Chercher"}</button>
+              </div>
+              {resultatsSignalement && resultatsSignalement.length === 0 && <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginTop: 6 }}>Aucun signalement trouvé.</div>}
+              {resultatsSignalement && resultatsSignalement.map(s => (
+                <button key={s.id} type="button" onClick={() => lierSignalement(s)} style={{ display: "block", width: "100%", textAlign: "left", background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 10, padding: 8, marginTop: 6, fontSize: 12, cursor: "pointer" }}>
+                  <b>{s.categorie || "Signalement"}</b> · {new Date(s.created_at).toLocaleDateString("fr-FR")}{s.description ? " — " + s.description.slice(0, 80) : ""}
+                </button>
+              ))}
+              <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 4 }}>L'enquête reste utilisable sans signalement lié, et un signalement reste consultable sans enquête.</div>
+            </div>
+          )}
+        </div>}
         <label style={label}>Date et heure</label>
         <input type="datetime-local" value={d.date_heure || ""} onChange={e => setSimple("date_heure", e.target.value)} style={champStyle} />
-        <label style={label}>Profil de l'enquêteur</label>
-        <select value={f.profil_enqueteur} onChange={e => setF(x => ({ ...x, profil_enqueteur: e.target.value }))} style={champStyle}><option value="">Choisir…</option>{[["benevole","Bénévole"],["ong","ONG"],["agent_public","Agent public"],["autre","Autre"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-        <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Enquêteur : {email}{organisationId ? " · rattaché à votre organisation" : ""}</div>
+        {!deviceId && <>
+          <label style={label}>Profil de l'enquêteur</label>
+          <select value={f.profil_enqueteur} onChange={e => setF(x => ({ ...x, profil_enqueteur: e.target.value }))} style={champStyle}><option value="">Choisir…</option>{[["benevole","Bénévole"],["ong","ONG"],["agent_public","Agent public"],["autre","Autre"]].map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        </>}
+        <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Enquêteur : {deviceId ? "vous" : email}{organisationId ? " · rattaché à votre organisation" : ""}</div>
       </div>}
 
       {etape === 1 && <div>
-        {champ("region", "Région")}{champ("prefecture", "Préfecture")}{champ("sous_prefecture", "Sous-préfecture")}{champ("commune", "Commune")}{champ("quartier", "Quartier / village / secteur")}
+        {champ("localite", "Localité / zone *")}
+        {champ("region", "Région")}{champ("prefecture", "Préfecture")}{champ("sous_prefecture", "Sous-préfecture / Commune")}{champ("commune", "Commune")}{champ("quartier", "Quartier / village / secteur")}{champ("lieu_dit", "Lieu-dit")}
         <button type="button" onClick={localiser} style={{ ...btn("var(--c-accent-dark)"), width: "100%", flex: "none", marginBottom: 6 }}>Utiliser ma position (GPS)</button>
         <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 8 }}>Votre appareil vous demandera votre accord avant de partager la position. Vous pouvez aussi corriger les coordonnées à la main.</div>
         <div style={{ display: "flex", gap: 8 }}>
@@ -10725,50 +11142,89 @@ ${imgs.length ? `<h2>Galerie</h2><div class="gal">${imgs.map(p => `<figure><img 
         </div>
         {f.precision_gps_m !== "" && <div style={{ fontSize: 12, marginBottom: 8 }}>Précision GPS : ± {f.precision_gps_m} m</div>}
         <PositionPicker lat={f.lat} lng={f.lng} onPick={(la, ln) => setF(x => ({ ...x, lat: la, lng: ln, precision_gps_m: "" }))} />
-        <div style={{ fontSize: 11, color: "var(--c-text-muted)" }}>Touchez la carte pour placer ou corriger la position (la précision GPS est alors effacée).</div>
+        <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 10 }}>Touchez la carte pour placer ou corriger la position (la précision GPS est alors effacée).</div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, marginBottom: 6 }}>
+          <input type="checkbox" checked={!!d.gps_indisponible} onChange={e => setSimple("gps_indisponible", e.target.checked)} />
+          Position GPS indisponible sur le terrain — l'enquête peut continuer sans bloquer
+        </label>
+        {d.gps_indisponible && champ("gps_indisponible_motif", "Motif de l'indisponibilité du GPS *", 2)}
       </div>}
 
       {etape === 2 && <div>
-        {champ("description", "Description détaillée *", 4, true)}{champ("periode", "Date ou période d'apparition")}{champ("etendue", "Étendue de la zone affectée")}{champ("frequence", "Fréquence")}{champ("evolution", "Évolution observée", 2, true)}
-        {champ("causes", "Causes présumées (à distinguer des faits établis)", 3)}
-        <div style={{ fontSize: 11, color: "var(--c-text-muted)" }}>Les causes présumées sont enregistrées comme « supposé ».</div>
+        {champ("faits_observes", "Faits observés — ce que vous avez directement constaté *", 4)}
+        {champ("periode", "Date ou période présumée du début")}{champ("etendue", "Étendue estimée")}{champ("frequence", "Fréquence")}
+        {champ("causes_observables", "Causes observables", 3, true)}{champ("evolution", "Évolution observée (complément)", 2, true)}
+        <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 12 }}>Ces éléments sont ce que vous avez vous-même constaté sur place.</div>
+        {champ("informations_recueillies", "Informations recueillies auprès de témoins ou personnes rencontrées", 4)}
+        <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 12 }}>Enregistrées comme « déclaré par un tiers », non vérifiées directement par vous.</div>
+        {champ("analyse_recommandations", "Analyse et recommandations — votre appréciation et mesures proposées", 4)}
       </div>}
 
       {etape === 3 && <div>
-        <label style={label}>Impacts observés</label>{multi("impacts", ENQ_IMPACTS)}
+        <label style={label}>Impacts — au moins une évaluation requise</label>
+        {ENQ_IMPACT_DOMAINES.map(dom => {
+          const v = (d.impacts_eval || {})[dom] || {};
+          const justifReq = ENQ_IMPACT_JUSTIF_REQUISE.includes(v.niveau);
+          return (
+            <div key={dom} style={{ marginBottom: 10, paddingBottom: 8, borderBottom: "1px solid var(--c-border)" }}>
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                <span style={{ fontSize: 13, fontWeight: 600 }}>{dom}</span>
+                <select value={v.niveau || ""} onChange={e => setImpact(dom, { niveau: e.target.value })} style={{ ...champStyle, marginBottom: 0, width: "auto", padding: "8px 10px" }}>
+                  <option value="">—</option>{ENQ_IMPACT_NIVEAUX.map(([nv, nl]) => <option key={nv} value={nv}>{nl}</option>)}
+                </select>
+              </div>
+              {justifReq && <textarea value={v.justification || ""} onChange={e => setImpact(dom, { justification: e.target.value })} rows={2} placeholder="Justification obligatoire pour un impact Élevé ou Critique" style={{ ...champStyle, resize: "vertical", marginTop: 6, marginBottom: 0, borderColor: (v.justification || "").trim() ? "var(--c-border)" : "#B5451B" }} />}
+            </div>
+          );
+        })}
         {champ("acteurs", "Personnes ou structures concernées", 3, true)}
         <div style={{ fontSize: 11, color: "var(--c-text-muted)" }}>Leur mention n'établit aucune responsabilité.</div>
       </div>}
 
       {etape === 4 && <div>
-        {!dossier && <div style={{ fontSize: 12, color: "#B5451B", marginBottom: 8 }}>Renseigne d'abord un titre (étape 1) pour enregistrer le dossier.</div>}
+        {ENQ_GRAVITE_PREUVE_OBLIGATOIRE.includes(f.niveau_constat) && <div style={{ fontSize: 12, color: "#B5451B", marginBottom: 8 }}>Niveau {(ENQ_NIVEAUX.find(n => n[0] === f.niveau_constat) || [])[1]} : au moins une preuve est requise, sauf motif d'absence ci-dessous.</div>}
         {preuves.map(p => <div key={p.id} style={{ fontSize: 12, padding: "6px 0", borderTop: "1px solid var(--c-border)" }}>
           {p.url && <img src={p.url} alt="" style={{ maxWidth: 120, borderRadius: 8, display: "block", marginBottom: 4 }} />}
           <b>{(ENQ_PREUVES.find(t => t[0] === p.type) || [])[1]}</b> — {p.description} <em style={{ color: "var(--c-text-muted)" }}>({nomNature(p.nature)} · {new Date(p.capture_at || p.created_at).toLocaleString("fr-FR")})</em></div>)}
+        {preuvesLocales.map(p => <div key={p.id} style={{ fontSize: 12, padding: "6px 0", borderTop: "1px solid var(--c-border)" }}>
+          {p.dataUrl && <img src={p.dataUrl} alt="" style={{ maxWidth: 120, borderRadius: 8, display: "block", marginBottom: 4 }} />}
+          <b>{(ENQ_PREUVES.find(t => t[0] === p.type) || [])[1]}</b> — {p.description} <em style={{ color: "var(--c-danger, #B5451B)" }}>🔵 en attente de synchronisation</em></div>)}
         <select value={np.type} onChange={e => setNp(x => ({ ...x, type: e.target.value }))} style={champStyle}>{ENQ_PREUVES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         <textarea value={np.description} onChange={e => setNp(x => ({ ...x, description: e.target.value }))} rows={2} placeholder="Description, mesure, propos recueillis…" style={{ ...champStyle, resize: "vertical" }} />
         {np.type === "photo" && <input type="file" accept="image/*" capture="environment" onChange={e => setNp(x => ({ ...x, fichier: e.target.files[0] || null }))} style={{ marginBottom: 10, fontSize: 12 }} />}
         <select value={np.nature} onChange={e => setNp(x => ({ ...x, nature: e.target.value }))} style={champStyle}>{ENQ_NATURES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
         <button type="button" onClick={ajouterPreuve} disabled={busy} style={{ ...btn(), width: "100%", flex: "none" }}>{busy ? "…" : "+ Ajouter cet élément de preuve"}</button>
-        <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 6 }}>Date, heure et position du dossier sont associées à chaque élément.</div>
+        <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 6, marginBottom: 10 }}>Date, heure et position du dossier sont associées à chaque élément. Fonctionne aussi hors connexion : la preuve est envoyée dès que possible.</div>
+        <label style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12.5, marginBottom: 6 }}>
+          <input type="checkbox" checked={!!d.preuve_absente} onChange={e => setSimple("preuve_absente", e.target.checked)} />
+          Aucune preuve disponible pour cette enquête
+        </label>
+        {d.preuve_absente && champ("preuve_absente_motif", "Motif de l'absence de preuve *", 2)}
       </div>}
 
       {etape === 5 && <div>
-        <label style={label}>Niveau du constat (appréciation environnementale, pas une qualification juridique)</label>
+        <label style={label}>Niveau de gravité (appréciation environnementale, pas une qualification juridique)</label>
         <select value={f.niveau_constat} onChange={e => setF(x => ({ ...x, niveau_constat: e.target.value }))} style={champStyle}>{ENQ_NIVEAUX.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
+        {(ENQ_NIVEAUX.find(n => n[0] === f.niveau_constat) || [])[2] && <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginTop: -6, marginBottom: 10 }}>{(ENQ_NIVEAUX.find(n => n[0] === f.niveau_constat) || [])[2]}</div>}
+        <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 10 }}>La gravité tient compte de l'étendue, l'intensité, la durée, le nombre de personnes affectées, l'impact sur les ressources naturelles et les écosystèmes, le risque pour la population, et le caractère immédiat ou potentiel du danger — jamais déduite automatiquement du seul type de problème.</div>
         <label style={label}>Actions réalisées</label>{multi("actions", ENQ_ACTIONS)}
         {champ("mesures", "Mesures proposées", 3)}{champ("priorites", "Actions prioritaires", 2)}{champ("autorite", "Autorité ou organisme à saisir")}{champ("suivi", "Besoin de suivi")}{champ("observations", "Observations complémentaires", 2)}
       </div>}
 
       {etape === 6 && <div>
         <div style={{ fontSize: 13, fontWeight: 700 }}>{f.titre || "Sans titre"}</div>
-        {ligne("Type", nomType(f.categorie))}{ligne("Date", d.date_heure ? new Date(d.date_heure).toLocaleString("fr-FR") : "")}
-        {ligne("Lieu", [val("quartier"), val("commune"), val("sous_prefecture"), val("prefecture"), val("region")].filter(Boolean).join(", "))}
-        {carte && ligne("GPS", `${f.lat}, ${f.lng}${f.precision_gps_m !== "" ? " (± " + f.precision_gps_m + " m)" : ""}`)}
-        {ligne("Constat", val("description"), d.description && d.description.nature)}{ligne("Évolution", val("evolution"), d.evolution && d.evolution.nature)}
-        {ligne("Causes présumées", val("causes"), "suppose")}{ligne("Impacts", (d.impacts || []).join(", "))}{ligne("Acteurs concernés", val("acteurs"), d.acteurs && d.acteurs.nature)}
-        {ligne("Niveau du constat", (ENQ_NIVEAUX.find(n => n[0] === f.niveau_constat) || [])[1])}{ligne("Actions réalisées", (d.actions || []).join(", "))}
-        {ligne("Recommandations", val("mesures"))}{ligne("Preuves", preuves.length ? preuves.length + " élément(s)" : "")}
+        {ligne("Type d'enquête", nomTypeEnquete(f.type_enquete))}{ligne("Type de problème", f.categorie ? nomGroupe(f.categorie) + " > " + nomType(f.categorie) : "")}
+        {signalementLie && ligne("Signalement lié", (signalementLie.categorie || "Signalement") + " du " + new Date(signalementLie.created_at).toLocaleDateString("fr-FR"))}
+        {f.categorie === "autre" && ligne("Précision", val("type_probleme_precision"))}
+        {ligne("Date", d.date_heure ? new Date(d.date_heure).toLocaleString("fr-FR") : "")}
+        {ligne("Lieu", [val("localite"), val("quartier"), val("commune"), val("sous_prefecture"), val("prefecture"), val("region")].filter(Boolean).join(", "))}
+        {carte ? ligne("GPS", `${f.lat}, ${f.lng}${f.precision_gps_m !== "" ? " (± " + f.precision_gps_m + " m)" : ""}`) : (d.gps_indisponible && ligne("GPS", "Indisponible — " + val("gps_indisponible_motif")))}
+        {ligne("Faits observés", val("faits_observes"), "observe")}{ligne("Causes observables", val("causes_observables"), d.causes_observables && d.causes_observables.nature)}
+        {ligne("Informations recueillies", val("informations_recueillies"), "declare")}{ligne("Analyse et recommandations", val("analyse_recommandations"))}
+        {impactsRenseignes().length > 0 && ligne("Impacts évalués", Object.entries(d.impacts_eval || {}).filter(([, v]) => v && v.niveau).map(([k, v]) => `${k} : ${(ENQ_IMPACT_NIVEAUX.find(n => n[0] === v.niveau) || [])[1]}`).join(" ; "))}
+        {ligne("Acteurs concernés", val("acteurs"), d.acteurs && d.acteurs.nature)}
+        {ligne("Niveau de gravité", (ENQ_NIVEAUX.find(n => n[0] === f.niveau_constat) || [])[1])}{ligne("Actions réalisées", (d.actions || []).join(", "))}
+        {ligne("Recommandations", val("mesures"))}{ligne("Preuves", preuves.length ? preuves.length + " élément(s)" : (d.preuve_absente ? "Aucune — " + val("preuve_absente_motif") : ""))}
         {!deviceId && dossier && <div style={{ marginTop: 10 }}>
           <label style={label}>Bénévoles assignés (accès à ce dossier uniquement)</label>
           {assignes.map(a => { const b = bens.find(x => x.id === a.benevole_id); return <div key={a.id} style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, padding: "4px 0" }}><span>{b ? b.nom : "Bénévole"}{b && b.ville ? " · " + b.ville : ""}</span><button type="button" onClick={() => retirer(a.id)} style={{ background: "none", border: "none", color: "#B5451B", cursor: "pointer", fontSize: 12 }}>Retirer</button></div>; })}
@@ -10781,10 +11237,10 @@ ${imgs.length ? `<h2>Galerie</h2><div class="gal">${imgs.map(p => `<figure><img 
         <select value={f.statut} onChange={e => setF(x => ({ ...x, statut: e.target.value }))} style={champStyle}>{Object.entries(ENQ_STATUTS).filter(([k]) => k !== "verifiee" || source === "admin").map(([k, l]) => <option key={k} value={k}>{l}</option>)}</select>
         {dossier && dossier.verificateur && <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Vérifié par {dossier.verificateur} le {new Date(dossier.verifie_at).toLocaleDateString("fr-FR")}</div>}
         <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-          <button type="button" onClick={() => valider(f.statut === "terminee" || f.statut === "verifiee" ? f.statut : "brouillon")} style={btn()}>Enregistrer</button>
+          <button type="button" onClick={() => valider(f.statut === "terminee" || f.statut === "verifiee" ? f.statut : "brouillon")} style={btn()}>Enregistrer comme brouillon</button>
           <button type="button" onClick={() => valider("terminee")} style={btn("var(--c-accent-dark)")}>Valider (terminée)</button>
         </div>
-        {dossier && (f.statut === "terminee" || f.statut === "verifiee") && dossier.statut !== "brouillon" && dossier.statut !== "en_cours" && <button type="button" onClick={rapport} style={{ ...btn("#1F5C38"), width: "100%", flex: "none", marginTop: 8 }}>Générer le rapport</button>}
+        {dossier && dossier.id && (f.statut === "terminee" || f.statut === "verifiee") && <button type="button" onClick={rapport} style={{ ...btn("#1F5C38"), width: "100%", flex: "none", marginTop: 8 }}>Générer le rapport</button>}
       </div>}
       </fieldset>
 
@@ -13388,6 +13844,7 @@ function App() {
 
   const [signalements, setSignalements] = useState([]);
   const [arbres, setArbres] = useState([]);
+  const [enquetesCarte, setEnquetesCarte] = useState([]);
   const [loaded, setLoaded] = useState(false);
   const [online, setOnline] = useState(typeof navigator !== "undefined" ? navigator.onLine : true);
   const [notifState, setNotifState] = useState(typeof Notification !== "undefined" ? Notification.permission : "unsupported");
@@ -13579,18 +14036,20 @@ function App() {
   async function chargerDonneesPrincipales() {
     setRafraichissementEnCours(true);
     try {
-      const [{ data: sigs }, { data: trees }, { data: news }, { data: obs }, { data: suiv }] = await Promise.all([
+      const [{ data: sigs }, { data: trees }, { data: news }, { data: obs }, { data: suiv }, { data: enq }] = await Promise.all([
         supabase.from("signalements_public").select("*").order("created_at", { ascending: false }).limit(300),
         supabase.from("arbres_public").select("*").order("created_at", { ascending: false }).limit(300),
         supabase.from("actualites").select("*").order("created_at", { ascending: false }).limit(20),
         supabase.from("observations").select("*").order("created_at", { ascending: false }).limit(200),
         supabase.from("arbre_suivis").select("*").order("created_at", { ascending: false }).limit(1000),
+        supabase.from("enquete_dossiers_public").select("*").order("created_at", { ascending: false }).limit(300),
       ]);
       setSignalements((sigs || []).reverse().map(mapSignalement));
       setArbres((trees || []).reverse().map(mapArbre));
       setActualites(news || []);
       setObservations((obs || []).reverse());
       setSuivis(suiv || []);
+      setEnquetesCarte(enq || []);
 
       const lastSeen = localStorage.getItem("pace-last-alert") || "";
       const newAlert = (news || []).find(n => n.urgent && n.created_at > lastSeen);
@@ -13782,6 +14241,7 @@ function App() {
     // (doublon en base) si deux passages de la file s'exécutaient en parallèle.
     if (flushInProgressRef.current) return;
     flushInProgressRef.current = true;
+    try { window.dispatchEvent(new CustomEvent("pace-queue-syncing", { detail: { syncing: true } })); } catch (e) {}
     const MAX_TENTATIVES = 8;
     try {
       const queue = loadPendingQueue();
@@ -13795,6 +14255,7 @@ function App() {
           else if (item.type === "suivi") await addSuivi(item.payload.arbreId, item.payload, { isReplay: true, tempId: item.id });
           else if (item.type === "suppression") await envoyerDemandeSuppression({ isReplay: true, tempId: item.id });
           else if (item.type === "benevole") await inscrireBenevole(item.payload, { isReplay: true, tempId: item.id });
+          else if (item.type === "enquete") { await syncOneDossierEnquete(item.payload.localId); dequeuePendingAction(item.id); }
           else dequeuePendingAction(item.id);
         } catch (e) {
           // Un échec sur un élément (réseau instable ou donnée rejetée par le serveur) ne doit
@@ -13817,6 +14278,7 @@ function App() {
     } finally {
       flushInProgressRef.current = false;
       setPendingQueueCount(loadPendingQueue().length);
+      try { window.dispatchEvent(new CustomEvent("pace-queue-syncing", { detail: { syncing: false } })); } catch (e) {}
     }
   }
 
@@ -13910,7 +14372,7 @@ function App() {
         ) : (
           <div key={tab} className="pace-fade-in">
             {tab === "accueil" && <Accueil signalements={signalements.filter(s => s.device_id === DEVICE_ID)} arbres={arbres.filter(a => a.device_id === DEVICE_ID)} notifState={notifState} onEnableNotif={enableNotif} onOpenAdmin={() => { enterAdminIdentity(); setShowAdmin(true); }} actualites={actualites} onNavigate={setTab} lang={lang} estBenevoleValide={estBenevoleValide} benevoleStatut={benevoleStatut} onBenevoleInscrit={() => { setBenevoleStatut("en_attente"); try { localStorage.setItem("pace-benevole-statut", "en_attente"); } catch (e) {} }} estOrganisationValidee={estOrganisationValidee} organisationStatut={organisationStatut} organisationEtapeDossier={organisationEtapeDossier} organisationEtapeMotif={organisationEtapeMotif} onBasculerStatutSignalement={citoyenBasculerStatutSignalement} profilInfo={profilInfo} onProfilChange={rafraichirProfil} />}
-            {tab === "carte" && accesEtendu && <Carte signalements={signalements} arbres={arbres} observations={observations} onAddSignalement={addSignalement} onAddArbre={addArbre} onAddObservation={addObservation} online={online} pendingQueueCount={pendingQueueCount} onFlushQueue={flushPendingQueue} lang={lang} coordFormat={coordFormat} />}
+            {tab === "carte" && accesEtendu && <Carte signalements={signalements} arbres={arbres} observations={observations} enquetesCarte={enquetesCarte} onAddSignalement={addSignalement} onAddArbre={addArbre} onAddObservation={addObservation} online={online} pendingQueueCount={pendingQueueCount} onFlushQueue={flushPendingQueue} lang={lang} coordFormat={coordFormat} />}
             {tab === "signaler" && accesEtendu && <Signaler onSubmit={addSignalement} lang={lang} coordFormat={coordFormat} />}
             {tab === "arbre" && accesEtendu && <MonArbre arbres={arbres.filter(a => a.device_id === DEVICE_ID)} suivis={suivis} onAdd={addArbre} onAddSuivi={addSuivi} lang={lang} coordFormat={coordFormat} />}
             {tab === "profil" && <ProfilTab profilInfo={profilInfo} onProfilChange={rafraichirProfil} lang={lang} />}
