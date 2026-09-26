@@ -1,4 +1,4 @@
-name: Déploiement EcoVigil
+name: EcoVigil Deployment
 
 on:
   push:
@@ -18,7 +18,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Récupérer le code
+      - name: Retrieve the code
         uses: actions/checkout@v4
 
       - name: Installer Node.js
@@ -27,13 +27,13 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Installer les dépendances
+      - name: Install the dependencies
         run: npm install
 
-      - name: Construire le site (npm run build)
+      - name: Build the site (npm run build)
         run: npm run build
 
-      - name: Préparer la publication
+      - name: Prepare the publication
         uses: actions/upload-pages-artifact@v3
         with:
           path: dist
@@ -45,6 +45,6 @@ jobs:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
-      - name: Publier sur GitHub Pages
+      - name: Publish to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
