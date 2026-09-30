@@ -188,13 +188,21 @@
     [style*="font-size: 10px"], [style*="font-size:10px"] { font-size: 11px !important; }
   }
 
-  /* Encoche / barre d'état / barre d'accueil : zéro dans un navigateur classique, actifs en appli installée (iOS) */
-  body {
-    padding-top: env(safe-area-inset-top, 0px);
-    padding-right: env(safe-area-inset-right, 0px);
-    padding-bottom: env(safe-area-inset-bottom, 0px);
-    padding-left: env(safe-area-inset-left, 0px);
+  /* ===== Barres fixes : l'en-tête reste en haut et la navigation reste en bas, en permanence ===== */
+  /* z-index 1100 : au-dessus de la carte (Leaflet monte à 1000), sous les fenêtres et plein écrans (>= 1200) */
+  .pace-header {
+    position: sticky !important; top: 0; z-index: 1100;
+    padding-top: calc(18px + env(safe-area-inset-top, 0px)) !important;  /* encoche / barre d'état en appli installée (0 sinon) */
   }
+  .pace-bottom-nav {
+    position: fixed !important; bottom: 0 !important; left: 50% !important; right: auto !important;
+    transform: translateX(-50%); z-index: 1100;
+    width: 390px; max-width: 100vw;  /* mêmes largeurs que .pace-frame */
+    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px)) !important;  /* barre d'accueil iPhone (0 sinon) */
+  }
+  @media (min-width: 700px)  { .pace-bottom-nav { width: 480px; } }
+  @media (min-width: 1024px) { .pace-bottom-nav { width: 600px; } }
+  body { padding-left: env(safe-area-inset-left, 0px); padding-right: env(safe-area-inset-right, 0px); }
 </style>
 </head>
 <body>
