@@ -48,8 +48,8 @@
     --c-border-soft: #D8E4DA;
     --c-text: #17211C;
     --c-text-secondary: #5B6B60;
-    --c-text-muted: #6B7280;
-    --c-text-faint: #B7C6BC;
+    --c-text-muted: #5A6472;
+    --c-text-faint: #7C8E83;
     --c-warning-bg: #FBEFE3;
     --c-success-bg: #E3F0E8;
     --c-danger-border-soft: #F3D9D0;
@@ -167,6 +167,33 @@
     -webkit-text-fill-color: var(--c-text);
     box-shadow: 0 0 0px 1000px var(--c-surface) inset;
     transition: background-color 9999s ease-in-out 0s;
+  }
+
+  /* ===== Optimisation mobile (visuel et tactile uniquement, aucun changement de structure) ===== */
+  html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }  /* pas d'agrandissement auto du texte en paysage (iOS) */
+  body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow-wrap: break-word; }  /* mots longs : coupés au lieu de déborder */
+  button, a, input, select, textarea, [role="button"] { touch-action: manipulation; }  /* supprime le délai de double-tap */
+  button, [role="button"] { -webkit-tap-highlight-color: transparent; }  /* le retour tactile existant (scale) suffit */
+  input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--c-accent); }
+  button:disabled { cursor: not-allowed; }
+
+  /* ===== Mobile uniquement (écrans < 700px) : lisibilité et ergonomie, sans toucher à la structure ===== */
+  @media (max-width: 699px) {
+    /* Saisie : 16px minimum évite le zoom automatique d'iOS au focus (la largeur des champs ne change pas) */
+    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+    textarea, select { font-size: 16px !important; }
+
+    /* Lisibilité : les textes de 9px et 10px (illisibles sur téléphone) passent à 11px */
+    [style*="font-size: 9px"], [style*="font-size:9px"],
+    [style*="font-size: 10px"], [style*="font-size:10px"] { font-size: 11px !important; }
+  }
+
+  /* Encoche / barre d'état / barre d'accueil : zéro dans un navigateur classique, actifs en appli installée (iOS) */
+  body {
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-right: env(safe-area-inset-right, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    padding-left: env(safe-area-inset-left, 0px);
   }
 </style>
 </head>
