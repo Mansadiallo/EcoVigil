@@ -217,6 +217,15 @@
     .orient-portrait .pace-frame:not(.pace-frame-wide),
     .orient-paysage  .pace-frame:not(.pace-frame-wide) { width: var(--pace-frame-w); }
   }
+  /* Suivi automatique de l'orientation du téléphone : dès que l'appareil passe en paysage (écran peu haut),
+     l'application exploite toute la largeur utilisable (hors encoche, 960px max) ; en revenant en portrait,
+     elle reprend sa largeur habituelle. Aucun réglage nécessaire. Le choix manuel « Portrait » reste respecté. */
+  @media (orientation: landscape) and (max-height: 500px) {
+    .pace-app-outer:not(.orient-portrait) {
+      --pace-frame-w: min(calc(100vw - env(safe-area-inset-left, 0px) - env(safe-area-inset-right, 0px)), 960px);
+    }
+    .pace-app-outer:not(.orient-portrait) .pace-frame:not(.pace-frame-wide) { width: var(--pace-frame-w); }
+  }
   /* Écran peu haut (téléphone en paysage) : barres fixes plus compactes pour laisser de la place au contenu */
   @media (max-height: 500px) {
     .pace-header { padding-top: calc(8px + env(safe-area-inset-top, 0px)) !important; padding-bottom: 10px !important; }
