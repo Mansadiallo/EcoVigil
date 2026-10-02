@@ -5,7 +5,7 @@
 // À chaque déploiement qui change index.html, manifest.json ou les icônes, incrémente
 // CACHE_VERSION ci-dessous pour que les appareils déjà installés récupèrent la nouvelle version
 // au lieu de rester bloqués sur une version mise en cache.
-const CACHE_VERSION = "ecovigil-v4";
+const CACHE_VERSION = "ecovigil-v5";
 // Bibliothèques chargées depuis des CDN (Leaflet, XLSX, jsPDF, MapLibre…) : toutes sont épinglées sur une
 // version précise dans index.html, leur contenu ne change donc jamais. On les garde en mémoire après le
 // premier chargement : l'application démarre alors même si le CDN ou le réseau est indisponible.
