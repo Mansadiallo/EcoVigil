@@ -2,7 +2,7 @@
   "name": "EcoVigil",
   "short_name": "EcoVigil",
   "description": "EcoVigil — Observer, signaler, protéger l'environnement. Plateforme citoyenne pour le signalement environnemental et le suivi d'arbres plantés.",
-  "start_url": "./index.html",
+  "start_url": "/",
   "scope": "./",
   "display": "standalone",
   "orientation": "portrait",
