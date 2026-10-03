@@ -70,6 +70,26 @@ function App() {
   // ouverture de l'app, pour tout utilisateur (citoyen anonyme ou compte admin/organisation).
   useEffect(() => { capturerConnexionParZone(); }, []);
 
+  // Reprise d'identité bénévole : le statut de bénévole (et les groupes, dossiers d'enquête et
+  // signalements qui lui sont rattachés) est lié à l'identifiant d'appareil, stocké par domaine
+  // dans le navigateur. Sur un nouveau domaine ou un nouvel appareil, le bénévole se connecte avec
+  // son profil, puis reprend ici son identifiant d'appareil d'origine (renvoyé uniquement au
+  // titulaire du profil par la fonction Supabase benevole_device_du_profil). Un seul rechargement :
+  // une fois les deux identifiants identiques, plus rien ne se déclenche.
+  useEffect(() => {
+    if (showAdmin) return;
+    if (!citoyenSession || !citoyenSession.user || !citoyenSession.user.email) return;
+    (async () => {
+      try {
+        const { data } = await supabase.rpc("benevole_device_du_profil");
+        if (typeof data === "string" && data && data !== DEVICE_ID) {
+          localStorage.setItem("pace-device-id", data);
+          window.location.reload();
+        }
+      } catch (e) { /* best-effort : en cas d'échec, l'accès reste celui de l'appareil courant */ }
+    })();
+  }, [citoyenSession, showAdmin]);
+
   // Charge une fois la taxonomie publiée (défis/problèmes) dans le cache global partagé par
   // categorieLabel/categorieMeta, puis force un re-render pour que tout l'affichage déjà monté
   // (accueil, carte, historique admin...) se mette à jour avec les nouveaux libellés/icônes.
@@ -104,7 +124,7 @@ function App() {
   // Statut bénévole de cet appareil : null tant qu'aucune inscription n'existe (accès libre en tant que citoyen).
   // Un enregistrement existant bloque l'accès au contenu tant qu'il n'est pas "valide" (voir Centre d'EcoVigil > Bénévoles).
   // Sans compte email/mot de passe (retiré), l'identité est de nouveau uniquement le device_id.
-  // La lecture passe par la fonction benevole_statut(p_device) (statut de cet appareil uniquement, aucune
+  // La lecture passe par la vue benevoles_statut_public (device_id + statut uniquement, aucune
   // donnée personnelle) plutôt que par la table benevoles directement, dont le SELECT public
   // n'existe plus depuis la correction de la fuite de vie privée.
   const [benevoleStatut, setBenevoleStatut] = useState(() => {
@@ -118,7 +138,7 @@ function App() {
     try { return !localStorage.getItem("pace-benevole-statut"); } catch (e) { return true; }
   });
   useEffect(() => {
-    supabase.rpc("benevole_statut", { p_device: DEVICE_ID })
+    supabase.from("benevoles_statut_public").select("statut").eq("device_id", DEVICE_ID).order("statut", { ascending: false }).limit(1)
       .then(({ data }) => {
         if (data && data.length > 0) {
           // Réponse serveur claire : statut à jour, on le met en cache.
