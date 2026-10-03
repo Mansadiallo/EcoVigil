@@ -340,6 +340,8 @@ export function ProfilGate({ profilInfo, children }) {
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState("");
   const [messageConfirmation, setMessageConfirmation] = useState(null); // { compteExistant: bool, texte } | null
+  const [modeOubli, setModeOubli] = useState(false); // formulaire "Mot de passe oublié" affiché à la place de la connexion
+  const [oubliEnvoye, setOubliEnvoye] = useState(false);
   const fileRef = useRef(null);
   const nomRef = useRef(null);
   const emailRef = useRef(null);
@@ -437,6 +439,20 @@ export function ProfilGate({ profilInfo, children }) {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
     if (error) { setErreur("E-mail ou mot de passe incorrect."); return; }
+  }
+
+  // Mot de passe oublié : envoie le lien de récupération (traité au retour par App.jsx, qui ouvre
+  // l'écran "Nouveau mot de passe"). Message volontairement identique que l'adresse soit connue
+  // ou non, pour ne pas révéler quels e-mails ont un profil.
+  async function envoyerLienOubli(e) {
+    if (e && e.preventDefault) e.preventDefault();
+    setErreur("");
+    if (!emailValide) { setErreur("Cette adresse e-mail ne semble pas valide."); return; }
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: urlRedirectionAuth() });
+    setBusy(false);
+    if (error) { setErreur(error.message || "Impossible d'envoyer l'e-mail pour le moment. Réessaie dans quelques instants."); return; }
+    setOubliEnvoye(true);
   }
 
   const boutonPrincipal = { width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "opacity .15s ease" };
@@ -567,10 +583,41 @@ export function ProfilGate({ profilInfo, children }) {
             )}
           </form>
         </>
+      ) : modeOubli ? (
+        <form onSubmit={envoyerLienOubli} className="pace-fade-in">
+          <div style={{ fontFamily: "Fraunces, serif", fontSize: 14.5, fontWeight: 600, color: "var(--c-text)", marginBottom: 6 }}>Mot de passe oublié</div>
+          {oubliEnvoye ? (
+            <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.6, marginBottom: 12 }}>
+              Si un profil existe avec cette adresse, un e-mail vient d'être envoyé. Ouvre le lien reçu (pense à vérifier les courriers indésirables) pour choisir un nouveau mot de passe.
+            </div>
+          ) : (
+            <>
+              <div style={{ fontSize: 12, color: "var(--c-text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
+                Saisis l'adresse e-mail de ton profil : nous t'enverrons un lien pour choisir un nouveau mot de passe.
+              </div>
+              <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail" style={champ} />
+              {erreur && (
+                <div role="alert" className="pace-fade-in" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>
+                  <IconAlert size={13} color="#B5451B" />
+                  <span>{erreur}</span>
+                </div>
+              )}
+              <button type="button" onClick={envoyerLienOubli} disabled={busy} style={{ ...boutonPrincipal, opacity: busy ? 0.75 : 1 }}>
+                {busy ? "Envoi…" : "Envoyer le lien"}
+              </button>
+            </>
+          )}
+          <button type="button" onClick={() => { setModeOubli(false); setOubliEnvoye(false); setErreur(""); }} style={boutonLien}>
+            ← Retour à la connexion
+          </button>
+        </form>
       ) : (
         <form onSubmit={connecterProfil} className="pace-fade-in">
           <input ref={emailLoginRef} required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail" style={champ} />
           <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" style={champ} />
+          <button type="button" onClick={() => { setModeOubli(true); setOubliEnvoye(false); setErreur(""); }} style={{ background: "none", border: "none", padding: "0 0 10px", color: "var(--c-accent-dark)", fontSize: 11.5, cursor: "pointer", display: "block", marginLeft: "auto" }}>
+            Mot de passe oublié ?
+          </button>
           {erreur && (
             <div role="alert" className="pace-fade-in" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>
               <IconAlert size={13} color="#B5451B" />
