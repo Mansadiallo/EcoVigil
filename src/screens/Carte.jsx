@@ -11,7 +11,7 @@ import { DEVICE_ID, supabase } from "../lib/supabase.js";
 import { formatCoordonnees } from "../lib/utils.js";
 import { T, TITRE_SOUS } from "../lib/typo.jsx";
 
-export function Carte({ signalements, arbres, observations, enquetesCarte, onAddSignalement, onAddArbre, onAddObservation, online, pendingQueueCount, onFlushQueue, lang, coordFormat }) {
+export function Carte({ signalements, arbres, observations, enquetesCarte, onAddSignalement, onAddArbre, onAddObservation, onSupprimerArbre, online, pendingQueueCount, onFlushQueue, lang, coordFormat }) {
   const mapElRef = useRef(null);
   const mapRef = useRef(null);
   const layerRef = useRef(null);
@@ -23,6 +23,10 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
   const parcoursLayerRef = useRef(null);
   const [locating, setLocating] = useState(true);
   const [selected, setSelected] = useState(null);
+  // Suppression d'un arbre par un bénévole validé (onSupprimerArbre n'est fourni que pour eux).
+  // État porté par Carte (et non par DetailCard, recréé à chaque rendu) pour ne pas être perdu.
+  const [suppArbre, setSuppArbre] = useState(null); // null | { motif, busy, erreur }
+  useEffect(() => { setSuppArbre(null); }, [selected]);
   const [fullscreen, setFullscreen] = useState(false);
   const [satellite, setSatellite] = useState(false);
   // Couches thématiques Esri (ArcGIS REST, sans clé API) : occupation du sol et hydrologie.
@@ -964,6 +968,18 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
     { id: "risques", label: "Risques (incendie / inondation)", icon: IconFlame },
   ];
 
+  async function confirmerSuppressionArbre(arbre) {
+    if (!suppArbre || !suppArbre.motif || suppArbre.busy || !onSupprimerArbre) return;
+    setSuppArbre(prev => ({ ...prev, busy: true, erreur: "" }));
+    try {
+      await onSupprimerArbre(arbre, suppArbre.motif);
+      setSuppArbre(null);
+      setSelected(null);
+    } catch (e) {
+      setSuppArbre(prev => ({ ...prev, busy: false, erreur: "Suppression refusée. Vérifie ta connexion et que tu es bien connecté avec ton compte bénévole." }));
+    }
+  }
+
   function DetailCard({ s }) {
     if (s.type === "signalement") {
       return (
@@ -1003,6 +1019,29 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
         <MediaThumb src={s.data.photo_url} style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 10, marginBottom: 8 }} />
         <div style={{ fontWeight: 600, fontSize: T.body }}>{s.data.nom}</div>
         <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginTop: 3 }}>{t(lang, "plante_le")}{s.data.date}</div>
+        {onSupprimerArbre && s.type === "arbre" && !s.data._pending && !s.data.organisation_id && (
+          !suppArbre ? (
+            <button onClick={() => setSuppArbre({ motif: "", busy: false, erreur: "" })} style={{ marginTop: 10, display: "flex", alignItems: "center", gap: 6, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--c-danger-border-soft)", background: "var(--c-surface)", color: "#B5451B", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>
+              <IconTrash size={14} /> Supprimer cet arbre
+            </button>
+          ) : (
+            <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--c-border-soft)" }}>
+              <div style={{ fontSize: T.small, fontWeight: 600, marginBottom: 6 }}>Pourquoi supprimer cet arbre ?</div>
+              {[["mal_enregistre", "Mal enregistré (faux arbre, doublon, espèce incorrecte)"], ["mal_geolocalise", "Mal géolocalisé (position incorrecte)"]].map(([id, label]) => (
+                <button key={id} onClick={() => setSuppArbre(prev => ({ ...prev, motif: id, erreur: "" }))} style={{ display: "block", width: "100%", textAlign: "left", marginBottom: 6, padding: "8px 10px", borderRadius: 8, border: suppArbre.motif === id ? "2px solid #B5451B" : "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text)", fontSize: T.small, cursor: "pointer" }}>
+                  {label}
+                </button>
+              ))}
+              {suppArbre.erreur && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 6 }}>{suppArbre.erreur}</div>}
+              <div style={{ display: "flex", gap: 8 }}>
+                <button onClick={() => setSuppArbre(null)} disabled={suppArbre.busy} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>Annuler</button>
+                <button onClick={() => confirmerSuppressionArbre(s.data)} disabled={!suppArbre.motif || suppArbre.busy} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: (!suppArbre.motif || suppArbre.busy) ? "var(--c-text-faint)" : "#B5451B", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: (!suppArbre.motif || suppArbre.busy) ? "default" : "pointer" }}>
+                  {suppArbre.busy ? "Suppression…" : "Confirmer la suppression"}
+                </button>
+              </div>
+            </div>
+          )
+        )}
       </>
     );
   }
