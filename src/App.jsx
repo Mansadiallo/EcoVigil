@@ -520,6 +520,22 @@ function App() {
     setArbres(prev => prev.filter(a => a.id !== arbre.id));
   }
 
+  // Abandon manuel des envois en attente (bandeau « Envoi de N élément(s) en attente… » bloqué).
+  // Retire de la file locale tous les éléments pas encore envoyés, ainsi que leurs copies
+  // provisoires affichées dans l'app (marquées _pending).
+  function abandonnerEnvoisEnAttente() {
+    const queue = loadPendingQueue();
+    if (queue.length === 0) { setPendingQueueCount(0); return; }
+    if (!confirm(`Supprimer ${queue.length} élément(s) en attente d'envoi ? Ces données n'ont pas encore été envoyées au serveur et seront perdues définitivement.`)) return;
+    queue.forEach(item => { try { dequeuePendingAction(item.id); } catch (e) {} });
+    setArbres(prev => prev.filter(a => !a._pending));
+    setSignalements(prev => prev.filter(x => !x._pending));
+    setObservations(prev => prev.filter(x => !x._pending));
+    setSuivis(prev => prev.filter(x => !x._pending));
+    setPendingQueueCount(loadPendingQueue().length);
+    logActivity("file_attente_abandonnee", "citoyen", DEVICE_ID, `${queue.length} élément(s)`);
+  }
+
   // Suppression par un bénévole validé d'un arbre qu'il juge mal enregistré ou mal géolocalisé.
   // Suppression douce via RPC SECURITY DEFINER (vérifie le statut bénévole côté serveur, journalise
   // dans audit_logs) : l'arbre reste restaurable par un admin depuis l'Historique.
@@ -900,6 +916,7 @@ function App() {
         {online && pendingQueueCount > 0 && (
           <div style={{ background: "var(--c-warning)", color: "#fff", fontSize: T.small, textAlign: "center", padding: "6px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <IconClock size={13} /> {t(lang, "envoi_en_cours_prefix")} {pendingQueueCount} {t(lang, "envoi_attente_suffix")}
+            <button onClick={abandonnerEnvoisEnAttente} style={{ marginLeft: 6, padding: "2px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.7)", background: "rgba(255,255,255,0.18)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>Supprimer</button>
           </div>
         )}
 
