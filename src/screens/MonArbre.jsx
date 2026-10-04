@@ -11,13 +11,14 @@ import { T } from "../lib/typo.jsx";
 
 const ETAT_SUIVI = { vivant: { label: "En bonne santé", color: "var(--c-accent)" }, stresse: { label: "En difficulté", color: "var(--c-warning)" }, mort: { label: "Mort", color: "#B5451B" } };
 
-export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat }) {
+export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, onDelete, lang, coordFormat }) {
   const [showForm, setShowForm] = useState(false);
   const [nom, setNom] = useState("");
   const [photo, setPhoto] = useState(null);
   const [suiviOuvert, setSuiviOuvert] = useState(null);
   const [gpsFix, setGpsFix] = useState(null);
   const [erreur, setErreur] = useState("");
+  const [suppressionEnCours, setSuppressionEnCours] = useState(null);
 
   // Surface à reboiser : même exigence que dans l'Espace Organisation — le citoyen doit
   // d'abord définir la surface qu'il compte reboiser (contour + superficie déclarée) avant
@@ -115,6 +116,21 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat 
     setErreur("");
     onAdd({ nom, photo, lat: gpsFix.lat, lng: gpsFix.lng });
     setNom(""); setPhoto(null); setShowForm(false); setGpsFix(null); setErreur("");
+  }
+
+  async function supprimerArbre(a) {
+    if (!onDelete) return;
+    if (!confirm(`Supprimer "${a.nom || "cet arbre"}" ? Utilise cette option si l'arbre a été enregistré par erreur ou si ses informations sont incorrectes.`)) return;
+    setSuppressionEnCours(a.id);
+    try {
+      await onDelete(a);
+      if (suiviOuvert === a.id) setSuiviOuvert(null);
+      logActivity("arbre_supprime", "citoyen", DEVICE_ID, a.nom || "");
+    } catch (e) {
+      alert("Impossible de supprimer l'arbre pour le moment. Vérifie ta connexion et réessaie.");
+    } finally {
+      setSuppressionEnCours(null);
+    }
   }
 
   function growth(a) {
@@ -302,6 +318,10 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat 
               </div>
               <button onClick={() => shareContent("Mon arbre sur EcoVigil", `Je viens d'enregistrer un ${a.nom} sur EcoVigil 🌱 Ensemble pour un avenir durable.`)}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "var(--c-text-muted)", padding: 6 }}><IconShare size={16} /></button>
+              {onDelete && (
+                <button onClick={() => supprimerArbre(a)} disabled={suppressionEnCours === a.id} aria-label={`Supprimer ${a.nom || "l'arbre"}`} title="Supprimer cet arbre"
+                  style={{ background: "none", border: "none", cursor: suppressionEnCours === a.id ? "default" : "pointer", color: "#B5451B", padding: 6, opacity: suppressionEnCours === a.id ? 0.5 : 1 }}><IconTrash size={16} /></button>
+              )}
               <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: T.body, color: "var(--c-accent)", fontWeight: 600 }}>{growth(a)}%</div>
             </div>
 
