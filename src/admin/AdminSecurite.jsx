@@ -4,6 +4,7 @@ import { logActivity } from "../lib/audit.js";
 import { categorieMeta } from "../lib/categories.jsx";
 import { supabase } from "../lib/supabase.js";
 import { distanceMetres } from "../lib/utils.js";
+import { T, TITRE_SOUS } from "../lib/typo.jsx";
 
 export function ConfirmActionModal({ title, description, reasonLabel, confirmLabel, confirmColor, danger, showDuration, motifOptions, onConfirm, onCancel }) {
   const [reason, setReason] = useState("");
@@ -36,13 +37,13 @@ export function ConfirmActionModal({ title, description, reasonLabel, confirmLab
       <div className="pace-fade-in" style={{ position: "relative", width: "100%", maxWidth: 480, background: "var(--c-surface)", borderRadius: "20px 20px 0 0", padding: 20, maxHeight: "88vh", overflowY: "auto" }}>
         {step === 1 ? (
           <>
-            <div style={{ fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600, color: danger ? "#B5451B" : "var(--c-accent-dark)", marginBottom: 6 }}>{title}</div>
-            {description && <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", marginBottom: 14, lineHeight: 1.5 }}>{description}</div>}
+            <div style={{ ...TITRE_SOUS, fontWeight: 600, color: danger ? "#B5451B" : "var(--c-accent-dark)", marginBottom: 6 }}>{title}</div>
+            {description && <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginBottom: 14, lineHeight: 1.5 }}>{description}</div>}
 
             {motifOptions && (
               <>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 6 }}>Motif</div>
-                <select value={motif} onChange={e => setMotif(e.target.value)} style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 12, boxSizing: "border-box" }}>
+                <div style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 6 }}>Motif</div>
+                <select value={motif} onChange={e => setMotif(e.target.value)} style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 12, boxSizing: "border-box" }}>
                   {motifOptions.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
                 </select>
               </>
@@ -50,8 +51,8 @@ export function ConfirmActionModal({ title, description, reasonLabel, confirmLab
 
             {showDuration && (
               <>
-                <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 6 }}>Durée</div>
-                <select value={duration} onChange={e => setDuration(e.target.value)} style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" }}>
+                <div style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 6 }}>Durée</div>
+                <select value={duration} onChange={e => setDuration(e.target.value)} style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" }}>
                   <option value="7">7 jours</option>
                   <option value="30">30 jours</option>
                   <option value="custom">Date précise…</option>
@@ -59,36 +60,36 @@ export function ConfirmActionModal({ title, description, reasonLabel, confirmLab
                 </select>
                 {duration === "custom" && (
                   <input type="date" value={customDate} onChange={e => setCustomDate(e.target.value)}
-                    style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 12, boxSizing: "border-box" }} />
+                    style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 12, boxSizing: "border-box" }} />
                 )}
               </>
             )}
 
-            <div style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 6 }}>{reasonLabel || "Motif de l'action (obligatoire)"}</div>
+            <div style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 6 }}>{reasonLabel || "Motif de l'action (obligatoire)"}</div>
             <textarea value={reason} onChange={e => setReason(e.target.value)} rows={3} placeholder="Explique la raison de cette action…"
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 6, boxSizing: "border-box", resize: "none", fontFamily: "Work Sans, sans-serif" }} />
-            {!reasonOk && reason.length > 0 && <div style={{ fontSize: 11, color: "#B5451B", marginBottom: 8 }}>Précise un peu plus (5 caractères minimum).</div>}
+              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 6, boxSizing: "border-box", resize: "none" }} />
+            {!reasonOk && reason.length > 0 && <div style={{ fontSize: T.meta, color: "#B5451B", marginBottom: 8 }}>Précise un peu plus (5 caractères minimum).</div>}
 
             <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
-              <button type="button" onClick={onCancel} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: 13, color: "var(--c-text)" }}>Annuler</button>
+              <button type="button" onClick={onCancel} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: T.body, color: "var(--c-text)" }}>Annuler</button>
               <button type="button" disabled={!reasonOk} onClick={() => setStep(2)} style={{
                 flex: 1, padding: "11px 0", borderRadius: 10, border: "none", cursor: reasonOk ? "pointer" : "default",
-                background: !reasonOk ? "var(--c-text-faint)" : (confirmColor || "var(--c-accent-dark)"), color: "#fff", fontWeight: 600, fontSize: 13 }}>
+                background: !reasonOk ? "var(--c-text-faint)" : (confirmColor || "var(--c-accent-dark)"), color: "#fff", fontWeight: 600, fontSize: T.body }}>
                 Continuer
               </button>
             </div>
           </>
         ) : (
           <>
-            <div style={{ fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600, color: "#B5451B", marginBottom: 10 }}>Confirmer définitivement ?</div>
-            <div style={{ fontSize: 13, color: "var(--c-text-secondary)", lineHeight: 1.6, marginBottom: 4 }}>
+            <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "#B5451B", marginBottom: 10 }}>Confirmer définitivement ?</div>
+            <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", lineHeight: 1.6, marginBottom: 4 }}>
               {confirmLabel || "Cette action"} — motif : « {reason.trim()} »
             </div>
-            <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginBottom: 16 }}>Cette action sera enregistrée dans le journal d'audit avec ton identité et l'horodatage.</div>
+            <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginBottom: 16 }}>Cette action sera enregistrée dans le journal d'audit avec ton identité et l'horodatage.</div>
             <div style={{ display: "flex", gap: 8 }}>
-              <button type="button" onClick={() => setStep(1)} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: 13, color: "var(--c-text)" }}>Retour</button>
+              <button type="button" onClick={() => setStep(1)} style={{ flex: 1, padding: "11px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: T.body, color: "var(--c-text)" }}>Retour</button>
               <button type="button" disabled={busy} onClick={handleFinalConfirm} style={{
-                flex: 1, padding: "11px 0", borderRadius: 10, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+                flex: 1, padding: "11px 0", borderRadius: 10, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
                 {busy ? "..." : "Confirmer"}
               </button>
             </div>
@@ -149,26 +150,26 @@ export function AdminConnexions() {
   return (
     <div>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-        <div style={{ fontSize: 11, fontWeight: 600, color: "var(--c-text-secondary)" }}>Connexions par zone géographique</div>
-        <select value={jours} onChange={e => setJours(Number(e.target.value))} style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12, background: "var(--c-bg)", color: "var(--c-text)" }}>
+        <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-secondary)" }}>Connexions par zone géographique</div>
+        <select value={jours} onChange={e => setJours(Number(e.target.value))} style={{ padding: "6px 8px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }}>
           <option value={7}>7 derniers jours</option>
           <option value={30}>30 derniers jours</option>
           <option value={90}>90 derniers jours</option>
         </select>
       </div>
-      <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 14, lineHeight: 1.5 }}>
+      <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 14, lineHeight: 1.5 }}>
         Position approximative (ville/région/pays) résolue à partir de l'adresse IP à chaque ouverture de l'app, agrégée par zone — jamais de position individuelle précise, jamais de suivi nominatif d'un utilisateur.
       </div>
       {logs === null ? (
-        <div style={{ color: "var(--c-text-muted)", fontSize: 13 }}>Chargement…</div>
+        <div style={{ color: "var(--c-text-muted)", fontSize: T.body }}>Chargement…</div>
       ) : parZone.length === 0 ? (
-        <div style={{ color: "var(--c-text-muted)", fontSize: 13 }}>Aucune connexion enregistrée sur cette période.</div>
+        <div style={{ color: "var(--c-text-muted)", fontSize: T.body }}>Aucune connexion enregistrée sur cette période.</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 2 }}>{total} connexion{total > 1 ? "s" : ""} sur la période, {parZone.length} zone{parZone.length > 1 ? "s" : ""}</div>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 2 }}>{total} connexion{total > 1 ? "s" : ""} sur la période, {parZone.length} zone{parZone.length > 1 ? "s" : ""}</div>
           {parZone.map(([zone, n]) => (
             <div key={zone}>
-              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 12.5, marginBottom: 3 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: T.body, marginBottom: 3 }}>
                 <span>{zone}</span><span style={{ fontWeight: 600 }}>{n}</span>
               </div>
               <div style={{ height: 6, borderRadius: 3, background: "var(--c-border)", overflow: "hidden" }}>
@@ -236,33 +237,33 @@ export function AdminAbusSignalements({ signalements }) {
 
   return (
     <div>
-      <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 16, lineHeight: 1.5 }}>
+      <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 16, lineHeight: 1.5 }}>
         Détection basée uniquement sur des identifiants d'appareil pseudonymes et les coordonnées/catégorie/date déjà présentes sur chaque signalement — jamais sur une identité réelle ni sur la connexion.
       </div>
 
-      <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>Appareils à volume inhabituel ({analyse.appareilsSuspects.length})</div>
+      <div style={{ fontSize: T.body, fontWeight: 600, marginBottom: 8 }}>Appareils à volume inhabituel ({analyse.appareilsSuspects.length})</div>
       {analyse.appareilsSuspects.length === 0 ? (
-        <div style={{ color: "var(--c-text-muted)", fontSize: 12.5, marginBottom: 18 }}>Aucun appareil au-dessus des seuils (5 signalements/24h ou 15/7j).</div>
+        <div style={{ color: "var(--c-text-muted)", fontSize: T.body, marginBottom: 18 }}>Aucun appareil au-dessus des seuils (5 signalements/24h ou 15/7j).</div>
       ) : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6, marginBottom: 18 }}>
           {analyse.appareilsSuspects.map(a => (
-            <div key={a.id} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 10, padding: "8px 12px", fontSize: 12 }}>
+            <div key={a.id} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 10, padding: "8px 12px", fontSize: T.small }}>
               Appareil {a.id.slice(0, 8)}… — {a.recents24h} en 24h, {a.recents7j} en 7j ({a.total} au total)
             </div>
           ))}
         </div>
       )}
 
-      <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 8 }}>Grappes de doublons potentiels ({analyse.grappes.length})</div>
+      <div style={{ fontSize: T.body, fontWeight: 600, marginBottom: 8 }}>Grappes de doublons potentiels ({analyse.grappes.length})</div>
       {analyse.grappes.length === 0 ? (
-        <div style={{ color: "var(--c-text-muted)", fontSize: 12.5 }}>Aucune grappe détectée (même catégorie, &lt;25 m, &lt;48h).</div>
+        <div style={{ color: "var(--c-text-muted)", fontSize: T.body }}>Aucune grappe détectée (même catégorie, &lt;25 m, &lt;48h).</div>
       ) : (
         <div className="pace-grid-cards" style={{ gap: 10 }}>
           {analyse.grappes.map((g, i) => (
             <div key={i} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 10, padding: "10px 12px" }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{categorieMeta(g[0].categorie).label} — {g.length} signalements groupés</div>
+              <div style={{ fontSize: T.small, fontWeight: 600, marginBottom: 4 }}>{categorieMeta(g[0].categorie).label} — {g.length} signalements groupés</div>
               {g.map(s => (
-                <div key={s.id} style={{ fontSize: 11, color: "var(--c-text-secondary)" }}>
+                <div key={s.id} style={{ fontSize: T.meta, color: "var(--c-text-secondary)" }}>
                   {s.date || new Date(s.created_at).toLocaleString("fr-FR")} — appareil {(s.device_id || "inconnu").slice(0, 8)}…
                 </div>
               ))}
@@ -327,18 +328,18 @@ export function AdminHistorique({ isSuperAdmin, onRestaurerItem }) {
     if (items.length === 0) return null;
     return (
       <div>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "var(--c-text-muted)", textTransform: "uppercase", letterSpacing: 0.4, margin: "10px 0 6px" }}>{titre} ({items.length})</div>
+        <div style={{ fontSize: T.meta, fontWeight: 700, color: "var(--c-text-muted)", textTransform: "uppercase", letterSpacing: 0.4, margin: "10px 0 6px" }}>{titre} ({items.length})</div>
         <div className="pace-grid-cards">
           {items.map(item => (
             <div key={item.id} style={{ background: "var(--c-surface)", borderRadius: 12, padding: 12, border: "1px solid var(--c-border)" }}>
-              <div style={{ fontWeight: 600, fontSize: 13, color: "var(--c-text)" }}>{nomDe(table, item)}</div>
-              <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 3 }}>Supprimé par {item.deleted_by || "?"} le {new Date(item.deleted_at).toLocaleDateString("fr-FR")}</div>
+              <div style={{ fontWeight: 600, fontSize: T.body, color: "var(--c-text)" }}>{nomDe(table, item)}</div>
+              <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 3 }}>Supprimé par {item.deleted_by || "?"} le {new Date(item.deleted_at).toLocaleDateString("fr-FR")}</div>
               {table === "signalements" && !isSuperAdmin ? (
-                <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 8, fontStyle: "italic" }}>Restauration et suppression définitive réservées au super-admin.</div>
+                <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 8, fontStyle: "italic" }}>Restauration et suppression définitive réservées au super-admin.</div>
               ) : (
                 <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-                  <button onClick={() => restaurer(table, item)} style={{ fontSize: 11.5, padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Restaurer</button>
-                  <button onClick={() => supprimerDefinitivement(table, item)} style={{ fontSize: 11.5, padding: "6px 12px", borderRadius: 8, border: "1px solid #B5451B", background: "var(--c-danger-border-soft)", color: "#B5451B", fontWeight: 600, cursor: "pointer" }}>Supprimer définitivement</button>
+                  <button onClick={() => restaurer(table, item)} style={{ fontSize: T.small, padding: "6px 12px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Restaurer</button>
+                  <button onClick={() => supprimerDefinitivement(table, item)} style={{ fontSize: T.small, padding: "6px 12px", borderRadius: 8, border: "1px solid #B5451B", background: "var(--c-danger-border-soft)", color: "#B5451B", fontWeight: 600, cursor: "pointer" }}>Supprimer définitivement</button>
                 </div>
               )}
             </div>
@@ -353,24 +354,24 @@ export function AdminHistorique({ isSuperAdmin, onRestaurerItem }) {
       <div style={{ display: "flex", gap: 6, marginBottom: 4 }}>
         {[["journal", "Journal"], ["corbeille", `Éléments supprimés${corbeille ? ` (${totalCorbeille})` : ""}`]].map(([id, label]) => (
           <button key={id} onClick={() => setVue(id)} style={{
-            padding: "6px 12px", borderRadius: 20, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+            padding: "6px 12px", borderRadius: 20, fontSize: T.small, fontWeight: 600, cursor: "pointer",
             border: vue === id ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
             background: vue === id ? "var(--c-accent-dark)" : "var(--c-surface)", color: vue === id ? "#fff" : "var(--c-text-secondary)" }}>{label}</button>
         ))}
       </div>
 
       {vue === "journal" && (
-        logs === null ? <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: 13 }}>Chargement…</div> :
+        logs === null ? <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: T.body }}>Chargement…</div> :
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-          <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginBottom: 4 }}>Les 100 dernières actions de l'équipe.</div>
-          {logs.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: 13, textAlign: "center", padding: 20 }}>Aucune action enregistrée pour l'instant.</div>}
+          <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginBottom: 4 }}>Les 100 dernières actions de l'équipe.</div>
+          {logs.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: T.body, textAlign: "center", padding: 20 }}>Aucune action enregistrée pour l'instant.</div>}
           {logs.map(l => (
-            <div key={l.id} style={{ background: "var(--c-surface)", borderRadius: 10, padding: "10px 12px", border: "1px solid var(--c-border)", fontSize: 12.5 }}>
+            <div key={l.id} style={{ background: "var(--c-surface)", borderRadius: 10, padding: "10px 12px", border: "1px solid var(--c-border)", fontSize: T.body }}>
               <span style={{ fontWeight: 600, color: "var(--c-text)" }}>{l.acteur}</span>{" "}
               <span style={{ color: "var(--c-text-secondary)" }}>{ACTION_LABELS[l.action] || l.action}</span>{" "}
               <span style={{ color: "var(--c-text-secondary)" }}>{l.cible_table}</span>
               {l.detail && <span style={{ color: "var(--c-text-muted)" }}> — {l.detail}</span>}
-              <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 3 }}>
+              <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 3 }}>
                 {new Date(l.created_at).toLocaleDateString("fr-FR")} à {new Date(l.created_at).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
               </div>
             </div>
@@ -379,10 +380,10 @@ export function AdminHistorique({ isSuperAdmin, onRestaurerItem }) {
       )}
 
       {vue === "corbeille" && (
-        corbeille === null ? <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: 13 }}>Chargement…</div> :
-        totalCorbeille === 0 ? <div style={{ color: "var(--c-text-muted)", fontSize: 13, textAlign: "center", padding: 20 }}>Corbeille vide.</div> :
+        corbeille === null ? <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: T.body }}>Chargement…</div> :
+        totalCorbeille === 0 ? <div style={{ color: "var(--c-text-muted)", fontSize: T.body, textAlign: "center", padding: 20 }}>Corbeille vide.</div> :
         <div>
-          <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginBottom: 4 }}>
+          <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginBottom: 4 }}>
             Les éléments supprimés restent ici jusqu'à restauration ou suppression définitive.
           </div>
           <CorbeilleSection titre="Signalements" table="signalements" items={corbeille.signalements} />
@@ -520,53 +521,53 @@ export function AdminMfaPanel({ session }) {
     <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)", marginBottom: 12 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <IconLock size={16} color="var(--c-accent-dark)" />
-        <div style={{ fontFamily: "Fraunces, serif", fontSize: 14.5, fontWeight: 600, color: "var(--c-accent-dark)" }}>Double authentification (2FA)</div>
+        <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)" }}>Double authentification (2FA)</div>
       </div>
-      <div style={{ fontSize: 11.5, color: "var(--c-text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
+      <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
         Ajoute une couche de sécurité supplémentaire : en plus du mot de passe, un code à 6 chiffres généré
         par une application d'authentification (Google Authenticator, Authy, 1Password…) sera demandé à
         chaque connexion.
       </div>
 
-      {message && <div style={{ fontSize: 12, color: "var(--c-accent)", marginBottom: 10 }}>{message}</div>}
-      {erreur && <div role="alert" style={{ fontSize: 12, color: "#B5451B", marginBottom: 10 }}>{erreur}</div>}
+      {message && <div style={{ fontSize: T.small, color: "var(--c-accent)", marginBottom: 10 }}>{message}</div>}
+      {erreur && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 10 }}>{erreur}</div>}
 
       {facteurVerifie && !enrolement ? (
         <>
-          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 700, color: "#fff", background: "var(--c-accent)", borderRadius: 999, padding: "4px 10px", marginBottom: 10 }}>
+          <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: T.small, fontWeight: 700, color: "#fff", background: "var(--c-accent)", borderRadius: 999, padding: "4px 10px", marginBottom: 10 }}>
             <IconCheck size={12} /> Activée
           </div>
           {!confirmSuppr ? (
-            <button onClick={() => setConfirmSuppr(true)} style={{ display: "block", padding: "8px 14px", borderRadius: 10, border: "1px solid var(--c-danger-border-soft)", background: "var(--c-surface)", color: "#B5451B", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+            <button onClick={() => setConfirmSuppr(true)} style={{ display: "block", padding: "8px 14px", borderRadius: 10, border: "1px solid var(--c-danger-border-soft)", background: "var(--c-surface)", color: "#B5451B", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>
               Désactiver la double authentification
             </button>
           ) : (
             <div>
-              <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginBottom: 8 }}>Confirme la désactivation : ton compte ne sera plus protégé que par le mot de passe.</div>
-              <button onClick={supprimerFacteur} disabled={busy} style={{ padding: "8px 14px", borderRadius: 10, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: 12, cursor: "pointer", marginRight: 8 }}>
+              <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginBottom: 8 }}>Confirme la désactivation : ton compte ne sera plus protégé que par le mot de passe.</div>
+              <button onClick={supprimerFacteur} disabled={busy} style={{ padding: "8px 14px", borderRadius: 10, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer", marginRight: 8 }}>
                 {busy ? "…" : "Confirmer la désactivation"}
               </button>
-              <button onClick={() => setConfirmSuppr(false)} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 12, cursor: "pointer" }}>
+              <button onClick={() => setConfirmSuppr(false)} style={{ padding: "8px 14px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>
                 Annuler
               </button>
             </div>
           )}
         </>
       ) : !enrolement ? (
-        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11.5, fontWeight: 700, color: "var(--c-text-muted)", background: "var(--c-surface-soft)", borderRadius: 999, padding: "4px 10px", marginBottom: 10 }}>
+        <div style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: T.small, fontWeight: 700, color: "var(--c-text-muted)", background: "var(--c-surface-soft)", borderRadius: 999, padding: "4px 10px", marginBottom: 10 }}>
           Non activée
         </div>
       ) : null}
 
       {!facteurVerifie && !enrolement && (
-        <button onClick={demarrerEnrolement} disabled={busy} style={{ display: "block", padding: "9px 14px", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+        <button onClick={demarrerEnrolement} disabled={busy} style={{ display: "block", padding: "9px 14px", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
           {busy ? "…" : "Activer la double authentification"}
         </button>
       )}
 
       {enrolement && (
         <form onSubmit={confirmerEnrolement}>
-          <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginBottom: 10 }}>
+          <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginBottom: 10 }}>
             1. Scanne ce QR code avec ton application d'authentification (ou saisis la clé manuellement).<br />
             2. Entre ensuite le code à 6 chiffres qu'elle affiche pour confirmer.
           </div>
@@ -575,7 +576,7 @@ export function AdminMfaPanel({ session }) {
               dangerouslySetInnerHTML={{ __html: enrolement.totp.qr_code }} />
           )}
           {enrolement.totp && enrolement.totp.secret && (
-            <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 10, wordBreak: "break-all" }}>
+            <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 10, wordBreak: "break-all" }}>
               Clé manuelle : <span style={{ fontFamily: "IBM Plex Mono, monospace" }}>{enrolement.totp.secret}</span>
             </div>
           )}
@@ -584,11 +585,11 @@ export function AdminMfaPanel({ session }) {
             style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 16, letterSpacing: 3, textAlign: "center", marginBottom: 10, boxSizing: "border-box" }} />
           <button type="submit" disabled={busy || code.length !== 6} style={{
             padding: "9px 14px", borderRadius: 10, border: "none",
-            background: code.length !== 6 ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 12.5,
+            background: code.length !== 6 ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body,
             cursor: code.length !== 6 ? "default" : "pointer", marginRight: 8 }}>
             {busy ? "…" : "Confirmer"}
           </button>
-          <button type="button" onClick={annulerEnrolement} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+          <button type="button" onClick={annulerEnrolement} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
             Annuler
           </button>
         </form>
@@ -634,8 +635,8 @@ export function AdminSecurite({ session }) {
     const c = COULEURS[a.niveau];
     return (
       <div style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: 10, padding: "10px 12px" }}>
-        <div style={{ fontWeight: 600, fontSize: 12.5, color: c.text }}>{a.titre}</div>
-        <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 3 }}>
+        <div style={{ fontWeight: 600, fontSize: T.body, color: c.text }}>{a.titre}</div>
+        <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 3 }}>
           {a.acteur} — {new Date(a.date).toLocaleDateString("fr-FR")} à {new Date(a.date).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
         </div>
       </div>
@@ -646,38 +647,38 @@ export function AdminSecurite({ session }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
       <AdminMfaPanel session={session} />
 
-      <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", lineHeight: 1.5, marginBottom: 4 }}>
+      <div style={{ fontSize: T.small, color: "var(--c-text-muted)", lineHeight: 1.5, marginBottom: 4 }}>
         Repérage de patterns anormaux dans les 300 dernières actions journalisées : rafales d'actions,
         suppressions groupées, activité hors horaires, compte au comportement destructeur dès sa
         première action. Ceci ne remplace pas une détection d'intrusion réseau : les IP et les
         tentatives de connexion échouées ne sont pas visibles depuis l'application.
       </div>
 
-      <button onClick={charger} style={{ alignSelf: "flex-start", fontSize: 11.5, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Actualiser</button>
+      <button onClick={charger} style={{ alignSelf: "flex-start", fontSize: T.small, padding: "6px 12px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Actualiser</button>
 
-      {erreur && <div style={{ color: "#B5451B", fontSize: 12.5 }}>{erreur}</div>}
+      {erreur && <div style={{ color: "#B5451B", fontSize: T.body }}>{erreur}</div>}
 
       {evenements === null ? (
-        <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: 13 }}>Chargement…</div>
+        <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: T.body }}>Chargement…</div>
       ) : alertes.length === 0 ? (
-        <div style={{ color: "var(--c-text-muted)", fontSize: 13, textAlign: "center", padding: 20 }}>Aucune activité suspecte détectée.</div>
+        <div style={{ color: "var(--c-text-muted)", fontSize: T.body, textAlign: "center", padding: 20 }}>Aucune activité suspecte détectée.</div>
       ) : (
         <>
           {critiques.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "#B5451B", textTransform: "uppercase", letterSpacing: 0.4, margin: "6px 0" }}>Critique ({critiques.length})</div>
+              <div style={{ fontSize: T.meta, fontWeight: 700, color: "#B5451B", textTransform: "uppercase", letterSpacing: 0.4, margin: "6px 0" }}>Critique ({critiques.length})</div>
               <div className="pace-grid-cards">{critiques.map(a => <AlerteCard key={a.cle} a={a} />)}</div>
             </div>
           )}
           {avertissements.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--c-warning-text)", textTransform: "uppercase", letterSpacing: 0.4, margin: "6px 0" }}>À surveiller ({avertissements.length})</div>
+              <div style={{ fontSize: T.meta, fontWeight: 700, color: "var(--c-warning-text)", textTransform: "uppercase", letterSpacing: 0.4, margin: "6px 0" }}>À surveiller ({avertissements.length})</div>
               <div className="pace-grid-cards">{avertissements.map(a => <AlerteCard key={a.cle} a={a} />)}</div>
             </div>
           )}
           {infos.length > 0 && (
             <div>
-              <div style={{ fontSize: 11, fontWeight: 700, color: "var(--c-text-muted)", textTransform: "uppercase", letterSpacing: 0.4, margin: "6px 0" }}>Information ({infos.length})</div>
+              <div style={{ fontSize: T.meta, fontWeight: 700, color: "var(--c-text-muted)", textTransform: "uppercase", letterSpacing: 0.4, margin: "6px 0" }}>Information ({infos.length})</div>
               <div className="pace-grid-cards">{infos.map(a => <AlerteCard key={a.cle} a={a} />)}</div>
             </div>
           )}

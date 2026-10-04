@@ -5,6 +5,7 @@ import { logAudit } from "../lib/audit.js";
 import { champTexte } from "../lib/categories.jsx";
 import { supabase } from "../lib/supabase.js";
 import { ETAPE_DOSSIER_INFO } from "../screens/Organisation.jsx";
+import { T, TITRE_SOUS } from "../lib/typo.jsx";
 
 const ENV_STATUTS = [
   { id: "brouillon", label: "Brouillon", color: "var(--c-text-muted)" },
@@ -51,32 +52,32 @@ export function AdminContenuEnv({ isSuperAdmin, adminEmail }) {
     return (
       <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 6 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-          <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.color, color: "#fff" }}>{s.label}</span>
-          {item.valide_par && <span style={{ fontSize: 10, color: "var(--c-text-muted)" }}>par {item.valide_par}</span>}
+          <span style={{ fontSize: T.meta, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.color, color: "#fff" }}>{s.label}</span>
+          {item.valide_par && <span style={{ fontSize: T.meta, color: "var(--c-text-muted)" }}>par {item.valide_par}</span>}
         </div>
-        {item.motif_refus && <div style={{ fontSize: 10.5, color: "#B5451B" }}>Motif : {item.motif_refus}</div>}
+        {item.motif_refus && <div style={{ fontSize: T.meta, color: "#B5451B" }}>Motif : {item.motif_refus}</div>}
         {isSuperAdmin && (
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 2 }}>
             {(item.statut === "brouillon" || item.statut === "en_validation") && (
               <>
-                <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "publie")} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Valider et publier</button>
-                <button disabled={busyId === item.id} onClick={() => { const m = prompt("Motif du refus (visible dans l'historique) :") || ""; changerStatut(table, item, "brouillon", m); }} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid #B5451B", background: "var(--c-danger-border-soft)", color: "#B5451B", fontWeight: 600, cursor: "pointer" }}>Refuser</button>
+                <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "publie")} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Valider et publier</button>
+                <button disabled={busyId === item.id} onClick={() => { const m = prompt("Motif du refus (visible dans l'historique) :") || ""; changerStatut(table, item, "brouillon", m); }} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid #B5451B", background: "var(--c-danger-border-soft)", color: "#B5451B", fontWeight: 600, cursor: "pointer" }}>Refuser</button>
               </>
             )}
             {item.statut === "publie" && (
               <>
-                <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "desactive")} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Désactiver</button>
-                <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "archive")} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Archiver</button>
+                <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "desactive")} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Désactiver</button>
+                <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "archive")} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Archiver</button>
               </>
             )}
             {item.statut === "desactive" && (
               <>
-                <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "publie")} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Republier</button>
-                <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "archive")} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Archiver</button>
+                <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "publie")} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Republier</button>
+                <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "archive")} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Archiver</button>
               </>
             )}
             {item.statut === "archive" && (
-              <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "brouillon")} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Restaurer en brouillon</button>
+              <button disabled={busyId === item.id} onClick={() => changerStatut(table, item, "brouillon")} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Restaurer en brouillon</button>
             )}
           </div>
         )}
@@ -84,11 +85,11 @@ export function AdminContenuEnv({ isSuperAdmin, adminEmail }) {
     );
   }
 
-  if (defis === null) return <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: 13 }}>Chargement…</div>;
+  if (defis === null) return <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: T.body }}>Chargement…</div>;
 
   return (
     <div>
-      <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", lineHeight: 1.5, marginBottom: 14 }}>
+      <div style={{ fontSize: T.small, color: "var(--c-text-muted)", lineHeight: 1.5, marginBottom: 14 }}>
         Taxonomie des défis environnementaux et des problèmes rattachés au formulaire Signaler.
         Seul le contenu au statut <b>Publié</b> est visible par les citoyens.
         {!isSuperAdmin && " Les actions de validation sont réservées au super-admin."}
@@ -96,17 +97,17 @@ export function AdminContenuEnv({ isSuperAdmin, adminEmail }) {
       <div className="pace-grid-cards">
       {defis.map(d => (
         <div key={d.id} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 14 }}>
-          <div style={{ fontFamily: "Fraunces, serif", fontSize: 14.5, fontWeight: 600, color: "var(--c-accent-dark)" }}>{(d.nom && d.nom.fr) || d.code}</div>
+          <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)" }}>{(d.nom && d.nom.fr) || d.code}</div>
           <LigneStatut table="env_defis" item={d} />
           <div style={{ marginTop: 10, paddingLeft: 10, borderLeft: "2px solid var(--c-border)", display: "flex", flexDirection: "column", gap: 10 }}>
             {problemes.filter(p => p.defi_id === d.id).map(p => (
               <div key={p.id}>
-                <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--c-text)" }}>{(p.nom && p.nom.fr) || p.code}</div>
+                <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-text)" }}>{(p.nom && p.nom.fr) || p.code}</div>
                 <LigneStatut table="env_problemes" item={p} />
               </div>
             ))}
             {problemes.filter(p => p.defi_id === d.id).length === 0 && (
-              <div style={{ fontSize: 11, color: "var(--c-text-faint)", fontStyle: "italic" }}>Aucun problème rattaché.</div>
+              <div style={{ fontSize: T.meta, color: "var(--c-text-faint)", fontStyle: "italic" }}>Aucun problème rattaché.</div>
             )}
           </div>
         </div>
@@ -192,72 +193,72 @@ export function AdminOrganisations({ isSuperAdmin, adminEmail }) {
     charger();
   }
 
-  if (organisations === null) return <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: 13 }}>Chargement…</div>;
+  if (organisations === null) return <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: T.body }}>Chargement…</div>;
 
   return (
     <div>
-      <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", lineHeight: 1.5, marginBottom: 14 }}>
+      <div style={{ fontSize: T.small, color: "var(--c-text-muted)", lineHeight: 1.5, marginBottom: 14 }}>
         Comptes ONG et Gouvernement. Une organisation validée peut modérer les signalements de son ou ses domaine(s) et publier des actualités officielles.
         {!isSuperAdmin && " Les actions de validation sont réservées au super-admin."}
       </div>
-      {organisations.length === 0 && <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: 13, padding: 20 }}>Aucune organisation inscrite.</div>}
+      {organisations.length === 0 && <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: T.body, padding: 20 }}>Aucune organisation inscrite.</div>}
       {organisations.map(o => {
         const s = ORG_ADMIN_STATUTS[o.statut] || { label: o.statut, color: "var(--c-text-muted)" };
         return (
           <div key={o.id} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 14, marginBottom: 10 }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
               <div>
-                <div style={{ fontFamily: "Fraunces, serif", fontSize: 14, fontWeight: 600, color: "var(--c-text)" }}>{o.nom}</div>
-                <div style={{ fontSize: 11, color: "var(--c-text-muted)" }}>{o.type === "ong" ? "ONG" : "Gouvernement"} · {o.email}</div>
-                {(o.ville || o.pays) && <div style={{ fontSize: 11, color: "var(--c-text-muted)" }}>{[o.ville, o.pays].filter(Boolean).join(", ")}</div>}
+                <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-text)" }}>{o.nom}</div>
+                <div style={{ fontSize: T.meta, color: "var(--c-text-muted)" }}>{o.type === "ong" ? "ONG" : "Gouvernement"} · {o.email}</div>
+                {(o.ville || o.pays) && <div style={{ fontSize: T.meta, color: "var(--c-text-muted)" }}>{[o.ville, o.pays].filter(Boolean).join(", ")}</div>}
               </div>
               <div style={{ display: "flex", flexDirection: "column", gap: 4, alignItems: "flex-end", flexShrink: 0 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.color, color: "#fff" }}>{s.label}</span>
-                <span style={{ fontSize: 9.5, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: (ETAPE_DOSSIER_INFO[o.etape_dossier] || {}).couleur || "var(--c-text-muted)", color: "#fff" }}>
+                <span style={{ fontSize: T.meta, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: s.color, color: "#fff" }}>{s.label}</span>
+                <span style={{ fontSize: T.meta, fontWeight: 700, padding: "2px 8px", borderRadius: 999, background: (ETAPE_DOSSIER_INFO[o.etape_dossier] || {}).couleur || "var(--c-text-muted)", color: "#fff" }}>
                   {(ETAPE_DOSSIER_INFO[o.etape_dossier] || {}).label || o.etape_dossier}
                 </span>
               </div>
             </div>
-            <div style={{ fontSize: 11, color: "var(--c-text-secondary)", marginTop: 8 }}>
+            <div style={{ fontSize: T.meta, color: "var(--c-text-secondary)", marginTop: 8 }}>
               <b>Domaine(s) :</b> {(o.defis || []).map(id => defisIndex[id] || id).join(", ") || "aucun"}
             </div>
-            {o.numero_agrement && <div style={{ fontSize: 10.5, color: "var(--c-text-muted)" }}>N° agrément / acte légal : {o.numero_agrement}{o.date_expiration_agrement ? ` (expire le ${new Date(o.date_expiration_agrement).toLocaleDateString("fr-FR")})` : ""}</div>}
-            {o.representant_nom && <div style={{ fontSize: 10.5, color: "var(--c-text-muted)" }}>Représentant légal : {o.representant_nom}{o.representant_fonction ? ` — ${o.representant_fonction}` : ""}</div>}
+            {o.numero_agrement && <div style={{ fontSize: T.meta, color: "var(--c-text-muted)" }}>N° agrément / acte légal : {o.numero_agrement}{o.date_expiration_agrement ? ` (expire le ${new Date(o.date_expiration_agrement).toLocaleDateString("fr-FR")})` : ""}</div>}
+            {o.representant_nom && <div style={{ fontSize: T.meta, color: "var(--c-text-muted)" }}>Représentant légal : {o.representant_nom}{o.representant_fonction ? ` — ${o.representant_fonction}` : ""}</div>}
             {(o.adresse_officielle || o.telephone_officiel || o.email_professionnel) && (
-              <div style={{ fontSize: 10.5, color: "var(--c-text-muted)" }}>{[o.adresse_officielle, o.telephone_officiel, o.email_professionnel].filter(Boolean).join(" · ")}</div>
+              <div style={{ fontSize: T.meta, color: "var(--c-text-muted)" }}>{[o.adresse_officielle, o.telephone_officiel, o.email_professionnel].filter(Boolean).join(" · ")}</div>
             )}
-            {o.etape_dossier_motif && <div style={{ fontSize: 10.5, color: "#B5451B", marginTop: 2 }}>Motif de l'étape : {o.etape_dossier_motif}</div>}
-            {o.motif_refus && <div style={{ fontSize: 10.5, color: "#B5451B", marginTop: 4 }}>Motif du compte : {o.motif_refus}</div>}
+            {o.etape_dossier_motif && <div style={{ fontSize: T.meta, color: "#B5451B", marginTop: 2 }}>Motif de l'étape : {o.etape_dossier_motif}</div>}
+            {o.motif_refus && <div style={{ fontSize: T.meta, color: "#B5451B", marginTop: 4 }}>Motif du compte : {o.motif_refus}</div>}
 
             <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
               {ETAPES_INTERMEDIAIRES.filter(e => e !== o.etape_dossier).map(e => (
-                <button key={e} disabled={busyId === o.id} onClick={() => changerEtapeDossier(o, e)} style={{ fontSize: 10, padding: "4px 8px", borderRadius: 7, border: `1px solid ${ETAPE_DOSSIER_INFO[e].couleur}`, background: "var(--c-surface)", color: ETAPE_DOSSIER_INFO[e].couleur, fontWeight: 600, cursor: "pointer" }}>
+                <button key={e} disabled={busyId === o.id} onClick={() => changerEtapeDossier(o, e)} style={{ fontSize: T.meta, padding: "4px 8px", borderRadius: 7, border: `1px solid ${ETAPE_DOSSIER_INFO[e].couleur}`, background: "var(--c-surface)", color: ETAPE_DOSSIER_INFO[e].couleur, fontWeight: 600, cursor: "pointer" }}>
                   {ETAPE_DOSSIER_INFO[e].label}
                 </button>
               ))}
             </div>
-            <div style={{ fontSize: 10, color: "var(--c-text-muted)", marginTop: 6 }}>Documents et niveau de vérification détaillés : onglet « Vérification ».</div>
+            <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 6 }}>Documents et niveau de vérification détaillés : onglet « Vérification ».</div>
             {isSuperAdmin && (
               <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: 10 }}>
                 {o.statut !== "valide" && o.statut !== "bloque" && (
-                  <button disabled={busyId === o.id} onClick={() => changerStatut(o, "valide")} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Valider</button>
+                  <button disabled={busyId === o.id} onClick={() => changerStatut(o, "valide")} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>Valider</button>
                 )}
                 {o.statut === "en_attente" && (
-                  <button disabled={busyId === o.id} onClick={() => { const m = prompt("Motif du refus :") || ""; changerStatut(o, "rejete", m); }} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid #B5451B", background: "var(--c-danger-border-soft)", color: "#B5451B", fontWeight: 600, cursor: "pointer" }}>Refuser</button>
+                  <button disabled={busyId === o.id} onClick={() => { const m = prompt("Motif du refus :") || ""; changerStatut(o, "rejete", m); }} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid #B5451B", background: "var(--c-danger-border-soft)", color: "#B5451B", fontWeight: 600, cursor: "pointer" }}>Refuser</button>
                 )}
                 {o.statut === "valide" && (
-                  <button disabled={busyId === o.id} onClick={() => { const m = prompt("Motif de la suspension :") || ""; changerStatut(o, "suspendu", m); }} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Suspendre</button>
+                  <button disabled={busyId === o.id} onClick={() => { const m = prompt("Motif de la suspension :") || ""; changerStatut(o, "suspendu", m); }} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Suspendre</button>
                 )}
                 {o.statut === "suspendu" && (
-                  <button disabled={busyId === o.id} onClick={() => changerStatut(o, "en_attente")} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Remettre en attente</button>
+                  <button disabled={busyId === o.id} onClick={() => changerStatut(o, "en_attente")} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Remettre en attente</button>
                 )}
                 {o.statut !== "bloque" && (
-                  <button disabled={busyId === o.id} onClick={() => { const m = prompt("Motif du blocage (compte définitivement bloqué jusqu'à déblocage manuel) :") || ""; changerStatut(o, "bloque", m); }} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid #7A1F1F", background: "#2a1414", color: "#ff9b9b", fontWeight: 600, cursor: "pointer" }}>Bloquer</button>
+                  <button disabled={busyId === o.id} onClick={() => { const m = prompt("Motif du blocage (compte définitivement bloqué jusqu'à déblocage manuel) :") || ""; changerStatut(o, "bloque", m); }} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid #7A1F1F", background: "#2a1414", color: "#ff9b9b", fontWeight: 600, cursor: "pointer" }}>Bloquer</button>
                 )}
                 {o.statut === "bloque" && (
-                  <button disabled={busyId === o.id} onClick={() => changerStatut(o, "en_attente")} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Débloquer</button>
+                  <button disabled={busyId === o.id} onClick={() => changerStatut(o, "en_attente")} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, cursor: "pointer" }}>Débloquer</button>
                 )}
-                <button disabled={busyId === o.id} onClick={() => supprimerOrg(o)} style={{ fontSize: 10.5, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-danger-border-soft)", background: "var(--c-surface)", color: "#B5451B", fontWeight: 600, cursor: "pointer" }}>
+                <button disabled={busyId === o.id} onClick={() => supprimerOrg(o)} style={{ fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-danger-border-soft)", background: "var(--c-surface)", color: "#B5451B", fontWeight: 600, cursor: "pointer" }}>
                   <IconTrash size={12} style={{ verticalAlign: -1, marginRight: 3 }} /> Supprimer
                 </button>
               </div>

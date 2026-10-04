@@ -7,6 +7,7 @@ import { ENV_DEFI_PAR_CODE, chargerTaxonomiePubliee } from "../lib/categories.js
 import { downloadCSV, exportExcel, exportPDF, exportWord } from "../lib/exports.js";
 import { supabase } from "../lib/supabase.js";
 import { calculerPriorite } from "../lib/utils.js";
+import { T, TITRE_SOUS } from "../lib/typo.jsx";
 
 function weeksAgo(dateStr, n) {
   const d = new Date(dateStr);
@@ -27,7 +28,7 @@ function MiniBarChart({ data, color, label }) {
   const max = Math.max(1, ...data.map(d => d.count));
   return (
     <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--c-border)", marginBottom: 12 }}>
-      <div style={{ fontSize: 12, fontWeight: 600, color: "var(--c-text)", marginBottom: 10 }}>{label}</div>
+      <div style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text)", marginBottom: 10 }}>{label}</div>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 6, height: 70 }}>
         {data.map((d, i) => (
           <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", height: "100%" }}>
@@ -37,7 +38,7 @@ function MiniBarChart({ data, color, label }) {
       </div>
       <div style={{ display: "flex", gap: 6, marginTop: 4 }}>
         {data.map((d, i) => (
-          <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 8.5, color: "var(--c-text-muted)" }}>{d.week === 0 ? "cette sem." : `-${d.week}`}</div>
+          <div key={i} style={{ flex: 1, textAlign: "center", fontSize: T.meta, color: "var(--c-text-muted)" }}>{d.week === 0 ? "cette sem." : `-${d.week}`}</div>
         ))}
       </div>
     </div>
@@ -58,11 +59,11 @@ function RepartitionParDefi({ signalements }) {
   const max = entries[0][1];
   return (
     <div style={{ marginBottom: 18 }}>
-      <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Répartition par défi environnemental</div>
+      <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Répartition par défi environnemental</div>
       <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
         {entries.map(([nom, count]) => (
           <div key={nom}>
-            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 11.5, color: "var(--c-text-secondary)", marginBottom: 3 }}>
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: T.small, color: "var(--c-text-secondary)", marginBottom: 3 }}>
               <span>{nom}</span><span>{count}</span>
             </div>
             <div style={{ height: 6, background: "var(--c-surface-soft)", borderRadius: 999 }}>
@@ -98,12 +99,12 @@ export function ExportRow({ label, count, getRows, columns, filenamePrefix, titl
   }
   return (
     <div style={{ border: "1px solid var(--c-border)", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
-      <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)", marginBottom: 8 }}>{label} ({count})</div>
+      <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-text)", marginBottom: 8 }}>{label} ({count})</div>
       <div style={{ display: "flex", gap: 6 }}>
         {formats.map(f => (
           <button key={f.id} onClick={() => lancer(f.id)} disabled={busy !== null} style={{
             flex: 1, padding: "7px 0", borderRadius: 8, border: "1px solid var(--c-border)",
-            background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 11,
+            background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: T.meta,
             cursor: busy !== null ? "default" : "pointer", opacity: busy && busy !== f.id ? 0.5 : 1 }}>
             {busy === f.id ? "…" : f.label}
           </button>
@@ -162,17 +163,17 @@ function AdminRapportOrganisation() {
 
   return (
     <div style={{ marginTop: 24 }}>
-      <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Rapports par organisation</div>
-      <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 10 }}>
+      <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Rapports par organisation</div>
+      <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 10 }}>
         Même rapport (signalements de son domaine) que celui que l'organisation exporte depuis son propre espace.
       </div>
-      <select value={orgId} onChange={e => chargerRapport(e.target.value)} style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 10, background: "var(--c-surface)" }}>
+      <select value={orgId} onChange={e => chargerRapport(e.target.value)} style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 10, background: "var(--c-surface)" }}>
         <option value="">Sélectionner une organisation…</option>
         {(organisations || []).map(o => (
           <option key={o.id} value={o.id}>{o.nom} ({o.type === "gouvernement" ? "Gouvernement" : "ONG"}{o.statut !== "valide" ? " — non validée" : ""})</option>
         ))}
       </select>
-      {chargement && <div style={{ fontSize: 12, color: "var(--c-text-muted)", textAlign: "center", padding: 10 }}>Chargement…</div>}
+      {chargement && <div style={{ fontSize: T.small, color: "var(--c-text-muted)", textAlign: "center", padding: 10 }}>Chargement…</div>}
       {rapport && (
         <ExportRow
           label={`Signalements du domaine de ${rapport.org.nom}`}
@@ -223,13 +224,13 @@ export function AdminRapports({ signalements, arbres, isSuperAdmin, centreVerrou
         <StatCard label="Bénévoles" value={benevolesCount === null ? "…" : benevolesCount} unit="" accent="var(--c-accent-dark)" />
       </div>
 
-      <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Évolution (8 dernières semaines)</div>
+      <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Évolution (8 dernières semaines)</div>
       <MiniBarChart data={weeklyBuckets(signalements)} color="#B5451B" label="Signalements" />
       <MiniBarChart data={weeklyBuckets(arbres)} color="var(--c-accent)" label="Arbres plantés" />
 
       <RepartitionParDefi signalements={signalements} />
 
-      <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Exporter le rapport</div>
+      <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Exporter le rapport</div>
       <ExportRow label="Signalements" count={signalements.length} columns={colonnesSignalements} filenamePrefix="pace-signalements" title="Rapport EcoVigil — Signalements"
         getRows={() => signalements.map(s => ({ ...s, defi: ENV_DEFI_PAR_CODE[s.categorie] || "Non classé", priorite: calculerPriorite(s, signalements) }))} />
       <ExportRow label="Arbres plantés" count={arbres.length} columns={colonnesArbres} filenamePrefix="pace-arbres" title="Rapport EcoVigil — Arbres plantés"
@@ -293,11 +294,11 @@ function AdminEquipe({ isSuperAdmin, centreVerrouille, onToggleCentre }) {
         }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
             <IconLock size={15} color={centreVerrouille && centreVerrouille.verrouille ? "#B5451B" : "var(--c-text-muted)"} />
-            <div style={{ fontWeight: 700, fontSize: 13, color: centreVerrouille && centreVerrouille.verrouille ? "#B5451B" : "var(--c-text)" }}>
+            <div style={{ fontWeight: 700, fontSize: T.body, color: centreVerrouille && centreVerrouille.verrouille ? "#B5451B" : "var(--c-text)" }}>
               Centre {centreVerrouille && centreVerrouille.verrouille ? "verrouillé" : "déverrouillé"}
             </div>
           </div>
-          <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
             {centreVerrouille && centreVerrouille.verrouille
               ? `Seul toi (super-admin) as accès au Centre d'EcoVigil. Les autres admins voient un écran d'accès suspendu.${centreVerrouille.motif ? ` Motif : ${centreVerrouille.motif}` : ""}`
               : "En cas de compte admin compromis ou pour une maintenance, tu peux suspendre l'accès de tous les autres admins. Toi seul gardes l'accès."}
@@ -312,35 +313,35 @@ function AdminEquipe({ isSuperAdmin, centreVerrouille, onToggleCentre }) {
               await onToggleCentre(motif);
             }
           }} style={{
-            padding: "9px 14px", borderRadius: 10, border: "none", fontWeight: 600, fontSize: 12.5, cursor: "pointer",
+            padding: "9px 14px", borderRadius: 10, border: "none", fontWeight: 600, fontSize: T.body, cursor: "pointer",
             background: centreVerrouille && centreVerrouille.verrouille ? "var(--c-accent-dark)" : "#B5451B", color: "#fff"
           }}>
             {centreVerrouille && centreVerrouille.verrouille ? "Déverrouiller" : "Verrouiller le Centre d'EcoVigil"}
           </button>
         </div>
       )}
-      <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Équipe administrateurs</div>
+      <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Équipe administrateurs</div>
       <form onSubmit={addAdmin} style={{ display: "flex", gap: 8, marginBottom: 10 }}>
         <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="email@exemple.com"
-          style={{ flex: 1, padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, boxSizing: "border-box" }} />
-        <button type="button" onClick={addAdmin} disabled={busy} style={{ padding: "0 16px", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+          style={{ flex: 1, padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
+        <button type="button" onClick={addAdmin} disabled={busy} style={{ padding: "0 16px", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
           {busy ? "..." : "Ajouter"}
         </button>
       </form>
-      {msg && <div style={{ fontSize: 11.5, color: "var(--c-text-secondary)", marginBottom: 10 }}>{msg}</div>}
-      <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 8 }}>La personne devra créer son compte via "Centre d'EcoVigil → Créer un compte" avec cette adresse exacte.</div>
-      {admins === null ? <div style={{ fontSize: 12, color: "var(--c-text-muted)" }}>Chargement…</div> : (
+      {msg && <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginBottom: 10 }}>{msg}</div>}
+      <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 8 }}>La personne devra créer son compte via "Centre d'EcoVigil → Créer un compte" avec cette adresse exacte.</div>
+      {admins === null ? <div style={{ fontSize: T.small, color: "var(--c-text-muted)" }}>Chargement…</div> : (
         <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
           {admins.map(a => (
-            <div key={a.email} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 10, padding: "8px 12px", fontSize: 12.5, color: "var(--c-text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <div key={a.email} style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 10, padding: "8px 12px", fontSize: T.body, color: "var(--c-text)", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <div style={{ display: "flex", alignItems: "center", gap: 8, minWidth: 0 }}>
                 <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{a.email}</span>
-                <span style={{ fontSize: 10, fontWeight: 700, padding: "2px 7px", borderRadius: 999, flexShrink: 0, background: a.role === "super_admin" ? "var(--c-accent-dark)" : "var(--c-surface-soft)", color: a.role === "super_admin" ? "#fff" : "var(--c-text-muted)" }}>
+                <span style={{ fontSize: T.meta, fontWeight: 700, padding: "2px 7px", borderRadius: 999, flexShrink: 0, background: a.role === "super_admin" ? "var(--c-accent-dark)" : "var(--c-surface-soft)", color: a.role === "super_admin" ? "#fff" : "var(--c-text-muted)" }}>
                   {a.role === "super_admin" ? "Super admin" : "Admin"}
                 </span>
               </div>
               {isSuperAdmin && a.role !== "super_admin" && (
-                <button onClick={() => retirerAdmin(a)} style={{ flexShrink: 0, fontSize: 11, padding: "5px 10px", borderRadius: 8, border: "1px solid #B5451B", background: "var(--c-danger-border-soft)", color: "#B5451B", fontWeight: 600, cursor: "pointer" }}>Retirer</button>
+                <button onClick={() => retirerAdmin(a)} style={{ flexShrink: 0, fontSize: T.meta, padding: "5px 10px", borderRadius: 8, border: "1px solid #B5451B", background: "var(--c-danger-border-soft)", color: "#B5451B", fontWeight: 600, cursor: "pointer" }}>Retirer</button>
               )}
             </div>
           ))}

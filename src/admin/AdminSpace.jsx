@@ -18,6 +18,7 @@ import { alerterErreurLien } from "../lib/i18n.js";
 import { subscribeToPush } from "../lib/push.js";
 import { AUTH_URL, SUPABASE_KEY, decoderJwtPayload, persistActiveSession, supabase, urlRedirectionAuth } from "../lib/supabase.js";
 import { PRIORITE_INFO, PRIORITE_ORDRE, calculerPriorite } from "../lib/utils.js";
+import { T } from "../lib/typo.jsx";
 
 export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateStatut, onResolve, onValidate, onValidateArbre, onDelete, onSoftDeleteArbre, onRevertModeration, onSoftDeleteSignalement, onRestaurerItem, onRafraichir, rafraichissementEnCours, onExit }) {
   const [session, setSession] = useState(null);
@@ -309,15 +310,15 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
         <SectionTitle sub="Choisis un nouveau mot de passe.">Réinitialisation</SectionTitle>
         <form onSubmit={handleSetNewPassword} style={{ background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)" }}>
           <PasswordInput value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe"
-            style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8 }} />
+            style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8 }} />
           <PasswordInput value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} placeholder="Confirme le nouveau mot de passe"
-            style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8 }} />
+            style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8 }} />
           <ExigencesMotDePasseAdmin password={newPassword} />
-          {error && <div role="alert" style={{ fontSize: 12, color: error.startsWith("Mot de passe mis") ? "var(--c-accent)" : "#B5451B", marginBottom: 10 }}>{error}</div>}
+          {error && <div role="alert" style={{ fontSize: T.small, color: error.startsWith("Mot de passe mis") ? "var(--c-accent)" : "#B5451B", marginBottom: 10 }}>{error}</div>}
           <button type="submit" disabled={busy || !evaluerForceMotDePasseAdmin(newPassword).valide || newPassword !== confirmNewPassword} style={{
             width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
             background: (!evaluerForceMotDePasseAdmin(newPassword).valide || newPassword !== confirmNewPassword) ? "var(--c-text-faint)" : "var(--c-accent-dark)",
-            color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: (!evaluerForceMotDePasseAdmin(newPassword).valide || newPassword !== confirmNewPassword) ? "default" : "pointer" }}>
+            color: "#fff", fontWeight: 600, fontSize: T.body, cursor: (!evaluerForceMotDePasseAdmin(newPassword).valide || newPassword !== confirmNewPassword) ? "default" : "pointer" }}>
             {busy ? "..." : "Enregistrer le nouveau mot de passe"}
           </button>
         </form>
@@ -330,19 +331,19 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
       <Screen>
         <SectionTitle sub={session.user ? session.user.email : ""}>Bienvenue sur EcoVigil</SectionTitle>
         <form onSubmit={handleChooseWelcomePassword} style={{ background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)" }}>
-          <div style={{ fontSize: 13, color: "var(--c-text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
             Ton adresse est confirmée. Choisis maintenant un mot de passe pour ton compte administrateur.
           </div>
           <PasswordInput value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Choisis un mot de passe"
-            style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8 }} />
+            style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8 }} />
           <PasswordInput value={confirmNewPassword} onChange={e => setConfirmNewPassword(e.target.value)} placeholder="Confirme le mot de passe"
-            style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8 }} />
+            style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8 }} />
           <ExigencesMotDePasseAdmin password={newPassword} />
-          {error && <div role="alert" style={{ fontSize: 12, color: "#B5451B", marginBottom: 10 }}>{error}</div>}
+          {error && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 10 }}>{error}</div>}
           <button type="submit" disabled={busy || !evaluerForceMotDePasseAdmin(newPassword).valide || newPassword !== confirmNewPassword} style={{
             width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
             background: (!evaluerForceMotDePasseAdmin(newPassword).valide || newPassword !== confirmNewPassword) ? "var(--c-text-faint)" : "var(--c-accent-dark)",
-            color: "#fff", fontWeight: 600, fontSize: 13.5,
+            color: "#fff", fontWeight: 600, fontSize: T.body,
             cursor: (!evaluerForceMotDePasseAdmin(newPassword).valide || newPassword !== confirmNewPassword) ? "default" : "pointer" }}>
             {busy ? "..." : "Activer mon compte"}
           </button>
@@ -359,14 +360,14 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
           <input inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={mfaCode} onChange={e => setMfaCode(e.target.value.replace(/\D/g, ""))}
             placeholder="Code à 6 chiffres" aria-label="Code de double authentification"
             style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 18, letterSpacing: 4, textAlign: "center", marginBottom: 10, boxSizing: "border-box" }} />
-          {mfaError && <div role="alert" style={{ fontSize: 12, color: "#B5451B", marginBottom: 10 }}>{mfaError}</div>}
+          {mfaError && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 10 }}>{mfaError}</div>}
           <button type="submit" disabled={mfaBusy || mfaCode.length !== 6 || !mfaChallenge} style={{
             width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-            background: (mfaCode.length !== 6 || !mfaChallenge) ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5,
+            background: (mfaCode.length !== 6 || !mfaChallenge) ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body,
             cursor: (mfaCode.length !== 6 || !mfaChallenge) ? "default" : "pointer", marginBottom: 8 }}>
             {mfaBusy ? "..." : "Valider"}
           </button>
-          <button type="button" onClick={handleLogout} style={{ width: "100%", background: "none", border: "none", color: "var(--c-text-secondary)", fontSize: 12, cursor: "pointer", padding: 6 }}>← Annuler et se déconnecter</button>
+          <button type="button" onClick={handleLogout} style={{ width: "100%", background: "none", border: "none", color: "var(--c-text-secondary)", fontSize: T.small, cursor: "pointer", padding: 6 }}>← Annuler et se déconnecter</button>
         </form>
       </Screen>
     );
@@ -379,14 +380,14 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
           <SectionTitle sub="Reçois un lien pour réinitialiser ton mot de passe.">Mot de passe oublié</SectionTitle>
           <form onSubmit={handleForgot} style={{ background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)" }}>
             <input type="email" required value={email} onChange={e => setEmail(e.target.value)} placeholder="Ton adresse e-mail admin" aria-label="Adresse e-mail"
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 10, boxSizing: "border-box" }} />
-            {error && <div role="alert" style={{ fontSize: 12, color: error.startsWith("Un e-mail") ? "var(--c-accent)" : "#B5451B", marginBottom: 10 }}>{error}</div>}
-            <button type="submit" disabled={busy} style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", marginBottom: 8 }}>
+              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 10, boxSizing: "border-box" }} />
+            {error && <div role="alert" style={{ fontSize: T.small, color: error.startsWith("Un e-mail") ? "var(--c-accent)" : "#B5451B", marginBottom: 10 }}>{error}</div>}
+            <button type="submit" disabled={busy} style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 8 }}>
               {busy ? "..." : "Envoyer le lien"}
             </button>
-            <button type="button" onClick={() => { setMode("login"); setError(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--c-text-secondary)", fontSize: 12, cursor: "pointer", padding: 6 }}>← Retour à la connexion</button>
+            <button type="button" onClick={() => { setMode("login"); setError(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--c-text-secondary)", fontSize: T.small, cursor: "pointer", padding: 6 }}>← Retour à la connexion</button>
           </form>
-          <button onClick={onExit} style={{ marginTop: 14, background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer" }}>← Retour à l'app</button>
+          <button onClick={onExit} style={{ marginTop: 14, background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.body, cursor: "pointer" }}>← Retour à l'app</button>
         </Screen>
       );
     }
@@ -396,19 +397,19 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
           <SectionTitle sub="Un lien te sera envoyé pour activer ton compte.">Créer un compte admin</SectionTitle>
           <form onSubmit={handleSignupOtp} style={{ background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)" }}>
             <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail" aria-label="Adresse e-mail"
-              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 4, boxSizing: "border-box" }} />
-            <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 10, lineHeight: 1.4 }}>
+              style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 4, boxSizing: "border-box" }} />
+            <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 10, lineHeight: 1.4 }}>
               Conseil : évite une adresse e-mail contenant des informations confidentielles ou sensibles.
             </div>
-            {error && <div role="alert" style={{ fontSize: 12, color: error.startsWith("E-mail envoyé") ? "var(--c-accent)" : "#B5451B", marginBottom: 10 }}>{error}</div>}
-            <button type="submit" disabled={busy} style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", marginBottom: 8 }}>
+            {error && <div role="alert" style={{ fontSize: T.small, color: error.startsWith("E-mail envoyé") ? "var(--c-accent)" : "#B5451B", marginBottom: 10 }}>{error}</div>}
+            <button type="submit" disabled={busy} style={{ width: "100%", padding: "11px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 8 }}>
               {busy ? "..." : "Envoyer le lien de création"}
             </button>
-            <button type="button" onClick={() => { setMode("login"); setError(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--c-text-secondary)", fontSize: 12, cursor: "pointer", padding: 6 }}>
+            <button type="button" onClick={() => { setMode("login"); setError(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--c-text-secondary)", fontSize: T.small, cursor: "pointer", padding: 6 }}>
               Déjà un compte ? Se connecter
             </button>
           </form>
-          <button onClick={onExit} style={{ marginTop: 14, background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer" }}>← Retour à l'app</button>
+          <button onClick={onExit} style={{ marginTop: 14, background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.body, cursor: "pointer" }}>← Retour à l'app</button>
         </Screen>
       );
     }
@@ -417,47 +418,47 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
         <SectionTitle sub="Réservé à l'équipe de modération.">Centre d'EcoVigil</SectionTitle>
         <form onSubmit={handleAuth} style={{ background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)" }}>
           <input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail" aria-label="Adresse e-mail"
-            style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" }} />
+            style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" }} />
           <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" disabled={estVerrouille}
-            style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 6 }} />
-          <button type="button" onClick={() => { setMode("forgot"); setError(""); }} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer", padding: 0, marginBottom: 10, display: "block" }}>
+            style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 6 }} />
+          <button type="button" onClick={() => { setMode("forgot"); setError(""); }} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.small, cursor: "pointer", padding: 0, marginBottom: 10, display: "block" }}>
             Mot de passe oublié ?
           </button>
           {estVerrouille && (
-            <div role="alert" style={{ fontSize: 12, color: "var(--c-warning-text)", background: "var(--c-warning-bg)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>
+            <div role="alert" style={{ fontSize: T.small, color: "var(--c-warning-text)", background: "var(--c-warning-bg)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>
               Trop de tentatives échouées. Réessaie dans {secondesRestantes}s.
             </div>
           )}
-          {!estVerrouille && error && <div role="alert" style={{ fontSize: 12, color: "#B5451B", marginBottom: 10 }}>{error}</div>}
+          {!estVerrouille && error && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 10 }}>{error}</div>}
           <button type="submit" disabled={busy || estVerrouille} style={{
             width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-            background: estVerrouille ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5,
+            background: estVerrouille ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body,
             cursor: estVerrouille ? "default" : "pointer", marginBottom: 8 }}>
             {busy ? "..." : estVerrouille ? `Réessaie dans ${secondesRestantes}s` : "Se connecter"}
           </button>
-          <button type="button" onClick={() => { setMode("signup"); setError(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--c-text-secondary)", fontSize: 12, cursor: "pointer", padding: 6 }}>
+          <button type="button" onClick={() => { setMode("signup"); setError(""); }} style={{ width: "100%", background: "none", border: "none", color: "var(--c-text-secondary)", fontSize: T.small, cursor: "pointer", padding: 6 }}>
             Pas encore de compte admin ? En créer un
           </button>
         </form>
-        <button onClick={onExit} style={{ marginTop: 14, background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer" }}>← Retour à l'app</button>
+        <button onClick={onExit} style={{ marginTop: 14, background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.body, cursor: "pointer" }}>← Retour à l'app</button>
       </Screen>
     );
   }
 
   if (isAdmin === null) {
-    return <Screen><div style={{ textAlign: "center", color: "var(--c-text-muted)", marginTop: 60, fontSize: 13 }}>Vérification des droits…</div></Screen>;
+    return <Screen><div style={{ textAlign: "center", color: "var(--c-text-muted)", marginTop: 60, fontSize: T.body }}>Vérification des droits…</div></Screen>;
   }
 
   if (!isAdmin) {
     return (
       <Screen>
         <SectionTitle>Accès refusé</SectionTitle>
-        <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)", fontSize: 13, color: "var(--c-text-secondary)" }}>
+        <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)", fontSize: T.body, color: "var(--c-text-secondary)" }}>
           Le compte <b>{session.user.email}</b> n'a pas les droits administrateur.
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-          <button onClick={handleLogout} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: 13 }}>Se déconnecter</button>
-          <button onClick={onExit} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", cursor: "pointer", fontSize: 13 }}>Retour à l'app</button>
+          <button onClick={handleLogout} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: T.body }}>Se déconnecter</button>
+          <button onClick={onExit} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", cursor: "pointer", fontSize: T.body }}>Retour à l'app</button>
         </div>
       </Screen>
     );
@@ -470,7 +471,7 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
     return (
       <Screen>
         <SectionTitle>Centre d'EcoVigil verrouillé</SectionTitle>
-        <div style={{ background: "var(--c-danger-border-soft)", border: "1px solid #B5451B", borderRadius: 14, padding: 16, fontSize: 13, color: "var(--c-text)" }}>
+        <div style={{ background: "var(--c-danger-border-soft)", border: "1px solid #B5451B", borderRadius: 14, padding: 16, fontSize: T.body, color: "var(--c-text)" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
             <IconLock size={16} color="#B5451B" />
             <div style={{ fontWeight: 700, color: "#B5451B" }}>Accès temporairement suspendu</div>
@@ -482,8 +483,8 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
           </div>
         </div>
         <div style={{ display: "flex", gap: 10, marginTop: 14 }}>
-          <button onClick={handleLogout} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: 13 }}>Se déconnecter</button>
-          <button onClick={onExit} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", cursor: "pointer", fontSize: 13 }}>Retour à l'app</button>
+          <button onClick={handleLogout} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: T.body }}>Se déconnecter</button>
+          <button onClick={onExit} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", cursor: "pointer", fontSize: T.body }}>Retour à l'app</button>
         </div>
       </Screen>
     );
@@ -499,10 +500,10 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
       <Screen>
         <SectionTitle sub="Obligatoire pour tout compte administrateur avant de continuer.">Sécurise ton compte</SectionTitle>
         <AdminMfaPanel session={session} />
-        <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginTop: 4, marginBottom: 14 }}>
+        <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginTop: 4, marginBottom: 14 }}>
           Une fois le code confirmé, reconnecte-toi pour accéder au Centre d'EcoVigil.
         </div>
-        <button onClick={handleLogout} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: 13 }}>Se déconnecter</button>
+        <button onClick={handleLogout} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: T.body }}>Se déconnecter</button>
       </Screen>
     );
   }
@@ -527,18 +528,18 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
           <div style={{ background: "var(--c-surface)", borderRadius: 16, padding: 20, maxWidth: 340, width: "100%" }} onClick={e => e.stopPropagation()}>
             {deleteSent ? (
               <div style={{ textAlign: "center" }}>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Demande enregistrée</div>
-                <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.5 }}>Ton compte et tes données seront supprimés sous 30 jours. Tu vas être déconnecté.</div>
+                <div style={{ fontSize: T.body, fontWeight: 600, marginBottom: 6 }}>Demande enregistrée</div>
+                <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", lineHeight: 1.5 }}>Ton compte et tes données seront supprimés sous 30 jours. Tu vas être déconnecté.</div>
               </div>
             ) : (
               <>
-                <div style={{ fontSize: 14, fontWeight: 600, marginBottom: 6 }}>Supprimer ton compte ?</div>
-                <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.5, marginBottom: 16 }}>
+                <div style={{ fontSize: T.body, fontWeight: 600, marginBottom: 6 }}>Supprimer ton compte ?</div>
+                <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", lineHeight: 1.5, marginBottom: 16 }}>
                   Ton compte ({session.user.email}) et les données qui y sont liées seront définitivement supprimés sous 30 jours. Cette action est irréversible.
                 </div>
                 <div style={{ display: "flex", gap: 8 }}>
-                  <button onClick={() => setConfirmDelete(false)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Annuler</button>
-                  <button onClick={handleDeleteAccount} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>Supprimer</button>
+                  <button onClick={() => setConfirmDelete(false)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>Annuler</button>
+                  <button onClick={handleDeleteAccount} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>Supprimer</button>
                 </div>
               </>
             )}
@@ -558,7 +559,7 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
       <div style={{ display: "flex", gap: 4, marginBottom: 10, background: "var(--c-bg)", borderRadius: 12, padding: 4 }}>
         {CATEGORIES_ADMIN.map(cat => (
           <button key={cat.id} onClick={() => setPanel(cat.panels[0][0])} style={{
-            flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 4px", borderRadius: 9, fontSize: 11.5, fontWeight: 700, cursor: "pointer",
+            flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 5, padding: "8px 4px", borderRadius: 9, fontSize: T.small, fontWeight: 700, cursor: "pointer",
             border: "none", background: categorieDuPanel(panel) === cat.id ? "var(--c-surface)" : "transparent",
             color: categorieDuPanel(panel) === cat.id ? "var(--c-accent-dark)" : "var(--c-text-muted)",
             boxShadow: categorieDuPanel(panel) === cat.id ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
@@ -571,7 +572,7 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
       <div style={{ display: "flex", gap: 6, marginBottom: 18, overflowX: "auto" }}>
         {(CATEGORIES_ADMIN.find(c => c.id === categorieDuPanel(panel)) || CATEGORIES_ADMIN[0]).panels.map(([id, label, Ic]) => (
           <button key={id} onClick={() => setPanel(id)} style={{
-            display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 20, fontSize: 11.5, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
+            display: "flex", alignItems: "center", gap: 5, padding: "7px 12px", borderRadius: 20, fontSize: T.small, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap",
             border: panel === id ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
             background: panel === id ? "var(--c-accent-dark)" : "var(--c-surface)", color: panel === id ? "#fff" : "var(--c-text-secondary)" }}><Ic size={13} />{label}</button>
         ))}
@@ -581,7 +582,7 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
         <>
           <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
             <button onClick={() => { onRafraichir(); chargerSignalementsAdmin(); }} disabled={rafraichissementEnCours} style={{
-              display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 20, fontSize: 11.5, fontWeight: 600,
+              display: "flex", alignItems: "center", gap: 6, padding: "6px 12px", borderRadius: 20, fontSize: T.small, fontWeight: 600,
               border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", cursor: rafraichissementEnCours ? "default" : "pointer" }}>
               <IconClock size={13} /> {rafraichissementEnCours ? "Actualisation…" : "Actualiser"}
             </button>
@@ -589,14 +590,14 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
           <div style={{ display: "flex", gap: 6, marginBottom: 12 }}>
             {[["attente", "En attente"], ["resolu", "Résolus"], ["tous", "Tous"]].map(([id, label]) => (
               <button key={id} onClick={() => setFilter(id)} style={{
-                padding: "6px 12px", borderRadius: 20, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                padding: "6px 12px", borderRadius: 20, fontSize: T.small, fontWeight: 600, cursor: "pointer",
                 border: filter === id ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
                 background: filter === id ? "var(--c-accent-dark)" : "var(--c-surface)", color: filter === id ? "#fff" : "var(--c-text-secondary)" }}>{label}</button>
             ))}
           </div>
 
           <div className="pace-grid-cards" style={{ gap: 10 }}>
-            {filtered.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: 13, textAlign: "center", padding: 20 }}>Aucun signalement ici.</div>}
+            {filtered.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: T.body, textAlign: "center", padding: 20 }}>Aucun signalement ici.</div>}
             {[...filtered].sort((a, b) => PRIORITE_ORDRE[calculerPriorite(b, signalements)] - PRIORITE_ORDRE[calculerPriorite(a, signalements)]).map(s => {
               const cat = categorieMeta(s.categorie);
               const u = URGENCE.find(x => x.id === s.urgence);
@@ -606,20 +607,20 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
                 <div key={s.id} style={{ background: "var(--c-surface)", borderRadius: 14, padding: 12, border: "1px solid var(--c-border)" }}>
                   <MediaThumb src={s.photo_url} style={{ width: "100%", maxHeight: 130, objectFit: "cover", borderRadius: 10, marginBottom: 8 }} />
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 4 }}>
-                    <div style={{ fontWeight: 600, fontSize: 13 }}>{cat.label}</div>
-                    <span style={{ fontSize: 10, fontWeight: 600, color: u ? u.color : "#B5451B" }}>{u ? u.label : s.urgence}</span>
+                    <div style={{ fontWeight: 600, fontSize: T.body }}>{cat.label}</div>
+                    <span style={{ fontSize: T.meta, fontWeight: 600, color: u ? u.color : "#B5451B" }}>{u ? u.label : s.urgence}</span>
                   </div>
-                  <div style={{ display: "inline-block", fontSize: 9.5, fontWeight: 700, color: "#fff", background: pInfo.color, borderRadius: 999, padding: "2px 8px", marginBottom: 6 }}>{pInfo.label}</div>
+                  <div style={{ display: "inline-block", fontSize: T.meta, fontWeight: 700, color: "#fff", background: pInfo.color, borderRadius: 999, padding: "2px 8px", marginBottom: 6 }}>{pInfo.label}</div>
                   <FicheEnvironnementale code={s.categorie} />
                   {!s.valide && (
-                    <div style={{ fontSize: 10.5, fontWeight: 600, color: "#B5451B", marginBottom: 4 }}>⏳ Non validé — invisible du public</div>
+                    <div style={{ fontSize: T.meta, fontWeight: 600, color: "#B5451B", marginBottom: 4 }}>⏳ Non validé — invisible du public</div>
                   )}
                   {s.moderation_motif && (
-                    <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 4 }}>Dernière modération : {MOTIF_LABELS_ADMIN[s.moderation_motif] || s.moderation_motif}</div>
+                    <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 4 }}>Dernière modération : {MOTIF_LABELS_ADMIN[s.moderation_motif] || s.moderation_motif}</div>
                   )}
-                  <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginBottom: 6 }}>{s.date} · appareil {s.device_id ? s.device_id.slice(0, 6) : "?"}</div>
+                  <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 6 }}>{s.date} · appareil {s.device_id ? s.device_id.slice(0, 6) : "?"}</div>
                   {s.benevole_nom && (
-                    <div style={{ fontSize: 11, color: "var(--c-text-secondary)", background: "var(--c-bg)", border: "1px solid var(--c-border)", borderRadius: 8, padding: "6px 8px", marginBottom: 6 }}>
+                    <div style={{ fontSize: T.meta, color: "var(--c-text-secondary)", background: "var(--c-bg)", border: "1px solid var(--c-border)", borderRadius: 8, padding: "6px 8px", marginBottom: 6 }}>
                       <IconUsers size={11} style={{ verticalAlign: -1, marginRight: 4 }} />
                       Signalé par <strong>{s.benevole_nom}</strong>
                       {(s.benevole_ville || s.benevole_pays) && <> — {[s.benevole_ville, s.benevole_pays].filter(Boolean).join(", ")}</>}
@@ -627,18 +628,18 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
                       {s.benevole_contact && <div>{s.benevole_contact}</div>}
                     </div>
                   )}
-                  {s.description && <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", marginBottom: 8 }}>{s.description}</div>}
+                  {s.description && <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginBottom: 8 }}>{s.description}</div>}
                   <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                     {!s.valide && (
                       <button onClick={() => { onValidate(s.id); setSignalementsAdmin(prev => prev ? prev.map(x => x.id === s.id ? { ...x, valide: true } : x) : prev); }} style={{
-                        flex: "1 1 100%", fontSize: 11.5, padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 600,
+                        flex: "1 1 100%", fontSize: T.small, padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 600,
                         background: "var(--c-accent-dark)", color: "#fff" }}>
                         ✓ Valider et publier
                       </button>
                     )}
                     {s.valide && (
                       <button onClick={() => setModerationModal({ type: "revert", signalement: s })} style={{
-                        flex: "1 1 100%", fontSize: 11, padding: "7px 0", borderRadius: 8, border: "1px solid var(--c-warning)", cursor: "pointer", fontWeight: 600,
+                        flex: "1 1 100%", fontSize: T.meta, padding: "7px 0", borderRadius: 8, border: "1px solid var(--c-warning)", cursor: "pointer", fontWeight: 600,
                         background: "var(--c-warning-bg)", color: "var(--c-warning-text)" }}>
                         ↺ Repasser en vérification
                       </button>
@@ -651,7 +652,7 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
                         setModerationModal({ type: "resolve", signalement: s });
                       }
                     }} style={{
-                      flex: 1, fontSize: 11.5, padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 600,
+                      flex: 1, fontSize: T.small, padding: "7px 0", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 600,
                       background: s.statut === "resolu" ? "var(--c-bg)" : "var(--c-accent)", color: s.statut === "resolu" ? "var(--c-text-secondary)" : "#fff" }}>
                       {s.statut === "resolu" ? "Remettre en attente" : "Marquer résolu"}
                     </button>
@@ -661,7 +662,7 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
                     </button>
                   </div>
                   {s.statut === "resolu" && s.resolution_organisme && (
-                    <div style={{ marginTop: 8, fontSize: 11, color: "var(--c-text-secondary)", background: "var(--c-success-bg)", borderRadius: 8, padding: "6px 8px" }}>
+                    <div style={{ marginTop: 8, fontSize: T.meta, color: "var(--c-text-secondary)", background: "var(--c-success-bg)", borderRadius: 8, padding: "6px 8px" }}>
                       ✓ Résolu par {ORGANISME_LABELS[s.resolution_organisme] || s.resolution_organisme}{s.resolution_action ? ` — ${s.resolution_action}` : ""}
                     </div>
                   )}
@@ -721,7 +722,7 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
 
       {panel === "arbres" && (
         <div className="pace-grid-cards" style={{ gap: 10 }}>
-          {arbres.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: 13, textAlign: "center", padding: 20 }}>Aucun arbre enregistré.</div>}
+          {arbres.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: T.body, textAlign: "center", padding: 20 }}>Aucun arbre enregistré.</div>}
           {[...arbres].reverse().map(a => (
             <div key={a.id} style={{ display: "flex", alignItems: "center", gap: 10, background: "var(--c-surface)", borderRadius: 12, padding: 10, border: "1px solid var(--c-border)" }}>
               {a.photo_url ? (
@@ -732,14 +733,14 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
                 </div>
               )}
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ fontWeight: 600, fontSize: 12.5, color: "var(--c-text)" }}>{a.nom || "Arbre"}</div>
+                <div style={{ fontWeight: 600, fontSize: T.body, color: "var(--c-text)" }}>{a.nom || "Arbre"}</div>
                 {!a.valide && (
-                  <div style={{ fontSize: 10.5, fontWeight: 600, color: "#B5451B" }}>⏳ Non validé — invisible du public</div>
+                  <div style={{ fontSize: T.meta, fontWeight: 600, color: "#B5451B" }}>⏳ Non validé — invisible du public</div>
                 )}
-                <div style={{ fontSize: 10.5, color: "var(--c-text-muted)" }}>{a.date} · appareil {a.device_id ? a.device_id.slice(0, 6) : "?"}</div>
+                <div style={{ fontSize: T.meta, color: "var(--c-text-muted)" }}>{a.date} · appareil {a.device_id ? a.device_id.slice(0, 6) : "?"}</div>
                 {!a.valide && (
                   <button onClick={() => onValidateArbre(a.id)} style={{
-                    marginTop: 6, fontSize: 11, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 600,
+                    marginTop: 6, fontSize: T.meta, padding: "6px 10px", borderRadius: 8, border: "none", cursor: "pointer", fontWeight: 600,
                     background: "var(--c-accent-dark)", color: "#fff" }}>
                     ✓ Valider et publier
                   </button>
@@ -768,7 +769,7 @@ export function AdminSpace({ signalements: signalementsProp, arbres, onUpdateSta
       {panel === "suppressions" && <AdminSuppressions isSuperAdmin={isSuperAdmin} />}
       {panel === "enquetes" && <AdminEnquetes session={session} />}
 
-      <button onClick={onExit} style={{ marginTop: 18, width: "100%", background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", padding: 8 }}>← Retour à l'app</button>
+      <button onClick={onExit} style={{ marginTop: 18, width: "100%", background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.body, cursor: "pointer", padding: 8 }}>← Retour à l'app</button>
     </Screen>
   );
 }

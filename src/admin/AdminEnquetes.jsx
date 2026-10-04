@@ -4,6 +4,7 @@ import { compressImage, uploadPhotoGeneric } from "../components/media.jsx";
 import { SectionTitle } from "../components/ui.jsx";
 import { BibliothequeQuestions, EnquetesStandard } from "../enquetes/EnquetesTerrain.jsx";
 import { supabase } from "../lib/supabase.js";
+import { T } from "../lib/typo.jsx";
 
 export function AdminEnquetes({ session }) {
   const email = session && session.user ? session.user.email : "";
@@ -35,69 +36,11 @@ export function AdminEnquetes({ session }) {
   const [resultatPublic, setResultatPublic] = useState("");
   const fileRefEntree = useRef(null);
 
-  const [orgs, setOrgs] = useState({});     // id d'organisation -> nom, pour afficher l'origine de chaque enquête
-  const [live, setLive] = useState(false);  // true tant que l'abonnement temps réel est actif
-  const selectionRef = useRef(null); selectionRef.current = selection;
-  const [corbeille, setCorbeille] = useState([]);       // enquêtes supprimées (suppression logique), restaurables
-  const [vueCorbeille, setVueCorbeille] = useState(false);
-  const [busyCorbeille, setBusyCorbeille] = useState("");  // id de l'enquête en cours de restauration/suppression définitive
-
   async function charger() {
-    const [{ data: actives }, { data: supprimees }] = await Promise.all([
-      supabase.from("enquetes").select("*").eq("is_deleted", false).order("created_at", { ascending: false }).limit(100),
-      supabase.from("enquetes").select("*").eq("is_deleted", true).order("deleted_at", { ascending: false }).limit(100),
-    ]);
-    setListe(actives || []);
-    setCorbeille(supprimees || []);
+    const { data } = await supabase.from("enquetes").select("*").order("created_at", { ascending: false }).limit(100);
+    setListe(data || []);
   }
   useEffect(() => { charger(); }, []);
-
-  useEffect(() => {
-    supabase.from("organisations").select("id, nom").then(({ data }) => {
-      const m = {}; (data || []).forEach(o => { m[o.id] = o.nom; });
-      setOrgs(prev => ({ ...m, ...prev }));
-    });
-  }, []);
-
-  // Temps réel : toute création, modification, clôture ou suppression d'enquête — y compris par
-  // une organisation — apparaît ici sans recharger. Les droits de lecture restent ceux de la RLS
-  // (policy "lecture enquetes"). À chaque (re)connexion on recharge la liste pour rattraper les
-  // événements manqués pendant une coupure.
-  useEffect(() => {
-    const canal = supabase.channel("admin-enquetes")
-      .on("postgres_changes", { event: "*", schema: "public", table: "enquetes" }, payload => {
-        if (payload.eventType === "DELETE") {
-          const id = payload.old.id;
-          setListe(prev => prev ? prev.filter(x => x.id !== id) : prev);
-          setCorbeille(prev => prev.filter(x => x.id !== id));
-          if (selectionRef.current && selectionRef.current.id === id) { setSelection(null); setDetail(null); }
-          return;
-        }
-        const e = payload.new;
-        if (e.is_deleted) {
-          // Suppression logique (par une organisation ou l'équipe) : l'enquête passe à la corbeille.
-          setListe(prev => prev ? prev.filter(x => x.id !== e.id) : prev);
-          setCorbeille(prev => [e, ...prev.filter(x => x.id !== e.id)]);
-          if (selectionRef.current && selectionRef.current.id === e.id) { setSelection(null); setDetail(null); }
-          return;
-        }
-        setCorbeille(prev => prev.filter(x => x.id !== e.id));
-        setListe(prev => {
-          if (prev === null) return prev;
-          if (prev.some(x => x.id === e.id)) return prev.map(x => x.id === e.id ? e : x);
-          return [e, ...prev].sort((x, y) => new Date(y.created_at) - new Date(x.created_at)).slice(0, 100);
-        });
-        setSelection(prev => prev && prev.id === e.id ? e : prev);
-        if (payload.eventType === "INSERT" && e.organisation_id) {
-          supabase.from("organisations").select("id, nom").eq("id", e.organisation_id).maybeSingle()
-            .then(({ data }) => { if (data) setOrgs(prev => ({ ...prev, [data.id]: data.nom })); });
-        }
-      })
-      .subscribe(status => { setLive(status === "SUBSCRIBED"); if (status === "SUBSCRIBED") charger(); });
-    return () => { supabase.removeChannel(canal); };
-  }, []);
-
-  const origine = e => e.organisation_id ? `Organisation : ${orgs[e.organisation_id] || "…"}` : "Équipe EcoVigil";
 
   const optionsQuestion = (q) => q.type_reponse === "oui_non" ? ["Oui", "Non"] : q.type_reponse === "echelle" ? [1, 2, 3, 4, 5] : (q.options || []);
 
@@ -145,43 +88,13 @@ export function AdminEnquetes({ session }) {
     setSelection(enq);
     setDetail(null);
     setResultatPublic(enq.resultat_public || "");
-    chargerDetail(enq);
-  }
-  // Charge (ou recharge, sans toucher à l'affichage) questions, participations et journal. Ignore
-  // le résultat si l'admin a changé d'enquête entre-temps.
-  async function chargerDetail(enq) {
     const [{ data: questions }, { data: participations }, { data: entrees }] = await Promise.all([
       supabase.from("enquete_questions").select("*").eq("enquete_id", enq.id).order("ordre", { ascending: true }),
       supabase.from("enquete_participations").select("id, enquete_reponses(question_id, valeur)").eq("enquete_id", enq.id),
       supabase.from("enquete_entrees").select("*").eq("enquete_id", enq.id).order("created_at", { ascending: false }),
     ]);
-    if (!selectionRef.current || selectionRef.current.id !== enq.id) return;
     setDetail({ questions: questions || [], participations: participations || [], entrees: entrees || [] });
   }
-
-  // Temps réel sur l'enquête ouverte : nouvelles participations, réponses et entrées de journal.
-  // Les réponses n'ont pas de colonne enquete_id : on ne rafraîchit que si la réponse concerne
-  // une question de cette enquête. Rafraîchissement regroupé (une participation et ses réponses
-  // arrivent en plusieurs écritures successives).
-  const detailRef = useRef(null); detailRef.current = detail;
-  const selectionId = selection ? selection.id : null;
-  useEffect(() => {
-    if (!selectionId) return;
-    let timer = null;
-    const rafraichir = () => {
-      clearTimeout(timer);
-      timer = setTimeout(() => { if (selectionRef.current && selectionRef.current.id === selectionId) chargerDetail(selectionRef.current); }, 400);
-    };
-    const canal = supabase.channel(`admin-enquete-${selectionId}-${Math.random().toString(36).slice(2)}`)
-      .on("postgres_changes", { event: "*", schema: "public", table: "enquete_participations", filter: `enquete_id=eq.${selectionId}` }, rafraichir)
-      .on("postgres_changes", { event: "*", schema: "public", table: "enquete_entrees", filter: `enquete_id=eq.${selectionId}` }, rafraichir)
-      .on("postgres_changes", { event: "INSERT", schema: "public", table: "enquete_reponses" }, payload => {
-        const qs = detailRef.current ? detailRef.current.questions : [];
-        if (qs.some(q => q.id === payload.new.question_id)) rafraichir();
-      })
-      .subscribe();
-    return () => { clearTimeout(timer); supabase.removeChannel(canal); };
-  }, [selectionId]);
 
   function statsQuestion(q) {
     const valeurs = [];
@@ -213,7 +126,7 @@ export function AdminEnquetes({ session }) {
     await supabase.from("enquete_entrees").insert({ enquete_id: selection.id, auteur: email, contenu: noteEntree.trim(), photo_url: photoUrl });
     setNoteEntree(""); setPhotoEntree(null);
     setBusyEntree(false);
-    chargerDetail(selection);
+    ouvrirGestion(selection);
   }
 
   async function enregistrerResultat() {
@@ -234,105 +147,87 @@ export function AdminEnquetes({ session }) {
     charger();
     ouvrirGestion({ ...selection, statut: "ouverte" });
   }
-  // Suppression logique : l'enquête passe à la corbeille (masquée pour l'organisation, les
-  // bénévoles et le public), avec qui/quand tracés côté serveur. Questions, participations,
-  // réponses et journal sont conservés ; l'équipe peut la restaurer à la demande de l'organisation.
+  // Suppression définitive (tout type, tout statut) — réservée au Super administrateur ici
+  // (voir la policy RLS "suppression enquetes") ; efface aussi questions, participations et
+  // réponses (cascade en base), et détache un dossier d'enquête éventuellement lié sans le supprimer.
   async function supprimerEnquete() {
     if (!selection) return;
-    if (!confirm(`Mettre l'enquête « ${selection.titre} » à la corbeille ? Elle ne sera plus visible de l'organisation, des bénévoles ni du public, mais pourra être restaurée depuis la corbeille.`)) return;
+    if (!confirm(`Supprimer définitivement l'enquête « ${selection.titre} » ? Cette action est irréversible : ses questions, participations et réponses seront aussi effacées.`)) return;
     setErreur("");
-    const { error } = await supabase.rpc("supprimer_enquete", { p_id: selection.id });
+    const { error } = await supabase.from("enquetes").delete().eq("id", selection.id);
     if (error) { setErreur("Suppression impossible : " + error.message); return; }
     charger();
     setSelection(null); setDetail(null);
   }
-  async function restaurerEnquete(e) {
-    if (!confirm(`Restaurer l'enquête « ${e.titre} » ? Elle redevient visible avec ses questions, participations et réponses.`)) return;
-    setErreur(""); setBusyCorbeille(e.id);
-    const { error } = await supabase.rpc("restaurer_enquete", { p_id: e.id });
-    setBusyCorbeille("");
-    if (error) { setErreur("Restauration impossible : " + error.message); return; }
-    charger();
-  }
-  // Suppression définitive, uniquement depuis la corbeille : efface aussi questions, participations
-  // et réponses (cascade en base), et détache un dossier d'enquête éventuellement lié sans le supprimer.
-  async function supprimerDefinitivement(e) {
-    if (!confirm(`Supprimer DÉFINITIVEMENT l'enquête « ${e.titre} » ? Cette action est irréversible : ses questions, participations et réponses seront aussi effacées, et elle ne pourra plus être restaurée.`)) return;
-    setErreur(""); setBusyCorbeille(e.id);
-    const { error } = await supabase.from("enquetes").delete().eq("id", e.id);
-    setBusyCorbeille("");
-    if (error) { setErreur("Suppression impossible : " + error.message); return; }
-    charger();
-  }
-  const dateFr = d => d ? new Date(d).toLocaleString("fr-FR") : "";
 
-  const champ = { width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" };
+  const champ = { width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" };
   const typeLabel = { questionnaire: "Questionnaire", investigation: "Investigation", mixte: "Questionnaire + investigation" };
 
   // --- Vue gestion d'une enquête ---
   if (selection && detail) {
     return (
       <div>
-        <button onClick={() => { setSelection(null); setDetail(null); }} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Enquêtes</button>
-        <SectionTitle sub={`${typeLabel[selection.type]} · ${origine(selection)}`}>{selection.titre}</SectionTitle>
-        <div style={{ fontSize: 11.5, color: selection.statut === "ouverte" ? "var(--c-accent-dark)" : "var(--c-text-muted)", marginBottom: 14 }}>
+        <button onClick={() => { setSelection(null); setDetail(null); }} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.body, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Enquêtes</button>
+        <SectionTitle sub={typeLabel[selection.type]}>{selection.titre}</SectionTitle>
+        <div style={{ fontSize: T.small, color: selection.statut === "ouverte" ? "var(--c-accent-dark)" : "var(--c-text-muted)", marginBottom: 14 }}>
           {selection.statut === "ouverte" ? "● En cours" : "● Clôturée"}
         </div>
 
         {selection.type !== "questionnaire" && (
           <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12, marginBottom: 16 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 8 }}>Journal d'investigation ({detail.entrees.length})</div>
+            <div style={{ fontSize: T.body, fontWeight: 600, marginBottom: 8 }}>Journal d'investigation ({detail.entrees.length})</div>
             <input ref={fileRefEntree} type="file" accept="image/*" onChange={choisirPhotoEntree} style={{ display: "none" }} />
-            <textarea value={noteEntree} onChange={e => setNoteEntree(e.target.value)} rows={2} placeholder="Ajouter une note, une preuve, une avancée…" style={{ ...champ, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+            <textarea value={noteEntree} onChange={e => setNoteEntree(e.target.value)} rows={2} placeholder="Ajouter une note, une preuve, une avancée…" style={{ ...champ, resize: "none" }} />
             <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
-              <button type="button" onClick={() => fileRefEntree.current && fileRefEntree.current.click()} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: photoEntree ? "var(--c-surface-soft)" : "none", fontSize: 11.5, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
+              <button type="button" onClick={() => fileRefEntree.current && fileRefEntree.current.click()} style={{ padding: "7px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: photoEntree ? "var(--c-surface-soft)" : "none", fontSize: T.small, cursor: "pointer", display: "flex", alignItems: "center", gap: 5 }}>
                 <IconCamera size={13} /> {photoEntree ? "Photo jointe" : "Ajouter une photo"}
               </button>
-              <button onClick={ajouterEntree} disabled={busyEntree || !noteEntree.trim()} style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer", opacity: busyEntree ? 0.7 : 1 }}>
+              <button onClick={ajouterEntree} disabled={busyEntree || !noteEntree.trim()} style={{ flex: 1, padding: "7px 10px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer", opacity: busyEntree ? 0.7 : 1 }}>
                 {busyEntree ? "…" : "Ajouter au journal"}
               </button>
             </div>
             {detail.entrees.map(en => (
-              <div key={en.id} style={{ borderTop: "1px solid var(--c-border)", padding: "8px 0", fontSize: 12 }}>
+              <div key={en.id} style={{ borderTop: "1px solid var(--c-border)", padding: "8px 0", fontSize: T.small }}>
                 <div style={{ color: "var(--c-text-secondary)" }}>{en.contenu}</div>
                 {en.photo_url && <img src={en.photo_url} alt="" style={{ maxWidth: "100%", borderRadius: 8, marginTop: 6 }} />}
-                <div style={{ fontSize: 10, color: "var(--c-text-muted)", marginTop: 3 }}>{en.auteur} · {new Date(en.created_at).toLocaleString("fr-FR")}</div>
+                <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 3 }}>{en.auteur} · {new Date(en.created_at).toLocaleString("fr-FR")}</div>
               </div>
             ))}
 
             <div style={{ marginTop: 14 }}>
-              {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>{erreur}</div>}
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Résultat public (visible à la clôture)</div>
-              <textarea value={resultatPublic} onChange={e => setResultatPublic(e.target.value)} rows={2} placeholder="Conclusion communicable à tous…" style={{ ...champ, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+              {erreur && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 8 }}>{erreur}</div>}
+              <div style={{ fontSize: T.small, fontWeight: 600, marginBottom: 6 }}>Résultat public (visible à la clôture)</div>
+              <textarea value={resultatPublic} onChange={e => setResultatPublic(e.target.value)} rows={2} placeholder="Conclusion communicable à tous…" style={{ ...champ, resize: "none" }} />
               <div style={{ display: "flex", gap: 8 }}>
-                <button onClick={enregistrerResultat} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", fontSize: 11.5, cursor: "pointer" }}>Enregistrer le brouillon</button>
+                <button onClick={enregistrerResultat} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", fontSize: T.small, cursor: "pointer" }}>Enregistrer le brouillon</button>
                 {selection.statut === "ouverte"
-                  ? <button onClick={cloturer} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>Clôturer</button>
-                  : <button onClick={reouvrir} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>Rouvrir</button>}
+                  ? <button onClick={cloturer} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>Clôturer</button>
+                  : <button onClick={reouvrir} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>Rouvrir</button>}
               </div>
+              <button onClick={supprimerEnquete} style={{ width: "100%", marginTop: 8, padding: "8px 0", borderRadius: 8, border: "1px solid #B5451B", background: "none", color: "#B5451B", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>Supprimer définitivement cette enquête</button>
             </div>
           </div>
         )}
 
         {selection.type !== "investigation" && (
           <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 12, padding: 12 }}>
-            <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 10 }}>Réponses ({detail.participations.length} participation{detail.participations.length > 1 ? "s" : ""})</div>
+            <div style={{ fontSize: T.body, fontWeight: 600, marginBottom: 10 }}>Réponses ({detail.participations.length} participation{detail.participations.length > 1 ? "s" : ""})</div>
             {detail.questions.map(q => {
               const s = statsQuestion(q);
               return (
                 <div key={q.id} style={{ marginBottom: 14 }}>
-                  <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>{q.texte}</div>
+                  <div style={{ fontSize: T.body, fontWeight: 600, marginBottom: 6 }}>{q.texte}</div>
                   {q.type_reponse === "texte" ? (
-                    s.texte.length === 0 ? <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Aucune réponse.</div> :
-                    s.texte.slice(0, 20).map((t, i) => <div key={i} style={{ fontSize: 11.5, color: "var(--c-text-secondary)", padding: "3px 0", borderTop: i > 0 ? "1px solid var(--c-border)" : "none" }}>« {t} »</div>)
-                  ) : Object.keys(s.comptage).length === 0 ? <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Aucune réponse.</div> : (
+                    s.texte.length === 0 ? <div style={{ fontSize: T.small, color: "var(--c-text-muted)" }}>Aucune réponse.</div> :
+                    s.texte.slice(0, 20).map((t, i) => <div key={i} style={{ fontSize: T.small, color: "var(--c-text-secondary)", padding: "3px 0", borderTop: i > 0 ? "1px solid var(--c-border)" : "none" }}>« {t} »</div>)
+                  ) : Object.keys(s.comptage).length === 0 ? <div style={{ fontSize: T.small, color: "var(--c-text-muted)" }}>Aucune réponse.</div> : (
                     Object.entries(s.comptage).map(([opt, n]) => (
                       <div key={opt} style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-                        <div style={{ fontSize: 11, width: 90, flexShrink: 0, color: "var(--c-text-secondary)" }}>{opt}</div>
+                        <div style={{ fontSize: T.meta, width: 90, flexShrink: 0, color: "var(--c-text-secondary)" }}>{opt}</div>
                         <div style={{ flex: 1, height: 8, background: "var(--c-surface-soft)", borderRadius: 4, overflow: "hidden" }}>
                           <div style={{ width: `${(n / s.total) * 100}%`, height: "100%", background: "var(--c-accent-dark)" }} />
                         </div>
-                        <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", width: 20 }}>{n}</div>
+                        <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", width: 20 }}>{n}</div>
                       </div>
                     ))
                   )}
@@ -341,34 +236,6 @@ export function AdminEnquetes({ session }) {
             })}
           </div>
         )}
-
-        {selection.restaure_le && <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 14 }}>Restaurée le {dateFr(selection.restaure_le)} par {selection.restaure_par}.</div>}
-        {erreur && selection.type === "questionnaire" && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginTop: 12 }}>{erreur}</div>}
-        <button onClick={supprimerEnquete} style={{ width: "100%", marginTop: 14, padding: "8px 0", borderRadius: 8, border: "1px solid #B5451B", background: "none", color: "#B5451B", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>Mettre cette enquête à la corbeille</button>
-      </div>
-    );
-  }
-
-  // --- Vue corbeille ---
-  if (vueCorbeille) {
-    return (
-      <div>
-        <button onClick={() => { setVueCorbeille(false); setErreur(""); }} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Enquêtes</button>
-        <SectionTitle sub="Enquêtes supprimées par les organisations ou l'équipe, restaurables à la demande de l'organisation responsable.">Corbeille ({corbeille.length})</SectionTitle>
-        {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 10 }}>{erreur}</div>}
-        {corbeille.length === 0 ? (
-          <div style={{ fontSize: 12.5, color: "var(--c-text-muted)", textAlign: "center", padding: 16 }}>La corbeille est vide.</div>
-        ) : corbeille.map(e => (
-          <div key={e.id} style={{ background: "var(--c-surface)", borderRadius: 12, padding: 12, border: "1px solid var(--c-border)", marginBottom: 10 }}>
-            <div style={{ fontWeight: 600, fontSize: 13 }}>{e.titre}</div>
-            <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>{typeLabel[e.type]} · {origine(e)}</div>
-            <div style={{ fontSize: 11, color: "#B5451B", marginTop: 4 }}>Supprimée le {dateFr(e.deleted_at)} par {e.deleted_by || "inconnu"}</div>
-            <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <button onClick={() => restaurerEnquete(e)} disabled={busyCorbeille === e.id} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer", opacity: busyCorbeille === e.id ? 0.7 : 1 }}>Restaurer</button>
-              <button onClick={() => supprimerDefinitivement(e)} disabled={busyCorbeille === e.id} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid #B5451B", background: "none", color: "#B5451B", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>Supprimer définitivement</button>
-            </div>
-          </div>
-        ))}
       </div>
     );
   }
@@ -376,33 +243,29 @@ export function AdminEnquetes({ session }) {
   // --- Vue liste ---
   return (
     <div>
-      <SectionTitle sub="Questionnaires citoyens et dossiers d'investigation, créés par l'équipe et par les organisations.">Enquêtes</SectionTitle>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8, marginBottom: 10 }}>
-        <div style={{ fontSize: 10.5, color: live ? "var(--c-accent-dark)" : "var(--c-text-muted)" }}>{live ? "● Temps réel actif" : "○ Temps réel indisponible — liste non synchronisée automatiquement"}</div>
-        <button onClick={() => { setErreur(""); setVueCorbeille(true); }} style={{ padding: "5px 10px", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", fontSize: 11.5, cursor: "pointer", color: corbeille.length ? "#B5451B" : "var(--c-text-secondary)", flexShrink: 0 }}>Corbeille ({corbeille.length})</button>
-      </div>
+      <SectionTitle sub="Questionnaires citoyens et dossiers d'investigation, créés et suivis par l'équipe.">Enquêtes</SectionTitle>
 
       <EnquetesStandard email={email} organisationId={null} source="admin" />
       {!showCreer ? (
-        <button onClick={() => setShowCreer(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "10px 14px", borderRadius: 12, border: "1px dashed var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 13, cursor: "pointer", margin: "14px 0" }}>
+        <button onClick={() => setShowCreer(true)} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, width: "100%", padding: "10px 14px", borderRadius: 12, border: "1px dashed var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: T.body, cursor: "pointer", margin: "14px 0" }}>
           <IconPlus size={16} /> Créer une enquête
         </button>
       ) : (
         <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--c-border)", margin: "14px 0" }}>
           <input value={titre} onChange={e => setTitre(e.target.value)} placeholder="Titre de l'enquête" style={champ} />
-          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Description (optionnel)" style={{ ...champ, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+          <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Description (optionnel)" style={{ ...champ, resize: "none" }} />
           <input value={categorie} onChange={e => setCategorie(e.target.value)} placeholder="Catégorie liée (optionnel, ex : pollution_eau)" style={champ} />
           <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
             {[["questionnaire", "Questionnaire"], ["investigation", "Investigation"], ["mixte", "Les deux"]].map(([v, l]) => (
-              <button key={v} type="button" onClick={() => setType(v)} style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: `1px solid ${type === v ? "var(--c-accent-dark)" : "var(--c-border)"}`, background: type === v ? "var(--c-accent-dark)" : "none", color: type === v ? "#fff" : "var(--c-text)", fontSize: 11, cursor: "pointer" }}>{l}</button>
+              <button key={v} type="button" onClick={() => setType(v)} style={{ flex: 1, padding: "7px 4px", borderRadius: 8, border: `1px solid ${type === v ? "var(--c-accent-dark)" : "var(--c-border)"}`, background: type === v ? "var(--c-accent-dark)" : "none", color: type === v ? "#fff" : "var(--c-text)", fontSize: T.meta, cursor: "pointer" }}>{l}</button>
             ))}
           </div>
 
           {type !== "investigation" && (
             <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 10, marginBottom: 10 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 6 }}>Questions ({draftQuestions.length})</div>
+              <div style={{ fontSize: T.small, fontWeight: 600, marginBottom: 6 }}>Questions ({draftQuestions.length})</div>
               {draftQuestions.map((q, i) => (
-                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: 11.5, padding: "4px 0" }}>
+                <div key={i} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", fontSize: T.small, padding: "4px 0" }}>
                   <span>{q.texte} <em style={{ color: "var(--c-text-muted)" }}>({q.type_reponse}{q.conditionIndex != null && draftQuestions[q.conditionIndex] ? ` · si « ${draftQuestions[q.conditionIndex].texte} » = ${q.conditionValeur}` : ""}{q.groupe ? ` · groupe « ${q.groupe} »` : ""}{q.validation ? (q.validation.kind === "nombre" ? ` · nombre ${q.validation.min ?? "…"}–${q.validation.max ?? "…"}` : ` · ${q.validation.min_len ?? 0}–${q.validation.max_len ?? "…"} car.`) : ""})</em></span>
                   <button type="button" onClick={() => retirerQuestionDraft(i)} style={{ background: "none", border: "none", cursor: "pointer", color: "var(--c-text-muted)" }}><IconX size={13} /></button>
                 </div>
@@ -429,12 +292,12 @@ export function AdminEnquetes({ session }) {
                     <input type="number" value={qMin} onChange={e => setQMin(e.target.value)} placeholder={qFormat === "nombre" ? "Valeur minimale" : "Longueur minimale (caractères)"} style={{ ...champ, marginBottom: 0 }} />
                     <input type="number" value={qMax} onChange={e => setQMax(e.target.value)} placeholder={qFormat === "nombre" ? "Valeur maximale" : "Longueur maximale (caractères)"} style={{ ...champ, marginBottom: 0 }} />
                   </div>
-                  <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 4 }}>Optionnel : le bénévole ne pourra pas envoyer une réponse qui sort de ces limites.</div>
+                  <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 4 }}>Optionnel : le bénévole ne pourra pas envoyer une réponse qui sort de ces limites.</div>
                 </div>
               )}
               <input value={qGroupe} onChange={e => setQGroupe(e.target.value)} list="groupes-repetables-admin" placeholder="Groupe répétable (optionnel, ex : Point de pollution)" style={champ} />
               <datalist id="groupes-repetables-admin">{[...new Set(draftQuestions.map(q => q.groupe).filter(Boolean))].map(g => <option key={g} value={g} />)}</datalist>
-              {qGroupe.trim() && <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: -4, marginBottom: 8 }}>Cette question et les suivantes portant le même nom de groupe pourront être répétées plusieurs fois par le répondant (ex. plusieurs sites touchés).</div>}
+              {qGroupe.trim() && <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: -4, marginBottom: 8 }}>Cette question et les suivantes portant le même nom de groupe pourront être répétées plusieurs fois par le répondant (ex. plusieurs sites touchés).</div>}
               {draftQuestions.some(q => ["oui_non", "echelle", "choix_unique", "choix_multiple"].includes(q.type_reponse)) && (
                 <div style={{ marginBottom: 8 }}>
                   <select value={qConditionIndex} onChange={e => { setQConditionIndex(e.target.value); setQConditionValeur(""); }} style={{ ...champ, marginBottom: qConditionIndex !== "" ? 6 : 8, background: "var(--c-surface)" }}>
@@ -449,31 +312,29 @@ export function AdminEnquetes({ session }) {
                   )}
                 </div>
               )}
-              <button type="button" onClick={ajouterQuestionDraft} style={{ width: "100%", padding: "7px 0", borderRadius: 8, border: "1px dashed var(--c-border)", background: "none", fontSize: 11.5, cursor: "pointer" }}>+ Ajouter cette question</button>
+              <button type="button" onClick={ajouterQuestionDraft} style={{ width: "100%", padding: "7px 0", borderRadius: 8, border: "1px dashed var(--c-border)", background: "none", fontSize: T.small, cursor: "pointer" }}>+ Ajouter cette question</button>
             </div>
           )}
 
-          {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>{erreur}</div>}
-          <button onClick={creerEnquete} disabled={busy} style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>
+          {erreur && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 8 }}>{erreur}</div>}
+          <button onClick={creerEnquete} disabled={busy} style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", opacity: busy ? 0.7 : 1 }}>
             {busy ? "…" : "Créer l'enquête"}
           </button>
-          <button onClick={() => setShowCreer(false)} style={{ width: "100%", padding: "6px 0", background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer", marginTop: 4 }}>Annuler</button>
+          <button onClick={() => setShowCreer(false)} style={{ width: "100%", padding: "6px 0", background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.small, cursor: "pointer", marginTop: 4 }}>Annuler</button>
         </div>
       )}
 
       {liste === null ? (
-        <div style={{ fontSize: 12, color: "var(--c-text-muted)", textAlign: "center", padding: 16 }}>Chargement…</div>
+        <div style={{ fontSize: T.small, color: "var(--c-text-muted)", textAlign: "center", padding: 16 }}>Chargement…</div>
       ) : liste.length === 0 ? (
-        <div style={{ fontSize: 12.5, color: "var(--c-text-muted)", textAlign: "center", padding: 16 }}>Aucune enquête créée pour le moment.</div>
+        <div style={{ fontSize: T.body, color: "var(--c-text-muted)", textAlign: "center", padding: 16 }}>Aucune enquête créée pour le moment.</div>
       ) : (
         <div className="pace-grid-cards">
           {liste.map(e => (
             <button key={e.id} onClick={() => ouvrirGestion(e)} style={{
               textAlign: "left", background: "var(--c-surface)", borderRadius: 12, padding: 12, border: "1px solid var(--c-border)", cursor: "pointer" }}>
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{e.titre}</div>
-              <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 2 }}>{typeLabel[e.type]} · {e.statut === "ouverte" ? "en cours" : "clôturée"}</div>
-              <div style={{ fontSize: 10.5, color: e.organisation_id ? "var(--c-accent-dark)" : "var(--c-text-muted)", marginTop: 2 }}>{origine(e)}</div>
-              {e.restaure_le && <div style={{ fontSize: 10, color: "var(--c-text-muted)", marginTop: 2 }}>Restaurée le {dateFr(e.restaure_le)}</div>}
+              <div style={{ fontWeight: 600, fontSize: T.body }}>{e.titre}</div>
+              <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 2 }}>{typeLabel[e.type]} · {e.statut === "ouverte" ? "en cours" : "clôturée"}</div>
             </button>
           ))}
         </div>

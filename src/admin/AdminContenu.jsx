@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { IconTrash } from "../components/icons.jsx";
 import { supabase } from "../lib/supabase.js";
+import { T } from "../lib/typo.jsx";
 
 export function AdminActualites() {
   const [items, setItems] = useState([]);
@@ -39,31 +40,31 @@ export function AdminActualites() {
     <div>
       <form onSubmit={publish} style={{ background: "var(--c-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--c-border)", marginBottom: 16 }}>
         <input required value={titre} onChange={e => setTitre(e.target.value)} placeholder="Titre"
-          style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" }} />
+          style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" }} />
         <textarea required value={contenu} onChange={e => setContenu(e.target.value)} placeholder="Contenu" rows={3}
-          style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box", resize: "none", fontFamily: "Work Sans, sans-serif" }} />
-        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: "var(--c-text-secondary)", marginBottom: 10, cursor: "pointer" }}>
+          style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box", resize: "none" }} />
+        <label style={{ display: "flex", alignItems: "center", gap: 6, fontSize: T.small, color: "var(--c-text-secondary)", marginBottom: 10, cursor: "pointer" }}>
           <input type="checkbox" checked={urgent} onChange={e => setUrgent(e.target.checked)} /> Marquer comme alerte urgente
         </label>
-        <button type="button" onClick={publish} disabled={busy} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+        <button type="button" onClick={publish} disabled={busy} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
           {busy ? "Publication..." : "Publier"}
         </button>
       </form>
 
-      {loading ? <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: 13 }}>Chargement…</div> : (
+      {loading ? <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: T.body }}>Chargement…</div> : (
         <div className="pace-grid-cards">
-          {items.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: 13, textAlign: "center", padding: 12 }}>Aucune actualité publiée.</div>}
+          {items.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: T.body, textAlign: "center", padding: 12 }}>Aucune actualité publiée.</div>}
           {items.map(n => (
             <div key={n.id} style={{ background: "var(--c-surface)", borderRadius: 12, padding: 12, border: "1px solid var(--c-border)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
-                  {n.urgent && <span style={{ fontSize: 10, fontWeight: 700, color: "#B5451B" }}>⚠ ALERTE — </span>}
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{n.titre}</span>
+                  {n.urgent && <span style={{ fontSize: T.meta, fontWeight: 700, color: "#B5451B" }}>⚠ ALERTE — </span>}
+                  <span style={{ fontWeight: 600, fontSize: T.body }}>{n.titre}</span>
                 </div>
                 <button onClick={() => remove(n.id)} style={{ background: "none", border: "none", color: "#B5451B", cursor: "pointer", padding: 4 }}><IconTrash size={14} /></button>
               </div>
-              <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginTop: 4 }}>{n.contenu}</div>
-              <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 5 }}>{new Date(n.created_at).toLocaleDateString("fr-FR")}</div>
+              <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginTop: 4 }}>{n.contenu}</div>
+              <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 5 }}>{new Date(n.created_at).toLocaleDateString("fr-FR")}</div>
             </div>
           ))}
         </div>
@@ -98,25 +99,25 @@ export function AdminEvenements() {
 
   return (
     <div>
-      <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginBottom: 12 }}>
+      <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginBottom: 12 }}>
         Les événements sont proposés librement par les citoyens et bénévoles depuis l'app. Cette liste sert à
         retirer un contenu inapproprié ou un doublon — la création se fait côté public, pas ici.
       </div>
-      {loading ? <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: 13 }}>Chargement…</div> : (
+      {loading ? <div style={{ textAlign: "center", color: "var(--c-text-muted)", fontSize: T.body }}>Chargement…</div> : (
         <div className="pace-grid-cards">
-          {items.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: 13, textAlign: "center", padding: 12 }}>Aucun événement proposé.</div>}
+          {items.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: T.body, textAlign: "center", padding: 12 }}>Aucun événement proposé.</div>}
           {items.map(ev => (
             <div key={ev.id} style={{ background: "var(--c-surface)", borderRadius: 12, padding: 12, border: "1px solid var(--c-border)" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
                 <div>
-                  <span style={{ fontWeight: 600, fontSize: 13 }}>{ev.titre}</span>
-                  <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 2 }}>
+                  <span style={{ fontWeight: 600, fontSize: T.body }}>{ev.titre}</span>
+                  <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 2 }}>
                     {new Date(ev.date_debut).toLocaleString("fr-FR")}{ev.lieu ? ` · ${ev.lieu}` : ""} · {counts[ev.id] || 0} participant(s)
                   </div>
                 </div>
                 <button onClick={() => remove(ev.id)} style={{ background: "none", border: "none", color: "#B5451B", cursor: "pointer", padding: 4 }}><IconTrash size={14} /></button>
               </div>
-              {ev.description && <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginTop: 4 }}>{ev.description}</div>}
+              {ev.description && <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginTop: 4 }}>{ev.description}</div>}
             </div>
           ))}
         </div>
