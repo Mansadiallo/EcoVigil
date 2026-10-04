@@ -520,6 +520,17 @@ function App() {
     setArbres(prev => prev.filter(a => a.id !== arbre.id));
   }
 
+  // Suppression par un bénévole validé d'un arbre qu'il juge mal enregistré ou mal géolocalisé.
+  // Suppression douce via RPC SECURITY DEFINER (vérifie le statut bénévole côté serveur, journalise
+  // dans audit_logs) : l'arbre reste restaurable par un admin depuis l'Historique.
+  // motif : "mal_enregistre" | "mal_geolocalise"
+  async function benevoleSupprimerArbre(arbre, motif) {
+    const { error } = await supabase.rpc("supprimer_arbre_benevole", { p_id: arbre.id, p_motif: motif });
+    if (error) throw error;
+    setArbres(prev => prev.filter(a => a.id !== arbre.id));
+    logActivity("arbre_supprime_benevole", "arbres", arbre.id, motif);
+  }
+
   // Le panneau "Historique" (corbeille) gère sa propre liste indépendamment de l'état
   // signalements/arbres chargé une fois au démarrage de App(). Sans ce callback, un élément
   // restauré depuis la corbeille redevient bien is_deleted=false en base, mais reste invisible
@@ -701,8 +712,14 @@ function App() {
     }
     try {
       const photo_url = await uploadPhoto(photo, "arbres");
-      const { data, error } = await supabase.from("arbres").insert({ ...toInsert, photo_url, device_id: DEVICE_ID, is_deleted: false }).select().single();
+      // Pas de .select() après l'insertion : la lecture directe de la table arbres est réservée
+      // aux admins/organisations (RLS), donc un RETURNING ferait rejeter l'INSERT d'un citoyen (403).
+      // L'identifiant est généré ici pour pouvoir afficher l'arbre sans relire la ligne.
+      const maintenant = new Date().toISOString();
+      const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+      const { error } = await supabase.from("arbres").insert({ ...toInsert, id, photo_url, device_id: DEVICE_ID, is_deleted: false, planted_at: maintenant });
       if (error) throw error;
+      const data = { ...toInsert, id: id || opts.tempId || ("local-" + Date.now()), photo_url, device_id: DEVICE_ID, is_deleted: false, valide: false, publie: false, planted_at: maintenant, created_at: maintenant };
       setArbres(prev => {
         const withoutPending = opts.tempId ? prev.filter(x => x.id !== opts.tempId) : prev;
         return [...withoutPending, mapArbre(data)];
@@ -755,6 +772,16 @@ function App() {
     try { window.dispatchEvent(new CustomEvent("pace-queue-syncing", { detail: { syncing: true } })); } catch (e) {}
     const MAX_TENTATIVES = 8;
     try {
+      // Réinitialisation unique : les éléments abandonnés (_failed) à cause de l'ancien rejet RLS
+      // sur l'insertion des arbres sont rejoués une fois avec le correctif.
+      try {
+        if (!localStorage.getItem("pace-queue-reset-v2")) {
+          const q = loadPendingQueue();
+          q.forEach(i => { delete i._failed; i.attempts = 0; });
+          savePendingQueue(q);
+          localStorage.setItem("pace-queue-reset-v2", "1");
+        }
+      } catch (e) {}
       const queue = loadPendingQueue();
       for (const item of queue) {
         if (!navigator.onLine) break; // vraie coupure réseau : on s'arrête, on réessaiera plus tard
@@ -914,7 +941,7 @@ function App() {
         ) : (
           <div key={tab} className="pace-fade-in">
             {tab === "accueil" && <Accueil signalements={signalements.filter(s => s.device_id === DEVICE_ID)} arbres={arbres.filter(a => a.device_id === DEVICE_ID)} notifState={notifState} onEnableNotif={enableNotif} onOpenAdmin={() => { enterAdminIdentity(); setShowAdmin(true); }} actualites={actualites} onNavigate={setTab} lang={lang} estBenevoleValide={estBenevoleValide} benevoleStatut={benevoleStatut} onBenevoleInscrit={() => { setBenevoleStatut("en_attente"); try { localStorage.setItem("pace-benevole-statut", "en_attente"); } catch (e) {} }} estOrganisationValidee={estOrganisationValidee} organisationStatut={organisationStatut} organisationEtapeDossier={organisationEtapeDossier} organisationEtapeMotif={organisationEtapeMotif} onBasculerStatutSignalement={citoyenBasculerStatutSignalement} profilInfo={profilInfo} onProfilChange={rafraichirProfil} />}
-            {tab === "carte" && accesEtendu && <Carte signalements={signalements} arbres={arbres} observations={observations} enquetesCarte={enquetesCarte} onAddSignalement={addSignalement} onAddArbre={addArbre} onAddObservation={addObservation} online={online} pendingQueueCount={pendingQueueCount} onFlushQueue={flushPendingQueue} lang={lang} coordFormat={coordFormat} />}
+            {tab === "carte" && accesEtendu && <Carte signalements={signalements} arbres={arbres} observations={observations} enquetesCarte={enquetesCarte} onAddSignalement={addSignalement} onAddArbre={addArbre} onAddObservation={addObservation} onSupprimerArbre={estBenevoleValide ? benevoleSupprimerArbre : undefined} online={online} pendingQueueCount={pendingQueueCount} onFlushQueue={flushPendingQueue} lang={lang} coordFormat={coordFormat} />}
             {tab === "signaler" && accesEtendu && <Signaler onSubmit={addSignalement} lang={lang} coordFormat={coordFormat} onNavigate={setTab} />}
             {tab === "arbre" && accesEtendu && <MonArbre arbres={arbres.filter(a => a.device_id === DEVICE_ID)} suivis={suivis} onAdd={addArbre} onAddSuivi={addSuivi} onDelete={citoyenSupprimerArbre} lang={lang} coordFormat={coordFormat} />}
             {tab === "profil" && <ProfilTab profilInfo={profilInfo} onProfilChange={rafraichirProfil} lang={lang} />}
