@@ -16,6 +16,7 @@ import { MonArbre } from "./screens/MonArbre.jsx";
 import { BenevoleAccesBloque, OrganisationCard } from "./screens/Organisation.jsx";
 import { MurProfilObligatoire, ProfilTab } from "./screens/Profil.jsx";
 import { Signaler } from "./screens/Signaler.jsx";
+import { FONT_TEXTE, T } from "./lib/typo.jsx";
 
 /* Écrans lourds chargés à la demande : le navigateur ne télécharge leur code qu'à la première ouverture. */
 const AdminSpace = lazy(() => import("./admin/AdminSpace.jsx").then((m) => ({ default: m.AdminSpace })));
@@ -797,7 +798,7 @@ function App() {
   ];
 
   return (
-    <div dir={RTL_LANGS.includes(lang) ? "rtl" : "ltr"} className={`pace-app-outer ${isDark ? "pace-dark" : ""} accent-${accent}${orientation !== "auto" ? ` orient-${orientation}` : ""}`} style={{ fontFamily: "Work Sans, sans-serif", background: "var(--c-bg)", minHeight: "100vh", display: "flex", justifyContent: "center", transition: "background-color .25s ease" }}>
+    <div dir={RTL_LANGS.includes(lang) ? "rtl" : "ltr"} className={`pace-app-outer ${isDark ? "pace-dark" : ""} accent-${accent}${orientation !== "auto" ? ` orient-${orientation}` : ""}`} style={{ fontFamily: FONT_TEXTE, background: "var(--c-bg)", minHeight: "100vh", display: "flex", justifyContent: "center", transition: "background-color .25s ease" }}>
       {showSplash && <SplashScreen lang={lang} />}
       {citoyenRecoveryToken && !showSplash && (
         <CitoyenNouveauMotDePasse token={citoyenRecoveryToken} onDone={() => setCitoyenRecoveryToken(null)} />
@@ -815,8 +816,8 @@ function App() {
           </div>
           <div style={{ flex: 1 }}>
             <div style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: 20, letterSpacing: 0.3 }}>EcoVigil</div>
-            <div style={{ fontSize: 10.5, opacity: 0.9, lineHeight: 1.3 }}>{t(lang, "plateforme_desc")}</div>
-            <div style={{ fontSize: 10, opacity: 0.75, marginTop: 1 }}>{t(lang, "sub_accueil")}</div>
+            <div style={{ fontSize: T.meta, opacity: 0.9, lineHeight: 1.3 }}>{t(lang, "plateforme_desc")}</div>
+            <div style={{ fontSize: T.meta, opacity: 0.75, marginTop: 1 }}>{t(lang, "sub_accueil")}</div>
           </div>
           {/* Cloche de notifications citoyenne : ferme la boucle de suivi (validation, résolution
               d'un signalement...) pour quiconque n'a pas activé les notifications push — sans elle,
@@ -849,12 +850,12 @@ function App() {
         )}
 
         {!online && (
-          <div style={{ background: "#B5451B", color: "#fff", fontSize: 11.5, textAlign: "center", padding: "6px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <div style={{ background: "#B5451B", color: "#fff", fontSize: T.small, textAlign: "center", padding: "6px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <IconWifiOff size={13} /> {t(lang, "hors_ligne_banner")}{pendingQueueCount > 0 ? ` (${pendingQueueCount} ${t(lang, "hors_ligne_banner_attente")})` : ""}
           </div>
         )}
         {online && pendingQueueCount > 0 && (
-          <div style={{ background: "var(--c-warning)", color: "#fff", fontSize: 11.5, textAlign: "center", padding: "6px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <div style={{ background: "var(--c-warning)", color: "#fff", fontSize: T.small, textAlign: "center", padding: "6px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <IconClock size={13} /> {t(lang, "envoi_en_cours_prefix")} {pendingQueueCount} {t(lang, "envoi_attente_suffix")}
           </div>
         )}
@@ -866,7 +867,7 @@ function App() {
         ) : tab === "confidentialite" ? (
           <Confidentialite onBack={() => setTab("accueil")} />
         ) : profilInfo === undefined ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: "var(--c-text-muted)", fontSize: 13, gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: "var(--c-text-muted)", fontSize: T.body, gap: 8 }}>
             <IconClock size={15} /> Chargement…
           </div>
         ) : profilInfo === null ? (
@@ -874,7 +875,7 @@ function App() {
         ) : accesBloque ? (
           <BenevoleAccesBloque statut={benevoleStatut} />
         ) : ecransReserves.includes(tab) && statutEnCours ? (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: "var(--c-text-muted)", fontSize: 13, gap: 8 }}>
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: "var(--c-text-muted)", fontSize: T.body, gap: 8 }}>
             <IconClock size={15} /> Vérification de l'accès…
           </div>
         ) : tab === "biodiversite" && accesEtendu ? (
@@ -883,7 +884,7 @@ function App() {
           <AssistantIA onBack={() => setTab("accueil")} signalements={signalements} arbres={arbres} observations={observations} actualites={actualites} />
         ) : tab === "compte_org" && !estOrganisationValidee ? (
           <Screen>
-            <button onClick={() => setTab("accueil")} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Retour</button>
+            <button onClick={() => setTab("accueil")} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.body, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Retour</button>
             <OrganisationCard lang={lang} organisationStatut={organisationStatut} organisationEtapeDossier={organisationEtapeDossier} organisationEtapeMotif={organisationEtapeMotif} profilInfo={profilInfo} onProfilChange={rafraichirProfil} />
           </Screen>
         ) : tab === "espace_org" && estOrganisationValidee ? (
@@ -918,7 +919,7 @@ function App() {
                   <div style={{ background: tabItem.cta && !verrouille ? "#B5451B" : (active && !verrouille ? "var(--c-surface-soft)" : "transparent"), borderRadius: "50%", width: 34, height: 34, display: "flex", alignItems: "center", justifyContent: "center" }}>
                     {verrouille ? <IconLock size={15} color="var(--c-text-muted)" /> : <IconT size={17} color={tabItem.cta ? "#fff" : (active ? "var(--c-accent)" : "var(--c-text-muted)")} />}
                   </div>
-                  <span style={{ fontSize: 10, color: active && !verrouille ? "var(--c-accent)" : "var(--c-text-muted)", fontWeight: active && !verrouille ? 600 : 500 }}>{navLabels[tabItem.id] || tabItem.label}</span>
+                  <span style={{ fontSize: T.meta, color: active && !verrouille ? "var(--c-accent)" : "var(--c-text-muted)", fontWeight: active && !verrouille ? 600 : 500 }}>{navLabels[tabItem.id] || tabItem.label}</span>
                 </button>
               );
             })}
