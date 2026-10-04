@@ -341,6 +341,7 @@ export function ProfilGate({ profilInfo, children }) {
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState("");
   const [messageConfirmation, setMessageConfirmation] = useState(null); // { compteExistant: bool, texte } | null
+  const [infoReset, setInfoReset] = useState(""); // confirmation d'envoi du lien « mot de passe oublié »
   const fileRef = useRef(null);
   const nomRef = useRef(null);
   const emailRef = useRef(null);
@@ -438,6 +439,19 @@ export function ProfilGate({ profilInfo, children }) {
     const { error } = await supabase.auth.signInWithPassword({ email: email.trim(), password });
     setBusy(false);
     if (error) { setErreur("E-mail ou mot de passe incorrect."); return; }
+  }
+
+  // « Mot de passe oublié » : envoie par e-mail un lien de réinitialisation. À l'ouverture du lien,
+  // l'app affiche l'écran de nouveau mot de passe (CitoyenNouveauMotDePasse). Le message de
+  // confirmation est volontairement identique que l'adresse soit inscrite ou non.
+  async function motDePasseOublie() {
+    setErreur(""); setInfoReset("");
+    if (!emailValide) { setErreur("Saisis ton adresse e-mail ci-dessus, puis touche « Mot de passe oublié ? »."); return; }
+    setBusy(true);
+    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: urlRedirectionAuth() });
+    setBusy(false);
+    if (error) { setErreur("Impossible d'envoyer le lien pour le moment. Vérifie ta connexion et réessaie."); return; }
+    setInfoReset("Si un profil existe avec cette adresse, un lien pour choisir un nouveau mot de passe vient d'être envoyé. Pense à vérifier tes courriers indésirables.");
   }
 
   const boutonPrincipal = { width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "opacity .15s ease" };
@@ -578,10 +592,19 @@ export function ProfilGate({ profilInfo, children }) {
               <span>{erreur}</span>
             </div>
           )}
+          {infoReset && (
+            <div role="status" className="pace-fade-in" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: T.small, color: "var(--c-accent-dark)", marginBottom: 8, lineHeight: 1.4 }}>
+              <IconCheck size={13} />
+              <span>{infoReset}</span>
+            </div>
+          )}
           <button type="button" onClick={connecterProfil} disabled={busy} style={{ ...boutonPrincipal, opacity: busy ? 0.75 : 1 }}>
             {busy ? "Connexion…" : "Se connecter"}
           </button>
-          <button type="button" onClick={() => { setModeProfil("signup"); setErreur(""); allerEtape(0); }} style={boutonLien}>
+          <button type="button" onClick={motDePasseOublie} disabled={busy} style={{ ...boutonLien, textDecoration: "underline" }}>
+            Mot de passe oublié ?
+          </button>
+          <button type="button" onClick={() => { setModeProfil("signup"); setErreur(""); setInfoReset(""); allerEtape(0); }} style={boutonLien}>
             Pas encore de profil ? En créer un
           </button>
         </form>
