@@ -127,7 +127,10 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, onDelete, lang, co
       if (suiviOuvert === a.id) setSuiviOuvert(null);
       logActivity("arbre_supprime", "citoyen", DEVICE_ID, a.nom || "");
     } catch (e) {
-      alert("Impossible de supprimer l'arbre pour le moment. Vérifie ta connexion et réessaie.");
+      const refuse = e && (e.code === "42501" || /non autoris/i.test(e.message || ""));
+      alert(refuse
+        ? "Suppression refusée : cet arbre a été enregistré avec un autre compte que celui actuellement connecté. Reconnecte-toi avec le compte qui l'a créé."
+        : "Impossible de supprimer l'arbre pour le moment. Vérifie ta connexion et réessaie.");
     } finally {
       setSuppressionEnCours(null);
     }
