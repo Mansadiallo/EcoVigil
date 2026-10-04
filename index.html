@@ -30,14 +30,15 @@
     } catch (e) {}
   })();
 </script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" />
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
-
   /* ===== Thème : variables sémantiques (clair par défaut) ===== */
   :root {
     --c-bg: #EEF3EC;
@@ -95,7 +96,7 @@
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  body { background: var(--c-bg); font-family: 'Work Sans', sans-serif; transition: background-color .25s ease; }
+  body { background: var(--c-bg); font-family: 'Work Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1.45; transition: background-color .25s ease; }
   button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible {
     outline: 2px solid var(--c-accent); outline-offset: 2px;
   }
@@ -183,9 +184,6 @@
     input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
     textarea, select { font-size: 16px !important; }
 
-    /* Lisibilité : les textes de 9px et 10px (illisibles sur téléphone) passent à 11px */
-    [style*="font-size: 9px"], [style*="font-size:9px"],
-    [style*="font-size: 10px"], [style*="font-size:10px"] { font-size: 11px !important; }
   }
 
   /* ===== Barres fixes : l'en-tête reste en haut et la navigation reste en bas, en permanence ===== */
