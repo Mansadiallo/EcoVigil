@@ -165,20 +165,50 @@ function App() {
   // via un code d'invitation pour un membre (citoyenSession dans les deux cas, pas device_id).
   // Nécessite une session active pour être vérifié — contrairement au bénévole, il faut se
   // connecter (ou resaisir son code) sur chaque nouvel appareil.
-  const [organisationStatut, setOrganisationStatut] = useState(null);
-  const [organisationEtapeDossier, setOrganisationEtapeDossier] = useState(null);
-  const [organisationEtapeMotif, setOrganisationEtapeMotif] = useState(null);
-  const [organisationChargement, setOrganisationChargement] = useState(true);
+  // Statut organisation mis en cache localement (par utilisateur), comme le statut bénévole : un
+  // membre d'organisation validé garde son accès sans connexion. La vérification serveur tourne
+  // en tâche de fond ; seule une réponse serveur claire modifie ou efface le cache — jamais un
+  // échec réseau.
+  const CLE_CACHE_ORG = "pace-org-cache";
+  function lireOrgCache(userId) {
+    try {
+      const o = JSON.parse(localStorage.getItem(CLE_CACHE_ORG) || "null");
+      return o && o.id === userId ? o : null;
+    } catch (e) { return null; }
+  }
+  function ecrireOrgCache(userId, org) {
+    try {
+      if (org) localStorage.setItem(CLE_CACHE_ORG, JSON.stringify({ id: userId, statut: org.statut, etape: org.etape || null, motif: org.motif || null }));
+      else localStorage.removeItem(CLE_CACHE_ORG);
+    } catch (e) {}
+  }
+  const orgCacheInitial = (() => {
+    const uid = currentSession && currentSession.user && currentSession.user.id;
+    return uid ? lireOrgCache(uid) : null;
+  })();
+  const [organisationStatut, setOrganisationStatut] = useState(orgCacheInitial ? orgCacheInitial.statut : null);
+  const [organisationEtapeDossier, setOrganisationEtapeDossier] = useState(orgCacheInitial ? orgCacheInitial.etape : null);
+  const [organisationEtapeMotif, setOrganisationEtapeMotif] = useState(orgCacheInitial ? orgCacheInitial.motif : null);
+  // Avec un statut en cache, pas d'attente réseau (même principe que benevoleStatutChargement).
+  const [organisationChargement, setOrganisationChargement] = useState(!orgCacheInitial);
   useEffect(() => {
     if (citoyenSession === undefined) return; // session en cours de résolution
     if (!citoyenSession || !citoyenSession.user || !citoyenSession.user.id) {
       setOrganisationStatut(null);
       setOrganisationEtapeDossier(null); setOrganisationEtapeMotif(null);
+      ecrireOrgCache(null, null);
       setOrganisationChargement(false);
       return;
     }
     const emailSession = citoyenSession.user.email || null;
     const userIdSession = citoyenSession.user.id;
+    // Applique une réponse serveur claire (organisation trouvée) et la met en cache.
+    function appliquerOrg(org) {
+      setOrganisationStatut(org.statut);
+      setOrganisationEtapeDossier(org.etape_dossier); setOrganisationEtapeMotif(org.etape_dossier_motif);
+      ecrireOrgCache(userIdSession, { statut: org.statut, etape: org.etape_dossier, motif: org.etape_dossier_motif });
+      setOrganisationChargement(false);
+    }
     (async () => {
       // Confirme automatiquement toute invitation de membre en attente pour cet e-mail (ex.
       // après un clic sur le lien reçu il y a longtemps, pour les tout premiers membres
@@ -189,33 +219,30 @@ function App() {
       // Le compte principal se connecte toujours par e-mail : sans e-mail sur la session
       // (cas d'un membre par code, via une session possiblement anonyme), on saute
       // directement à la recherche via org_membres.
-      const data = emailSession
-        ? (await supabase.from("organisations").select("statut, type, etape_dossier, etape_dossier_motif").eq("email", emailSession).eq("is_deleted", false).order("created_at", { ascending: false }).limit(1)).data
-        : [];
-      if (data && data.length > 0) {
-        setOrganisationStatut(data[0].statut);
-        setOrganisationEtapeDossier(data[0].etape_dossier); setOrganisationEtapeMotif(data[0].etape_dossier_motif);
-        setOrganisationChargement(false);
-        return;
+      let data = [];
+      if (emailSession) {
+        const res = await supabase.from("organisations").select("statut, type, etape_dossier, etape_dossier_motif").eq("email", emailSession).eq("is_deleted", false).order("created_at", { ascending: false }).limit(1);
+        if (res.error) { setOrganisationChargement(false); return; } // échec réseau : on garde le statut en cache
+        data = res.data;
       }
+      if (data && data.length > 0) { appliquerOrg(data[0]); return; }
       if (data && data.length === 0) {
         // Pas de compte principal à cette identité : peut-être un membre confirmé d'une
         // organisation, identifié par e-mail (tout premiers membres) ou par user_id
         // (membres ayant rejoint via un code d'invitation).
         let membreQuery = supabase.from("org_membres").select("organisation_id").eq("statut", "actif").limit(1);
         membreQuery = emailSession ? membreQuery.eq("email", emailSession) : membreQuery.eq("user_id", userIdSession);
-        const { data: membreData } = await membreQuery.maybeSingle();
+        const { data: membreData, error: membreErr } = await membreQuery.maybeSingle();
+        if (membreErr) { setOrganisationChargement(false); return; } // échec réseau : on garde le cache
         if (membreData) {
-          const { data: orgData } = await supabase.from("organisations").select("statut, type, etape_dossier, etape_dossier_motif").eq("id", membreData.organisation_id).eq("is_deleted", false).maybeSingle();
-          if (orgData) {
-            setOrganisationStatut(orgData.statut);
-            setOrganisationEtapeDossier(orgData.etape_dossier); setOrganisationEtapeMotif(orgData.etape_dossier_motif);
-            setOrganisationChargement(false);
-            return;
-          }
+          const { data: orgData, error: orgErr } = await supabase.from("organisations").select("statut, type, etape_dossier, etape_dossier_motif").eq("id", membreData.organisation_id).eq("is_deleted", false).maybeSingle();
+          if (orgErr) { setOrganisationChargement(false); return; } // échec réseau : on garde le cache
+          if (orgData) { appliquerOrg(orgData); return; }
         }
+        // Réponse serveur claire : aucune organisation pour cette identité.
         setOrganisationStatut(null);
         setOrganisationEtapeDossier(null); setOrganisationEtapeMotif(null);
+        ecrireOrgCache(null, null);
       }
       setOrganisationChargement(false);
     })();
@@ -226,11 +253,46 @@ function App() {
   // Profil de base (e-mail + mot de passe) : préalable requis avant de devenir bénévole ou de
   // créer un compte organisation. Partage la même citoyenSession que le compte organisation —
   // un profil n'est pas un compte organisation, mais utilise le même mécanisme d'authentification.
-  const [profilInfo, setProfilInfo] = useState(undefined); // undefined = en cours, null = aucun profil
+  // Le profil est mis en cache localement (comme le statut bénévole) : sans connexion, la lecture
+  // de profils_comptes échoue, et l'app concluait à tort « aucun profil » en affichant la création.
+  const CLE_CACHE_PROFIL = "pace-profil-cache";
+  function lireProfilCache(userId) {
+    try {
+      const o = JSON.parse(localStorage.getItem(CLE_CACHE_PROFIL) || "null");
+      return o && o.id === userId ? o.profil : null;
+    } catch (e) { return null; }
+  }
+  function ecrireProfilCache(userId, profil) {
+    try {
+      if (profil) localStorage.setItem(CLE_CACHE_PROFIL, JSON.stringify({ id: userId, profil }));
+      else localStorage.removeItem(CLE_CACHE_PROFIL);
+    } catch (e) {}
+  }
+  // Valeur initiale : si une session existe déjà, le profil en cache s'affiche immédiatement
+  // (aucune attente réseau) ; la vérification serveur tourne ensuite en tâche de fond.
+  const [profilInfo, setProfilInfo] = useState(() => {
+    const uid = currentSession && currentSession.user && currentSession.user.id;
+    return (uid && lireProfilCache(uid)) || undefined; // undefined = en cours, null = aucun profil
+  });
   async function rafraichirProfil() {
-    if (!citoyenSession || !citoyenSession.user || !citoyenSession.user.id) { setProfilInfo(null); return; }
-    const { data } = await supabase.from("profils_comptes").select("nom, email, pays, ville, photo_url").eq("id", citoyenSession.user.id).maybeSingle();
-    setProfilInfo(data || null);
+    const user = citoyenSession && citoyenSession.user;
+    if (!user || !user.id) { setProfilInfo(null); ecrireProfilCache(null, null); return; }
+    let data = null, echec = false;
+    try {
+      const res = await supabase.from("profils_comptes").select("nom, email, pays, ville, photo_url").eq("id", user.id).maybeSingle();
+      data = res.data || null;
+      echec = !!res.error || (!res.data && typeof navigator !== "undefined" && navigator.onLine === false);
+    } catch (e) { echec = true; }
+    if (echec) {
+      // Panne réseau : on n'en déduit surtout pas « aucun profil ». On garde l'affichage actuel,
+      // sinon le cache local, sinon (compte avec e-mail) les infos saisies à l'inscription.
+      const meta = user.user_metadata || {};
+      const depuisSession = user.email ? { nom: meta.nom || user.email, email: user.email, pays: meta.pays || null, ville: meta.ville || null, photo_url: meta.photo_url || null } : null;
+      setProfilInfo(prev => prev || lireProfilCache(user.id) || depuisSession || null);
+      return;
+    }
+    setProfilInfo(data);
+    ecrireProfilCache(user.id, data);
   }
   useEffect(() => {
     if (citoyenSession === undefined) return;
@@ -361,6 +423,12 @@ function App() {
     const retryTimer = setInterval(() => { if (navigator.onLine) flushPendingQueue(); }, 20000);
     return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); window.removeEventListener("pace-queue-updated", onQueueUpdated); clearInterval(retryTimer); };
   }, []);
+
+  // Retour de la connexion : relit le profil pour rafraîchir le cache local (effet séparé de celui
+  // ci-dessus, dont les écouteurs sont figés au premier rendu et ne verraient pas la session à jour).
+  useEffect(() => {
+    if (online && citoyenSession !== undefined) rafraichirProfil();
+  }, [online]);
 
   function enableNotif() {
     if (typeof Notification === "undefined") return;
@@ -515,7 +583,8 @@ function App() {
       return;
     }
     // RPC SECURITY DEFINER : la table arbres n'est pas lisible/modifiable directement par un citoyen (RLS).
-    const { error } = await supabase.rpc("supprimer_arbre_citoyen", { p_id: arbre.id });
+    const sessionAppareil = await ensureDeviceSession();
+    const { error } = await supabase.rpc("supprimer_arbre_citoyen", { p_id: arbre.id }, sessionAppareil ? { Authorization: "Bearer " + sessionAppareil.access_token } : undefined);
     if (error) throw error;
     setArbres(prev => prev.filter(a => a.id !== arbre.id));
   }
@@ -728,12 +797,18 @@ function App() {
     }
     try {
       const photo_url = await uploadPhoto(photo, "arbres");
-      // Pas de .select() après l'insertion : la lecture directe de la table arbres est réservée
-      // aux admins/organisations (RLS), donc un RETURNING ferait rejeter l'INSERT d'un citoyen (403).
-      // L'identifiant est généré ici pour pouvoir afficher l'arbre sans relire la ligne.
+      // .returning(false) (Prefer: return=minimal) : la lecture directe de la table arbres est réservée
+      // aux admins/organisations (RLS), donc demander la ligne en retour ferait rejeter l'INSERT d'un
+      // citoyen (403). L'identifiant est généré ici pour afficher l'arbre sans relire la ligne.
       const maintenant = new Date().toISOString();
       const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : undefined;
-      const { error } = await supabase.from("arbres").insert({ ...toInsert, id, photo_url, device_id: DEVICE_ID, is_deleted: false, planted_at: maintenant });
+      // Identité stable de l'appareil (session anonyme), comme pour les signalements : l'arbre est
+      // rattaché à citoyen_id, ce qui permet à son auteur de le supprimer même s'il change de compte.
+      const sessionAppareil = await ensureDeviceSession();
+      const { error } = await supabase.from("arbres")
+        .insert({ ...toInsert, id, photo_url, device_id: DEVICE_ID, citoyen_id: sessionAppareil ? sessionAppareil.user.id : null, is_deleted: false, planted_at: maintenant })
+        .headers(sessionAppareil ? { Authorization: "Bearer " + sessionAppareil.access_token } : {})
+        .returning(false);
       if (error) throw error;
       const data = { ...toInsert, id: id || opts.tempId || ("local-" + Date.now()), photo_url, device_id: DEVICE_ID, is_deleted: false, valide: false, publie: false, planted_at: maintenant, created_at: maintenant };
       setArbres(prev => {
