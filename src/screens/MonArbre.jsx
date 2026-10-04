@@ -185,10 +185,10 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat 
 
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
               <input value={latPointTemp} onChange={e => setLatPointTemp(e.target.value)} placeholder="Latitude" inputMode="decimal"
-                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
+                style={{ flex: "1 1 0", minWidth: 0, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
               <input value={lngPointTemp} onChange={e => setLngPointTemp(e.target.value)} placeholder="Longitude" inputMode="decimal"
-                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
-              <button onClick={ajouterPointManuel} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer", whiteSpace: "nowrap" }}>
+                style={{ flex: "1 1 0", minWidth: 0, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
+              <button onClick={ajouterPointManuel} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
                 Ajouter
               </button>
             </div>
@@ -232,7 +232,7 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat 
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
               <input value={superficieSaisie} onChange={e => setSuperficieSaisie(e.target.value)} placeholder="Superficie" inputMode="decimal"
-                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
+                style={{ flex: "1 1 0", minWidth: 0, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
               <select value={uniteSuperficieSaisie} onChange={e => setUniteSuperficieSaisie(e.target.value)}
                 style={{ padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-surface)", color: "var(--c-text)" }}>
                 <option value="m2">m²</option>
