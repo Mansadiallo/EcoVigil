@@ -7,6 +7,7 @@ import { FicheEnvironnementale, categorieLabel, categorieMeta } from "../lib/cat
 import { t } from "../lib/i18n.js";
 import { co2EstimeParArbre } from "../lib/utils.js";
 import { VolunteerCard } from "./Profil.jsx";
+import { T, TITRE_SOUS } from "../lib/typo.jsx";
 
 function ClimatWidget({ lang }) {
   const [weather, setWeather] = useState(null);
@@ -41,13 +42,13 @@ function ClimatWidget({ lang }) {
     <div style={{ background: "linear-gradient(120deg,var(--c-accent-dark),var(--c-sky))", borderRadius: 14, padding: 14, marginBottom: 16, color: "#fff" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <div>
-          <div style={{ fontSize: 11, opacity: 0.8 }}>{t(lang, "meteo_locale")}</div>
+          <div style={{ fontSize: T.meta, opacity: 0.8 }}>{t(lang, "meteo_locale")}</div>
           <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 26, fontWeight: 700 }}>{Math.round(weather.temperature_2m)}°C</div>
         </div>
         <WIcon size={30} color="#fff" />
       </div>
       {alert && (
-        <div style={{ marginTop: 8, fontSize: 11.5, background: "rgba(255,255,255,0.15)", borderRadius: 8, padding: "6px 10px" }}>
+        <div style={{ marginTop: 8, fontSize: T.small, background: "rgba(255,255,255,0.15)", borderRadius: 8, padding: "6px 10px" }}>
           ⚠ {alert}
         </div>
       )}
@@ -78,7 +79,7 @@ function ExemplesProblemesCarousel({ lang, onNavigate, accesEtendu }) {
     <div style={{ marginBottom: 18 }}>
       <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
         <IconAlert size={15} color="var(--c-accent-dark)" />
-        <div style={{ fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600, color: "var(--c-accent-dark)" }}>Exemples de problèmes à signaler</div>
+        <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)" }}>Exemples de problèmes à signaler</div>
       </div>
       <div
         onMouseEnter={() => setPaused(true)}
@@ -111,7 +112,7 @@ function ExemplesProblemesCarousel({ lang, onNavigate, accesEtendu }) {
         {accesEtendu && (
           <button onClick={() => onNavigate("signaler")} style={{
             position: "absolute", top: 10, right: 12, background: "rgba(255,255,255,0.92)", color: "var(--c-accent-dark)",
-            border: "none", borderRadius: 20, padding: "6px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer",
+            border: "none", borderRadius: 20, padding: "6px 12px", fontSize: T.meta, fontWeight: 700, cursor: "pointer",
             display: "flex", alignItems: "center", gap: 4 }}>
             <IconAlert size={12} /> Signaler
           </button>
@@ -122,9 +123,9 @@ function ExemplesProblemesCarousel({ lang, onNavigate, accesEtendu }) {
             <div style={{ background: "rgba(255,255,255,0.22)", borderRadius: 8, padding: 5, display: "flex" }}>
               <CatIcon size={14} color="#fff" />
             </div>
-            <span style={{ fontSize: 9.5, fontWeight: 700, opacity: 0.85, textTransform: "uppercase", letterSpacing: 0.6 }}>EcoVigil</span>
+            <span style={{ fontSize: T.meta, fontWeight: 700, opacity: 0.85, textTransform: "uppercase", letterSpacing: 0.6 }}>EcoVigil</span>
           </div>
-          <div style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: 16, lineHeight: 1.2 }}>{categorieLabel(lang, catId)}</div>
+          <div style={{ ...TITRE_SOUS, fontWeight: 700, lineHeight: 1.2 }}>{categorieLabel(lang, catId)}</div>
         </div>
       </div>
     </div>
@@ -134,7 +135,7 @@ function ExemplesProblemesCarousel({ lang, onNavigate, accesEtendu }) {
 // Bascule entre l'espace bénévole et l'espace organisation (visible si les deux sont disponibles)
 export function EspaceSwitch({ actif, onBenevole, onOrganisation }) {
   const b = (id, lab, fn) => <button type="button" onClick={actif === id ? undefined : fn} aria-pressed={actif === id}
-    style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", cursor: actif === id ? "default" : "pointer", fontSize: 13, fontWeight: 600,
+    style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", cursor: actif === id ? "default" : "pointer", fontSize: T.body, fontWeight: 600,
       background: actif === id ? "var(--c-accent-dark)" : "transparent", color: actif === id ? "#fff" : "var(--c-text)" }}>{lab}</button>;
   return <div role="group" aria-label="Changer d'espace" style={{ display: "flex", gap: 4, padding: 4, background: "var(--c-surface-soft)", border: "1px solid var(--c-border-soft)", borderRadius: 14, marginBottom: 14 }}>
     {b("benevole", "Espace bénévole", onBenevole)}{b("organisation", "Espace organisation", onOrganisation)}</div>;
@@ -152,7 +153,7 @@ export function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpe
         <button onClick={onEnableNotif} style={{
           display: "flex", alignItems: "center", gap: 8, width: "100%", textAlign: "left",
           background: "var(--c-surface-soft)", border: "1px solid var(--c-border-soft)", borderRadius: 12, padding: "10px 12px",
-          marginBottom: 14, cursor: "pointer", color: "var(--c-accent-dark)", fontSize: 12.5
+          marginBottom: 14, cursor: "pointer", color: "var(--c-accent-dark)", fontSize: T.body
         }}>
           <IconBell size={16} /> {t(lang, "activer_notifs")}
         </button>
@@ -166,9 +167,9 @@ export function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpe
         <div style={{ background: "linear-gradient(120deg,var(--c-accent-dark),var(--c-accent))", borderRadius: 14, padding: "14px 16px", marginBottom: 4, color: "#fff" }}>
           <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
             <IconShield size={16} color="#fff" />
-            <div style={{ fontSize: 13.5, fontWeight: 700 }}>Accès complet réservé aux bénévoles et organisations</div>
+            <div style={{ fontSize: T.body, fontWeight: 700 }}>Accès complet réservé aux bénévoles et organisations</div>
           </div>
-          <div style={{ fontSize: 12, opacity: 0.92, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.small, opacity: 0.92, lineHeight: 1.5 }}>
             Carte, signalements, arbres et biodiversité sont réservés aux bénévoles et organisations validés par EcoVigil.
             Inscris-toi ci-dessous pour y accéder.
           </div>
@@ -180,18 +181,18 @@ export function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpe
         <div style={{ marginBottom: 18 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 8 }}>
             <IconNewspaper size={15} color="var(--c-accent-dark)" />
-            <div style={{ fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600, color: "var(--c-accent-dark)" }}>{t(lang, "actualites")}</div>
+            <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)" }}>{t(lang, "actualites")}</div>
           </div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {actualites.slice(0, 3).map(n => (
               <div key={n.id} style={{
                 background: n.urgent ? "var(--c-warning-bg)" : "var(--c-surface)", border: `1px solid ${n.urgent ? "var(--c-warning-border-soft)" : "var(--c-border)"}`,
                 borderRadius: 12, padding: 12 }}>
-                {n.urgent && <div style={{ fontSize: 10, fontWeight: 700, color: "#B5451B", marginBottom: 3 }}>⚠ ALERTE</div>}
-                {n.auteur_nom && <div style={{ fontSize: 10, fontWeight: 700, color: "var(--c-accent-dark)", marginBottom: 3, display: "flex", alignItems: "center", gap: 4 }}><IconShield size={10} /> {n.auteur_nom}</div>}
-                <div style={{ fontWeight: 600, fontSize: 13, color: "var(--c-text)" }}>{n.titre}</div>
-                <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginTop: 3 }}>{n.contenu}</div>
-                <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 5 }}>{new Date(n.created_at).toLocaleDateString("fr-FR")}</div>
+                {n.urgent && <div style={{ fontSize: T.meta, fontWeight: 700, color: "#B5451B", marginBottom: 3 }}>⚠ ALERTE</div>}
+                {n.auteur_nom && <div style={{ fontSize: T.meta, fontWeight: 700, color: "var(--c-accent-dark)", marginBottom: 3, display: "flex", alignItems: "center", gap: 4 }}><IconShield size={10} /> {n.auteur_nom}</div>}
+                <div style={{ fontWeight: 600, fontSize: T.body, color: "var(--c-text)" }}>{n.titre}</div>
+                <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginTop: 3 }}>{n.contenu}</div>
+                <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 5 }}>{new Date(n.created_at).toLocaleDateString("fr-FR")}</div>
               </div>
             ))}
           </div>
@@ -207,7 +208,7 @@ export function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpe
       </div>
       <SectionTitle>{t(lang, "activite_recente")}</SectionTitle>
       {signalements.length === 0 && arbres.length === 0 && (
-        <div style={{ color: "var(--c-text-muted)", fontSize: 13.5, background: "var(--c-surface)", padding: 16, borderRadius: 12, border: "1px dashed var(--c-border-soft)" }}>
+        <div style={{ color: "var(--c-text-muted)", fontSize: T.body, background: "var(--c-surface)", padding: 16, borderRadius: 12, border: "1px dashed var(--c-border-soft)" }}>
           {t(lang, "rien_signaler")}
         </div>
       )}
@@ -220,11 +221,11 @@ export function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpe
               <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                 <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 8 }}><IconC size={16} color="var(--c-accent)" /></div>
                 <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 13.5, fontWeight: 600, color: "var(--c-text)" }}>{categorieLabel(lang, cat.id)}</div>
-                  <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>{s.date}</div>
+                  <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-text)" }}>{categorieLabel(lang, cat.id)}</div>
+                  <div style={{ fontSize: T.small, color: "var(--c-text-muted)" }}>{s.date}</div>
                 </div>
                 <span style={{
-                  fontSize: 10.5, fontWeight: 600, padding: "3px 8px", borderRadius: 20,
+                  fontSize: T.meta, fontWeight: 600, padding: "3px 8px", borderRadius: 20,
                   background: s.statut === "resolu" ? "var(--c-success-bg)" : "var(--c-warning-bg)", color: s.statut === "resolu" ? "var(--c-accent)" : "#B5451B" }}>
                   {s.statut === "resolu" ? t(lang, "resolu") : t(lang, "en_attente")}
                 </span>
@@ -235,7 +236,7 @@ export function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpe
               {onBasculerStatutSignalement && (
                 <div style={{ marginTop: 8, paddingLeft: 42 }}>
                   <button onClick={() => onBasculerStatutSignalement(s)} style={{
-                    fontSize: 11, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: "pointer",
+                    fontSize: T.meta, fontWeight: 600, padding: "6px 12px", borderRadius: 8, cursor: "pointer",
                     border: s.statut === "resolu" ? "1px solid var(--c-border)" : "none",
                     background: s.statut === "resolu" ? "var(--c-surface)" : "var(--c-accent-dark)",
                     color: s.statut === "resolu" ? "var(--c-text-secondary)" : "#fff" }}>
@@ -247,7 +248,7 @@ export function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpe
           );
         })}
         {[...signalements].reverse().slice(0, 3).some(s => s.statut === "resolu" && s.resolution_organisme) && (
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", padding: "0 4px" }}>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", padding: "0 4px" }}>
             {[...signalements].reverse().slice(0, 3).filter(s => s.statut === "resolu" && s.resolution_organisme).map(s => (
               <div key={s.id} style={{ marginBottom: 2 }}>{t(lang, "traite_par")} {ORGANISME_LABELS[s.resolution_organisme] || s.resolution_organisme}{s.resolution_action ? ` — ${s.resolution_action}` : ""}</div>
             ))}
@@ -260,7 +261,7 @@ export function Accueil({ signalements, arbres, notifState, onEnableNotif, onOpe
       {/* Lien "Centre d'EcoVigil" retiré de l'écran d'accueil : accès admin uniquement via ?admin=1 dans l'URL */}
       <button onClick={() => onNavigate("confidentialite")} style={{
         width: "100%", background: "none", border: "none", color: "var(--c-text-faint)",
-        fontSize: 11, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: 8
+        fontSize: T.meta, cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 4, padding: 8
       }}>{t(lang, "apropos_confidentialite")}</button>
     </Screen>
   );
@@ -279,7 +280,7 @@ export function CarteBiodiversite({ lang, onNavigate }) {
         <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 8 }}>
           <IconPaw size={18} color="var(--c-accent)" />
         </div>
-        <div style={{ fontSize: 12.5, fontWeight: 600, color: "var(--c-text)" }}>{t(lang, "title_biodiversite")}</div>
+        <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-text)" }}>{t(lang, "title_biodiversite")}</div>
       </button>
     </div>
   );

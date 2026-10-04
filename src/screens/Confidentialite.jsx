@@ -3,6 +3,7 @@ import { IconLogOut } from "../components/icons.jsx";
 import { Screen, SectionTitle } from "../components/ui.jsx";
 import { envoyerDemandeSuppression } from "../lib/audit.js";
 import { supabase } from "../lib/supabase.js";
+import { T, TITRE_SOUS } from "../lib/typo.jsx";
 
 export function Confidentialite({ onBack }) {
   async function handleLogout() {
@@ -10,16 +11,16 @@ export function Confidentialite({ onBack }) {
   }
   const Section = ({ title, children }) => (
     <div style={{ marginBottom: 18 }}>
-      <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 6 }}>{title}</div>
-      <div style={{ fontSize: 13, color: "var(--c-text-secondary)", lineHeight: 1.6 }}>{children}</div>
+      <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 6 }}>{title}</div>
+      <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", lineHeight: 1.6 }}>{children}</div>
     </div>
   );
   return (
     <Screen>
-      <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Retour</button>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.body, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Retour</button>
       <SectionTitle sub="Dernière mise à jour : 27 septembre 2026">À propos & Informations légales</SectionTitle>
 
-      <button onClick={handleLogout} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontSize: 12.5, fontWeight: 600, cursor: "pointer", marginBottom: 18 }}>
+      <button onClick={handleLogout} style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontSize: T.body, fontWeight: 600, cursor: "pointer", marginBottom: 18 }}>
         <IconLogOut size={15} /> Se déconnecter de mon compte
       </button>
 
@@ -32,7 +33,7 @@ export function Confidentialite({ onBack }) {
         EcoVigil — Plateforme Africaine d'Actions et de Contrôle Environnemental — Conakry, Guinée.<br/>Contact : wassolonmansa97@gmail.com
       </Section>
 
-      <div style={{ fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 4, marginTop: 4 }}>Politique de confidentialité</div>
+      <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 4, marginTop: 4 }}>Politique de confidentialité</div>
 
       <Section title="Données collectées">
         Selon ta façon d'utiliser EcoVigil :<br/><br/>
@@ -66,7 +67,7 @@ export function Confidentialite({ onBack }) {
       </Section>
       <SuppressionDonneesCitoyen />
 
-      <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 4 }}>
+      <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 4 }}>
         Document complet disponible sur demande auprès du responsable du traitement.
       </div>
     </Screen>
@@ -81,7 +82,7 @@ function SuppressionDonneesCitoyen() {
   }
   if (step === "sent") {
     return (
-      <div style={{ background: "var(--c-surface-soft)", borderRadius: 12, padding: 14, fontSize: 12.5, color: "var(--c-text-secondary)", marginBottom: 18 }}>
+      <div style={{ background: "var(--c-surface-soft)", borderRadius: 12, padding: 14, fontSize: T.body, color: "var(--c-text-secondary)", marginBottom: 18 }}>
         {navigator.onLine
           ? "Ta demande a été enregistrée. Tes données seront supprimées sous 30 jours."
           : "Ta demande a été mise en attente sur l'appareil (pas de connexion) et sera envoyée automatiquement dès le retour du réseau. Le délai de 30 jours démarrera à ce moment-là."}
@@ -91,18 +92,18 @@ function SuppressionDonneesCitoyen() {
   if (step === "confirm") {
     return (
       <div style={{ background: "var(--c-warning-bg)", border: "1px solid var(--c-warning-border-soft)", borderRadius: 12, padding: 14, marginBottom: 18 }}>
-        <div style={{ fontSize: 12.5, color: "var(--c-warning-text)", lineHeight: 1.5, marginBottom: 10 }}>
+        <div style={{ fontSize: T.body, color: "var(--c-warning-text)", lineHeight: 1.5, marginBottom: 10 }}>
           Toutes les données liées à cet appareil seront définitivement supprimées sous 30 jours. Confirmer ?
         </div>
         <div style={{ display: "flex", gap: 8 }}>
-          <button onClick={() => setStep("idle")} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>Annuler</button>
-          <button onClick={envoyerDemande} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>Confirmer</button>
+          <button onClick={() => setStep("idle")} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>Annuler</button>
+          <button onClick={envoyerDemande} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "none", background: "#B5451B", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>Confirmer</button>
         </div>
       </div>
     );
   }
   return (
-    <button onClick={() => setStep("confirm")} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid #B5451B", background: "none", color: "#B5451B", fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 18 }}>
+    <button onClick={() => setStep("confirm")} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "1px solid #B5451B", background: "none", color: "#B5451B", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 18 }}>
       Demander la suppression de mes données
     </button>
   );

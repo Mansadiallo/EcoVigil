@@ -8,6 +8,7 @@ import { inscrireBenevole } from "../lib/audit.js";
 import { uid } from "../lib/categories.jsx";
 import { t } from "../lib/i18n.js";
 import { supabase, urlRedirectionAuth } from "../lib/supabase.js";
+import { T, TITRE_GRAND, TITRE_SOUS } from "../lib/typo.jsx";
 
 export const PAYS_INDICATIFS = [
   // Afrique
@@ -168,7 +169,7 @@ export function ProfilTab({ profilInfo, onProfilChange, lang }) {
   const [showEdit, setShowEdit] = useState(false);
 
   if (profilInfo === undefined) {
-    return <div style={{ padding: 24, textAlign: "center", color: "var(--c-text-muted)", fontSize: 13 }}>Chargement…</div>;
+    return <div style={{ padding: 24, textAlign: "center", color: "var(--c-text-muted)", fontSize: T.body }}>Chargement…</div>;
   }
 
   if (!profilInfo) {
@@ -195,7 +196,7 @@ export function ProfilTab({ profilInfo, onProfilChange, lang }) {
     onProfilChange && onProfilChange();
   }
 
-  const ligne = { display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 4px", border: "none", background: "none", borderBottom: "1px solid var(--c-border)", cursor: "pointer", textAlign: "left", fontSize: 13.5 };
+  const ligne = { display: "flex", alignItems: "center", gap: 12, width: "100%", padding: "14px 4px", border: "none", background: "none", borderBottom: "1px solid var(--c-border)", cursor: "pointer", textAlign: "left", fontSize: T.body };
 
   return (
     <div>
@@ -211,8 +212,8 @@ export function ProfilTab({ profilInfo, onProfilChange, lang }) {
             <IconCamera size={14} />
           </button>
         </div>
-        <div style={{ fontFamily: "Fraunces, serif", fontSize: 19, fontWeight: 700, color: "var(--c-text)" }}>{profilInfo.nom}</div>
-        <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 2 }}>{[profilInfo.ville, profilInfo.pays].filter(Boolean).join(" · ") || profilInfo.email}</div>
+        <div style={{ ...TITRE_GRAND, fontWeight: 700, color: "var(--c-text)" }}>{profilInfo.nom}</div>
+        <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginTop: 2 }}>{[profilInfo.ville, profilInfo.pays].filter(Boolean).join(" · ") || profilInfo.email}</div>
       </div>
 
       {/* Liste de réglages, façon menu WhatsApp/Facebook. */}
@@ -221,7 +222,7 @@ export function ProfilTab({ profilInfo, onProfilChange, lang }) {
           <IconEdit size={17} color="var(--c-text-secondary)" />
           <span style={{ flex: 1 }}>Modifier mes informations</span>
         </button>
-        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 4px", fontSize: 13.5, color: "var(--c-text-secondary)" }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, padding: "14px 4px", fontSize: T.body, color: "var(--c-text-secondary)" }}>
           <IconMailPlus size={17} color="var(--c-text-secondary)" />
           <span style={{ flex: 1 }}>{profilInfo.email}</span>
         </div>
@@ -244,7 +245,7 @@ export function MurProfilObligatoire({ profilInfo, lang }) {
         <div style={{ width: 72, height: 72, borderRadius: "50%", background: "var(--c-surface)", margin: "0 auto 14px", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden", border: "1px solid var(--c-border)" }}>
           <img src={LOGO_DATA_URL} alt={t(lang, "logo_pace_alt")} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         </div>
-        <div style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: 19 }}>Bienvenue sur EcoVigil</div>
+        <div style={{ ...TITRE_GRAND, fontWeight: 700 }}>Bienvenue sur EcoVigil</div>
       </div>
       <ProfilGate profilInfo={profilInfo}><div /></ProfilGate>
     </div>
@@ -261,7 +262,7 @@ export function ProfilEditeur({ profilInfo, onSaved, onCancel }) {
   const [erreur, setErreur] = useState("");
   const fileRef = useRef(null);
 
-  const champ = { width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" };
+  const champ = { width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" };
 
   async function choisirPhoto(e) {
     const f = e.target.files && e.target.files[0];
@@ -310,11 +311,11 @@ export function ProfilEditeur({ profilInfo, onSaved, onCancel }) {
             </optgroup>
           ))}
         </select>
-        {erreur && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>{erreur}</div>}
-        <button type="button" onClick={enregistrer} disabled={busy} style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 6 }}>
+        {erreur && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 8 }}>{erreur}</div>}
+        <button type="button" onClick={enregistrer} disabled={busy} style={{ width: "100%", padding: "9px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 6 }}>
           {busy ? "…" : "Enregistrer"}
         </button>
-        <button type="button" onClick={onCancel} style={{ width: "100%", padding: "6px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer" }}>
+        <button type="button" onClick={onCancel} style={{ width: "100%", padding: "6px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: T.small, cursor: "pointer" }}>
           Annuler
         </button>
       </form>
@@ -340,8 +341,6 @@ export function ProfilGate({ profilInfo, children }) {
   const [busy, setBusy] = useState(false);
   const [erreur, setErreur] = useState("");
   const [messageConfirmation, setMessageConfirmation] = useState(null); // { compteExistant: bool, texte } | null
-  const [modeOubli, setModeOubli] = useState(false); // formulaire "Mot de passe oublié" affiché à la place de la connexion
-  const [oubliEnvoye, setOubliEnvoye] = useState(false);
   const fileRef = useRef(null);
   const nomRef = useRef(null);
   const emailRef = useRef(null);
@@ -364,13 +363,13 @@ export function ProfilGate({ profilInfo, children }) {
   }, [etape, modeProfil, profilInfo, messageConfirmation]);
 
   if (profilInfo === undefined) {
-    return <div style={{ fontSize: 12, color: "var(--c-text-muted)" }}>Chargement…</div>;
+    return <div style={{ fontSize: T.small, color: "var(--c-text-muted)" }}>Chargement…</div>;
   }
   if (profilInfo) {
     return children;
   }
 
-  const champ = { width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13.5, marginBottom: 8, boxSizing: "border-box", transition: "border-color .15s ease" };
+  const champ = { width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box", transition: "border-color .15s ease" };
   const champErreur = { ...champ, borderColor: "#C0522A" };
 
   async function choisirPhoto(e) {
@@ -441,22 +440,8 @@ export function ProfilGate({ profilInfo, children }) {
     if (error) { setErreur("E-mail ou mot de passe incorrect."); return; }
   }
 
-  // Mot de passe oublié : envoie le lien de récupération (traité au retour par App.jsx, qui ouvre
-  // l'écran "Nouveau mot de passe"). Message volontairement identique que l'adresse soit connue
-  // ou non, pour ne pas révéler quels e-mails ont un profil.
-  async function envoyerLienOubli(e) {
-    if (e && e.preventDefault) e.preventDefault();
-    setErreur("");
-    if (!emailValide) { setErreur("Cette adresse e-mail ne semble pas valide."); return; }
-    setBusy(true);
-    const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: urlRedirectionAuth() });
-    setBusy(false);
-    if (error) { setErreur(error.message || "Impossible d'envoyer l'e-mail pour le moment. Réessaie dans quelques instants."); return; }
-    setOubliEnvoye(true);
-  }
-
-  const boutonPrincipal = { width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "opacity .15s ease" };
-  const boutonLien = { width: "100%", padding: "6px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer" };
+  const boutonPrincipal = { width: "100%", padding: "11px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 6, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, transition: "opacity .15s ease" };
+  const boutonLien = { width: "100%", padding: "6px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: T.small, cursor: "pointer" };
 
   // --- Écran de confirmation (après inscription) ---
   if (messageConfirmation) {
@@ -468,10 +453,10 @@ export function ProfilGate({ profilInfo, children }) {
           background: messageConfirmation.compteExistant ? "var(--c-surface-soft)" : "var(--c-accent-dark)" }}>
           <OkIcon size={24} color={messageConfirmation.compteExistant ? "var(--c-accent-dark)" : "#fff"} />
         </div>
-        <div style={{ fontFamily: "Fraunces, serif", fontSize: 16, fontWeight: 600, color: "var(--c-text)", marginBottom: 6 }}>
+        <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-text)", marginBottom: 6 }}>
           {messageConfirmation.compteExistant ? "Déjà inscrit·e" : "Presque prêt·e"}
         </div>
-        <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.6, marginBottom: 16 }}>{messageConfirmation.texte}</div>
+        <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", lineHeight: 1.6, marginBottom: 16 }}>{messageConfirmation.texte}</div>
         <button type="button" onClick={() => { setMessageConfirmation(null); setModeProfil("login"); setPassword(""); allerEtape(0); }} style={boutonPrincipal}>
           {messageConfirmation.compteExistant ? "Se connecter" : "J'ai confirmé, me connecter"}
         </button>
@@ -484,7 +469,7 @@ export function ProfilGate({ profilInfo, children }) {
 
   return (
     <div className="pace-fade-in" style={{ background: "var(--c-bg)", borderRadius: 12, padding: 14 }}>
-      <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
+      <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginBottom: 12, lineHeight: 1.5 }}>
         Un profil de base est nécessaire avant de continuer — il te servira aussi bien pour devenir bénévole que pour créer un compte organisation.
       </div>
 
@@ -506,9 +491,9 @@ export function ProfilGate({ profilInfo, children }) {
               <span style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 26, height: 26, borderRadius: "50%", background: "var(--c-surface-soft)", color: "var(--c-accent-dark)" }}>
                 {React.createElement(ETAPES_PROFIL[etape].icone, { size: 14 })}
               </span>
-              <span style={{ fontFamily: "Fraunces, serif", fontSize: 14.5, fontWeight: 600, color: "var(--c-text)" }}>{ETAPES_PROFIL[etape].titre}</span>
+              <span style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-text)" }}>{ETAPES_PROFIL[etape].titre}</span>
             </div>
-            <span style={{ fontSize: 10.5, color: "var(--c-text-faint)" }}>{etape + 1}/{ETAPES_PROFIL.length}</span>
+            <span style={{ fontSize: T.meta, color: "var(--c-text-faint)" }}>{etape + 1}/{ETAPES_PROFIL.length}</span>
           </div>
 
           <form onSubmit={creerProfil}>
@@ -523,7 +508,7 @@ export function ProfilGate({ profilInfo, children }) {
                       {!photo && <IconCamera size={21} color="var(--c-text-muted)" />}
                     </button>
                   </div>
-                  <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", textAlign: "center", marginBottom: 12 }}>Photo de profil (optionnel)</div>
+                  <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", textAlign: "center", marginBottom: 12 }}>Photo de profil (optionnel)</div>
                   <input ref={nomRef} required value={nom} onChange={e => setNom(e.target.value)} placeholder="Nom complet" style={champ} />
                 </>
               )}
@@ -531,12 +516,12 @@ export function ProfilGate({ profilInfo, children }) {
                 <>
                   <input ref={emailRef} required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail"
                     style={email && !emailValide ? champErreur : champ} />
-                  <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: -4, marginBottom: 8, lineHeight: 1.4 }}>
+                  <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: -4, marginBottom: 8, lineHeight: 1.4 }}>
                     Conseil : évite une adresse e-mail contenant des informations confidentielles ou sensibles (nom d'employeur, etc.).
                   </div>
                   <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe (6 caractères min.)" style={champ} />
                   {password.length > 0 && (
-                    <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 10.5, color: password.length >= 6 ? "var(--c-accent-dark)" : "var(--c-text-muted)", marginTop: -3, marginBottom: 8 }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: T.meta, color: password.length >= 6 ? "var(--c-accent-dark)" : "var(--c-text-muted)", marginTop: -3, marginBottom: 8 }}>
                       {password.length >= 6 ? <IconCheck size={11} /> : null}
                       {password.length >= 6 ? "Longueur suffisante" : `Encore ${6 - password.length} caractère${6 - password.length > 1 ? "s" : ""}`}
                     </div>
@@ -560,7 +545,7 @@ export function ProfilGate({ profilInfo, children }) {
             </div>
 
             {erreur && (
-              <div role="alert" className="pace-fade-in" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>
+              <div role="alert" className="pace-fade-in" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: T.small, color: "#B5451B", marginBottom: 8 }}>
                 <IconAlert size={13} color="#B5451B" />
                 <span>{erreur}</span>
               </div>
@@ -583,43 +568,12 @@ export function ProfilGate({ profilInfo, children }) {
             )}
           </form>
         </>
-      ) : modeOubli ? (
-        <form onSubmit={envoyerLienOubli} className="pace-fade-in">
-          <div style={{ fontFamily: "Fraunces, serif", fontSize: 14.5, fontWeight: 600, color: "var(--c-text)", marginBottom: 6 }}>Mot de passe oublié</div>
-          {oubliEnvoye ? (
-            <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.6, marginBottom: 12 }}>
-              Si un profil existe avec cette adresse, un e-mail vient d'être envoyé. Ouvre le lien reçu (pense à vérifier les courriers indésirables) pour choisir un nouveau mot de passe.
-            </div>
-          ) : (
-            <>
-              <div style={{ fontSize: 12, color: "var(--c-text-secondary)", lineHeight: 1.5, marginBottom: 10 }}>
-                Saisis l'adresse e-mail de ton profil : nous t'enverrons un lien pour choisir un nouveau mot de passe.
-              </div>
-              <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail" style={champ} />
-              {erreur && (
-                <div role="alert" className="pace-fade-in" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>
-                  <IconAlert size={13} color="#B5451B" />
-                  <span>{erreur}</span>
-                </div>
-              )}
-              <button type="button" onClick={envoyerLienOubli} disabled={busy} style={{ ...boutonPrincipal, opacity: busy ? 0.75 : 1 }}>
-                {busy ? "Envoi…" : "Envoyer le lien"}
-              </button>
-            </>
-          )}
-          <button type="button" onClick={() => { setModeOubli(false); setOubliEnvoye(false); setErreur(""); }} style={boutonLien}>
-            ← Retour à la connexion
-          </button>
-        </form>
       ) : (
         <form onSubmit={connecterProfil} className="pace-fade-in">
           <input ref={emailLoginRef} required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail" style={champ} />
           <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe" style={champ} />
-          <button type="button" onClick={() => { setModeOubli(true); setOubliEnvoye(false); setErreur(""); }} style={{ background: "none", border: "none", padding: "0 0 10px", color: "var(--c-accent-dark)", fontSize: 11.5, cursor: "pointer", display: "block", marginLeft: "auto" }}>
-            Mot de passe oublié ?
-          </button>
           {erreur && (
-            <div role="alert" className="pace-fade-in" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>
+            <div role="alert" className="pace-fade-in" style={{ display: "flex", alignItems: "flex-start", gap: 6, fontSize: T.small, color: "#B5451B", marginBottom: 8 }}>
               <IconAlert size={13} color="#B5451B" />
               <span>{erreur}</span>
             </div>
@@ -703,10 +657,10 @@ export function VolunteerCard({ lang, benevoleStatut, onInscrit, profilInfo, onP
       <div style={{ marginTop: 22, background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <IconUsers size={17} color="var(--c-accent-dark)" />
-          <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)" }}>{t(lang, "devenir_benevole")}</div>
+          <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)" }}>{t(lang, "devenir_benevole")}</div>
         </div>
-        <div style={{ display: "inline-block", fontSize: 10.5, fontWeight: 700, color: "#fff", background: info.couleur, borderRadius: 999, padding: "3px 10px", marginBottom: 8 }}>{info.label}</div>
-        <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.5 }}>{info.texte}</div>
+        <div style={{ display: "inline-block", fontSize: T.meta, fontWeight: 700, color: "#fff", background: info.couleur, borderRadius: 999, padding: "3px 10px", marginBottom: 8 }}>{info.label}</div>
+        <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", lineHeight: 1.5 }}>{info.texte}</div>
       </div>
     );
   }
@@ -715,14 +669,14 @@ export function VolunteerCard({ lang, benevoleStatut, onInscrit, profilInfo, onP
     <div style={{ marginTop: 22, background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <IconUsers size={17} color="var(--c-accent-dark)" />
-        <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)" }}>{t(lang, "devenir_benevole")}</div>
+        <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)" }}>{t(lang, "devenir_benevole")}</div>
       </div>
       {done ? (
-        <div style={{ fontSize: 12.5, color: "var(--c-accent)", display: "flex", alignItems: "center", gap: 6 }}><IconCheck size={14} /> {t(lang, "inscription_recue")}</div>
+        <div style={{ fontSize: T.body, color: "var(--c-accent)", display: "flex", alignItems: "center", gap: 6 }}><IconCheck size={14} /> {t(lang, "inscription_recue")}</div>
       ) : !open ? (
         <>
-          <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", marginBottom: 10 }}>{t(lang, "rejoindre_equipe")}</div>
-          <button onClick={() => setOpen(true)} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-accent-dark)", background: "var(--c-surface)", color: "var(--c-accent-dark)", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>{t(lang, "sinscrire")}</button>
+          <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginBottom: 10 }}>{t(lang, "rejoindre_equipe")}</div>
+          <button onClick={() => setOpen(true)} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-accent-dark)", background: "var(--c-surface)", color: "var(--c-accent-dark)", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>{t(lang, "sinscrire")}</button>
         </>
       ) : (
         <ProfilGate profilInfo={profilInfo}>
@@ -730,7 +684,7 @@ export function VolunteerCard({ lang, benevoleStatut, onInscrit, profilInfo, onP
             <ProfilEditeur profilInfo={profilInfo} onSaved={() => { setShowEditProfil(false); onProfilChange && onProfilChange(); }} onCancel={() => setShowEditProfil(false)} />
           ) : (
           <form onSubmit={submit}>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 11, color: "var(--c-text-secondary)", marginBottom: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: T.meta, color: "var(--c-text-secondary)", marginBottom: 8 }}>
               {profilInfo && profilInfo.photo_url && (
                 <img src={profilInfo.photo_url} alt="" style={{ width: 24, height: 24, borderRadius: "50%", objectFit: "cover" }} />
               )}
@@ -740,9 +694,9 @@ export function VolunteerCard({ lang, benevoleStatut, onInscrit, profilInfo, onP
               </button>
             </div>
             <input required value={contact} onChange={e => setContact(e.target.value)} placeholder={indicatif ? `${t(lang, "telephone_email")} (${indicatif})` : t(lang, "telephone_email")}
-              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" }} />
+              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" }} />
             <select required value={pays} onChange={e => setPays(e.target.value)}
-              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 4, boxSizing: "border-box", background: "var(--c-surface)", color: pays ? "var(--c-text)" : "var(--c-text-muted)" }}>
+              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 4, boxSizing: "border-box", background: "var(--c-surface)", color: pays ? "var(--c-text)" : "var(--c-text-muted)" }}>
               <option value="" disabled>{t(lang, "pays_label")}</option>
               {Object.entries(PAYS_INDICATIFS.reduce((acc, p) => { (acc[p.region] = acc[p.region] || []).push(p); return acc; }, {})).map(([region, list]) => (
                 <optgroup key={region} label={region}>
@@ -751,21 +705,21 @@ export function VolunteerCard({ lang, benevoleStatut, onInscrit, profilInfo, onP
               ))}
             </select>
             {indicatif && (
-              <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 8 }}>{t(lang, "indicatif_associe")}{indicatif}</div>
+              <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 8 }}>{t(lang, "indicatif_associe")}{indicatif}</div>
             )}
             <input required value={ville} onChange={e => setVille(e.target.value)} placeholder={t(lang, "ville_label")}
-              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" }} />
+              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" }} />
             <input value={zone} onChange={e => setZone(e.target.value)} placeholder={t(lang, "quartier_zone")}
-              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" }} />
+              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" }} />
             <input value={code} onChange={e => setCode(e.target.value)} placeholder="Code d'une organisation (optionnel)"
-              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 4, boxSizing: "border-box" }} />
-            <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 10 }}>
+              style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 4, boxSizing: "border-box" }} />
+            <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 10 }}>
               Si une ONG ou une administration t'a communiqué un code, saisis-le ici pour qu'elle puisse t'assigner ses signalements. Laisse vide si tu ne participes à aucune organisation.
             </div>
 
-            {erreur && <div role="alert" style={{ fontSize: 12.5, color: "#B5451B", background: "var(--c-danger-border-soft)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{erreur}</div>}
+            {erreur && <div role="alert" style={{ fontSize: T.body, color: "#B5451B", background: "var(--c-danger-border-soft)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{erreur}</div>}
 
-            <button type="button" onClick={submit} disabled={busy} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+            <button type="button" onClick={submit} disabled={busy} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
               {busy ? t(lang, "envoi_en_cours") : t(lang, "confirmer_inscription")}
             </button>
           </form>

@@ -7,6 +7,7 @@ import { CATEGORIES, URGENCE, categorieLabel, urgenceLabel } from "../lib/catego
 import { t } from "../lib/i18n.js";
 import { supabase } from "../lib/supabase.js";
 import { CarteBiodiversite, envIcon } from "./Accueil.jsx";
+import { T, TITRE_GRAND } from "../lib/typo.jsx";
 
 export function Signaler({ onSubmit, lang, coordFormat, onNavigate }) {
   const [step, setStep] = useState(1); // 1 = défi, 2 = problème (mode dynamique uniquement), 3 = détails
@@ -74,8 +75,8 @@ export function Signaler({ onSubmit, lang, coordFormat, onNavigate }) {
       <Screen>
         <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", height: 380, textAlign: "center" }}>
           <div style={{ background: "var(--c-success-bg)", borderRadius: "50%", padding: 18, marginBottom: 14 }}><IconCheck size={32} color="var(--c-accent)" /></div>
-          <div style={{ fontFamily: "Fraunces, serif", fontSize: 19, fontWeight: 600, color: "var(--c-accent-dark)" }}>{t(lang, "signalement_envoye")}</div>
-          <div style={{ fontSize: 13, color: "var(--c-text-secondary)", marginTop: 6 }}>{t(lang, "merci_equipe")}</div>
+          <div style={{ ...TITRE_GRAND, fontWeight: 600, color: "var(--c-accent-dark)" }}>{t(lang, "signalement_envoye")}</div>
+          <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginTop: 6 }}>{t(lang, "merci_equipe")}</div>
         </div>
       </Screen>
     );
@@ -93,7 +94,7 @@ export function Signaler({ onSubmit, lang, coordFormat, onNavigate }) {
               <button key={d.id} onClick={() => { setDefiChoisi(d); setStep(2); }} style={{
                 textAlign: "left", border: "1px solid var(--c-border)", background: "var(--c-surface)", borderRadius: 14, padding: 12, cursor: "pointer" }}>
                 <IconD size={20} color="var(--c-text-secondary)" />
-                <div style={{ fontSize: 12.5, marginTop: 8, fontWeight: 600, color: "var(--c-text)", lineHeight: 1.25 }}>{(d.nom && d.nom[lang]) || (d.nom && d.nom.fr) || d.code}</div>
+                <div style={{ fontSize: T.body, marginTop: 8, fontWeight: 600, color: "var(--c-text)", lineHeight: 1.25 }}>{(d.nom && d.nom[lang]) || (d.nom && d.nom.fr) || d.code}</div>
               </button>
             );
           })}
@@ -120,12 +121,12 @@ export function Signaler({ onSubmit, lang, coordFormat, onNavigate }) {
                 textAlign: "left", border: active ? "2px solid var(--c-accent)" : "1px solid var(--c-border)",
                 background: active ? "var(--c-surface-soft)" : "var(--c-surface)", borderRadius: 14, padding: 12, cursor: "pointer" }}>
                 <IconP size={20} color={active ? "var(--c-accent)" : "var(--c-text-secondary)"} />
-                <div style={{ fontSize: 12.5, marginTop: 8, fontWeight: 600, color: "var(--c-text)", lineHeight: 1.25 }}>{(p.nom && p.nom[lang]) || (p.nom && p.nom.fr) || p.code}</div>
+                <div style={{ fontSize: T.body, marginTop: 8, fontWeight: 600, color: "var(--c-text)", lineHeight: 1.25 }}>{(p.nom && p.nom[lang]) || (p.nom && p.nom.fr) || p.code}</div>
               </button>
             );
           })}
           {problemesDuDefi.length === 0 && (
-            <div style={{ gridColumn: "1 / -1", fontSize: 12, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Aucun problème publié pour ce défi pour le moment.</div>
+            <div style={{ gridColumn: "1 / -1", fontSize: T.small, color: "var(--c-text-muted)", textAlign: "center", padding: 20 }}>Aucun problème publié pour ce défi pour le moment.</div>
           )}
         </div>
       </Screen>
@@ -147,7 +148,7 @@ export function Signaler({ onSubmit, lang, coordFormat, onNavigate }) {
                 textAlign: "left", border: active ? "2px solid var(--c-accent)" : "1px solid var(--c-border)",
                 background: active ? "var(--c-surface-soft)" : "var(--c-surface)", borderRadius: 14, padding: 12, cursor: "pointer" }}>
                 <IconC size={20} color={active ? "var(--c-accent)" : "var(--c-text-secondary)"} />
-                <div style={{ fontSize: 12.5, marginTop: 8, fontWeight: 600, color: "var(--c-text)", lineHeight: 1.25 }}>{categorieLabel(lang, c.id)}</div>
+                <div style={{ fontSize: T.body, marginTop: 8, fontWeight: 600, color: "var(--c-text)", lineHeight: 1.25 }}>{categorieLabel(lang, c.id)}</div>
               </button>
             );
           })}
@@ -156,37 +157,37 @@ export function Signaler({ onSubmit, lang, coordFormat, onNavigate }) {
       {!modeDynamique && step === 1 && <CarteBiodiversite lang={lang} onNavigate={onNavigate} />}
       {etapeDetails && (
         <div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)", marginBottom: 8 }}>{t(lang, "urgence_label")}</div>
+          <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-text)", marginBottom: 8 }}>{t(lang, "urgence_label")}</div>
           <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
             {URGENCE.map(u => (
               <button key={u.id} onClick={() => setUrgence(u.id)} style={{
                 flex: 1, padding: "10px 0", borderRadius: 10, cursor: "pointer",
                 border: urgence === u.id ? `2px solid ${u.color}` : "1px solid var(--c-border)",
                 background: urgence === u.id ? `${u.color}18` : "var(--c-surface)",
-                color: urgence === u.id ? u.color : "var(--c-text-secondary)", fontWeight: 600, fontSize: 12.5 }}>{urgenceLabel(lang, u.id)}</button>
+                color: urgence === u.id ? u.color : "var(--c-text-secondary)", fontWeight: 600, fontSize: T.body }}>{urgenceLabel(lang, u.id)}</button>
             ))}
           </div>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)", marginBottom: 8 }}>{t(lang, "photo_label")}</div>
+          <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-text)", marginBottom: 8 }}>{t(lang, "photo_label")}</div>
           <PhotoCaptureButton photo={photo} onChange={setPhoto} label={t(lang, "ajouter_photo")} previewMaxHeight={160} />
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)", marginBottom: 8 }}>{t(lang, "description_label")}</div>
+          <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-text)", marginBottom: 8 }}>{t(lang, "description_label")}</div>
           <textarea value={description} onChange={e => setDescription(e.target.value)} rows={3} placeholder={t(lang, "decrire_situation")}
-            style={{ width: "100%", borderRadius: 12, border: "1px solid var(--c-border)", padding: 10, fontSize: 13, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+            style={{ width: "100%", borderRadius: 12, border: "1px solid var(--c-border)", padding: 10, fontSize: T.field, resize: "none" }} />
 
           {champsDynamiques.length > 0 && (
             <div style={{ marginTop: 16, display: "flex", flexDirection: "column", gap: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)" }}>Détails spécifiques à ce problème</div>
+              <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-text)" }}>Détails spécifiques à ce problème</div>
               {champsDynamiques.filter(c => c.type !== "photo").map(c => (
                 <div key={c.cle}>
-                  <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginBottom: 4 }}>{c.label}{c.requis && " *"}</div>
+                  <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginBottom: 4 }}>{c.label}{c.requis && " *"}</div>
                   {c.type === "select" ? (
                     <select value={donneesCollecte[c.cle] || ""} onChange={e => setDonneesCollecte(prev => ({ ...prev, [c.cle]: e.target.value }))}
-                      style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, background: "var(--c-surface)", color: "var(--c-text)" }}>
+                      style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-surface)", color: "var(--c-text)" }}>
                       <option value="" disabled>Choisir…</option>
                       {(c.options || []).map(opt => <option key={opt} value={opt}>{opt}</option>)}
                     </select>
                   ) : (
                     <input type={c.type === "nombre" ? "number" : "text"} value={donneesCollecte[c.cle] || ""} onChange={e => setDonneesCollecte(prev => ({ ...prev, [c.cle]: e.target.value }))}
-                      style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, boxSizing: "border-box" }} />
+                      style={{ width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
                   )}
                 </div>
               ))}
@@ -202,7 +203,7 @@ export function Signaler({ onSubmit, lang, coordFormat, onNavigate }) {
         {etapeDetails && <button onClick={() => setStep(modeDynamique ? 2 : 1)} style={{ padding: "12px 16px", borderRadius: 12, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer" }}><IconChevronLeft size={16} /></button>}
         <button disabled={(!modeDynamique && step === 1 && !categorie) || (etapeDetails && champManquant())} onClick={() => (!modeDynamique && step === 1) ? setStep(2) : submit()} style={{
           flex: 1, padding: "12px 0", borderRadius: 12, border: "none",
-          background: ((!modeDynamique && step === 1 && !categorie) || (etapeDetails && champManquant())) ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 14,
+          background: ((!modeDynamique && step === 1 && !categorie) || (etapeDetails && champManquant())) ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body,
           cursor: ((!modeDynamique && step === 1 && !categorie) || (etapeDetails && champManquant())) ? "default" : "pointer" }}>
           {(!modeDynamique && step === 1) ? t(lang, "continuer") : t(lang, "envoyer_signalement")}
         </button>

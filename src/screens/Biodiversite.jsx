@@ -4,6 +4,7 @@ import { MediaThumb, PhotoCaptureButton } from "../components/media.jsx";
 import { Screen, SectionTitle } from "../components/ui.jsx";
 import { AFRICA_CENTER, LocationPrecision } from "../lib/carteUtils.jsx";
 import { t } from "../lib/i18n.js";
+import { T } from "../lib/typo.jsx";
 
 export function Biodiversite({ observations, onAdd, onBack, lang, coordFormat }) {
   const [showForm, setShowForm] = useState(false);
@@ -34,39 +35,39 @@ export function Biodiversite({ observations, onAdd, onBack, lang, coordFormat })
 
   return (
     <Screen>
-      <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>{t(lang, "retour")}</button>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.body, cursor: "pointer", marginBottom: 10, padding: 0 }}>{t(lang, "retour")}</button>
       <SectionTitle sub={t(lang, "sub_biodiv2")}>{t(lang, "title_biodiversite")}</SectionTitle>
 
       {!showForm ? (
-        <button onClick={() => setShowForm(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", marginBottom: 16 }}>
+        <button onClick={() => setShowForm(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 16 }}>
           <IconPlus size={16} /> {t(lang, "signaler_observation")}
         </button>
       ) : (
         <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--c-border)", marginBottom: 16 }}>
           <PhotoCaptureButton photo={photo} onChange={setPhoto} label={t(lang, "photo_espece")} previewMaxHeight={130} />
           <input value={espece} onChange={e => setEspece(e.target.value)} placeholder={t(lang, "espece_placeholder")}
-            style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" }} />
+            style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" }} />
           <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder={t(lang, "remarques_placeholder")}
-            style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 10, boxSizing: "border-box", resize: "none", fontFamily: "Work Sans, sans-serif" }} />
+            style={{ width: "100%", padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 10, boxSizing: "border-box", resize: "none" }} />
           <LocationPrecision coordFormat={coordFormat} onUpdate={setGpsFix} compact />
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => setShowForm(false)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: 13 }}>{t(lang, "annuler")}</button>
-            <button onClick={submit} disabled={busy} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>{busy ? t(lang, "envoi_en_cours") : t(lang, "enregistrer")}</button>
+            <button onClick={() => setShowForm(false)} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: T.body }}>{t(lang, "annuler")}</button>
+            <button onClick={submit} disabled={busy} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: T.body }}>{busy ? t(lang, "envoi_en_cours") : t(lang, "enregistrer")}</button>
           </div>
         </div>
       )}
 
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-        {observations.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: 13, textAlign: "center", padding: 20 }}>{t(lang, "aucune_observation_partagee")}</div>}
+        {observations.length === 0 && <div style={{ color: "var(--c-text-muted)", fontSize: T.body, textAlign: "center", padding: 20 }}>{t(lang, "aucune_observation_partagee")}</div>}
         {[...observations].reverse().map(o => (
           <div key={o.id} style={{ background: "var(--c-surface)", borderRadius: 14, padding: 12, border: "1px solid var(--c-border)" }}>
             <MediaThumb src={o.photo_url} style={{ width: "100%", maxHeight: 150, objectFit: "cover", borderRadius: 10, marginBottom: 8 }} />
             <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
               <IconPaw size={14} color="var(--c-accent)" />
-              <div style={{ fontWeight: 600, fontSize: 13 }}>{o.espece}</div>
+              <div style={{ fontWeight: 600, fontSize: T.body }}>{o.espece}</div>
             </div>
-            {o.description && <div style={{ fontSize: 12, color: "var(--c-text-secondary)" }}>{o.description}</div>}
-            <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 4 }}>{new Date(o.created_at).toLocaleDateString("fr-FR")}</div>
+            {o.description && <div style={{ fontSize: T.small, color: "var(--c-text-secondary)" }}>{o.description}</div>}
+            <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 4 }}>{new Date(o.created_at).toLocaleDateString("fr-FR")}</div>
           </div>
         ))}
       </div>

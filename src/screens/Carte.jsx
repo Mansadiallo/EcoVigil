@@ -9,6 +9,7 @@ import { downloadCSV } from "../lib/exports.js";
 import { t } from "../lib/i18n.js";
 import { DEVICE_ID, supabase } from "../lib/supabase.js";
 import { formatCoordonnees } from "../lib/utils.js";
+import { T, TITRE_SOUS } from "../lib/typo.jsx";
 
 export function Carte({ signalements, arbres, observations, enquetesCarte, onAddSignalement, onAddArbre, onAddObservation, online, pendingQueueCount, onFlushQueue, lang, coordFormat }) {
   const mapElRef = useRef(null);
@@ -856,7 +857,7 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
         counts.arbres++;
         const icon = L.divIcon({ html: markerHtml("var(--c-accent)", "tree"), className: "", iconSize: [30, 30], iconAnchor: [15, 30] });
         const photoHtml = mediaHtml(a.photo_url, 110);
-        const pendingHtml = !a.valide ? `<div style="font-size:11px;color:#B5451B;margin-top:4px">⏳ ${t(lang, "en_attente_validation")}</div>` : "";
+        const pendingHtml = !a.valide ? `<div style="font-size:12px;color:#B5451B;margin-top:4px">⏳ ${t(lang, "en_attente_validation")}</div>` : "";
         L.marker([a.lat, a.lng], { icon, opacity: a.valide ? 1 : 0.6 }).addTo(layerRef.current)
           .on("click", () => setSelected({ type: "arbre", data: a }))
           .bindPopup(`<b>${escapeHtml(a.nom)}</b><br/>${t(lang, "plante_le")}${a.date}${photoHtml}${pendingHtml}`);
@@ -877,8 +878,8 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
         const icon = L.divIcon({ html: markerHtml(color, "pin", ORIGINE_COULEURS[origine]), className: "", iconSize: [30, 30], iconAnchor: [15, 30] });
         const cat = categorieMeta(s.categorie);
         const photoHtml = mediaHtml(s.photo_url, 110);
-        const pendingHtml = !s.valide ? `<div style="font-size:11px;color:#B5451B;margin-top:4px">⏳ ${t(lang, "en_attente_validation")}</div>` : "";
-        const origineHtml = origine !== "citoyen" ? `<div style="font-size:10.5px;color:${ORIGINE_COULEURS[origine]};font-weight:600;margin-top:2px">${ORIGINE_LABELS[origine]}</div>` : "";
+        const pendingHtml = !s.valide ? `<div style="font-size:12px;color:#B5451B;margin-top:4px">⏳ ${t(lang, "en_attente_validation")}</div>` : "";
+        const origineHtml = origine !== "citoyen" ? `<div style="font-size:12px;color:${ORIGINE_COULEURS[origine]};font-weight:600;margin-top:2px">${ORIGINE_LABELS[origine]}</div>` : "";
         L.marker([s.lat, s.lng], { icon, opacity: s.valide ? 1 : 0.6 }).addTo(layerRef.current)
           .on("click", () => setSelected({ type: "signalement", data: s }))
           .bindPopup(`<b>${escapeHtml(categorieLabel(lang, cat.id))}</b><br/>${s.date}${origineHtml}${photoHtml}${pendingHtml}`);
@@ -968,9 +969,9 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
       return (
         <>
           <MediaThumb src={s.data.photo_url} style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 10, marginBottom: 8 }} />
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{categorieLabel(lang, s.data.categorie)}</div>
-          <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 3 }}>{s.data.date}{s.data.statut ? ` · ${s.data.statut}` : ""}</div>
-          <div style={{ fontSize: 13, color: "var(--c-text-secondary)", marginTop: 6 }}>{s.data.description || t(lang, "aucune_description")}</div>
+          <div style={{ fontWeight: 600, fontSize: T.body }}>{categorieLabel(lang, s.data.categorie)}</div>
+          <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginTop: 3 }}>{s.data.date}{s.data.statut ? ` · ${s.data.statut}` : ""}</div>
+          <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginTop: 6 }}>{s.data.description || t(lang, "aucune_description")}</div>
         </>
       );
     }
@@ -979,11 +980,11 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
       const color = ENQ_NIVEAU_COULEUR[s.data.niveau_constat] || "#6B7A8F";
       return (
         <>
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{s.data.titre}</div>
-          <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 3 }}>{nomTypeEnqueteCarte(s.data.categorie)} · {s.data.numero}</div>
-          <div style={{ fontSize: 13, fontWeight: 600, color, marginTop: 6 }}>{niveauT[1] || ""}</div>
-          {niveauT[2] && <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginTop: 4 }}>{niveauT[2]}</div>}
-          <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginTop: 6 }}>Enquête {s.data.statut === "verifiee" ? "vérifiée" : "terminée"} le {new Date(s.data.updated_at).toLocaleDateString("fr-FR")}</div>
+          <div style={{ fontWeight: 600, fontSize: T.body }}>{s.data.titre}</div>
+          <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginTop: 3 }}>{nomTypeEnqueteCarte(s.data.categorie)} · {s.data.numero}</div>
+          <div style={{ fontSize: T.body, fontWeight: 600, color, marginTop: 6 }}>{niveauT[1] || ""}</div>
+          {niveauT[2] && <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginTop: 4 }}>{niveauT[2]}</div>}
+          <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginTop: 6 }}>Enquête {s.data.statut === "verifiee" ? "vérifiée" : "terminée"} le {new Date(s.data.updated_at).toLocaleDateString("fr-FR")}</div>
         </>
       );
     }
@@ -991,17 +992,17 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
       return (
         <>
           <MediaThumb src={s.data.photo_url} style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 10, marginBottom: 8 }} />
-          <div style={{ fontWeight: 600, fontSize: 14 }}>{s.data.espece || t(lang, "observation_biodiversite")}</div>
-          <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 3 }}>{new Date(s.data.created_at).toLocaleDateString("fr-FR")}</div>
-          <div style={{ fontSize: 13, color: "var(--c-text-secondary)", marginTop: 6 }}>{s.data.description || t(lang, "aucune_description")}</div>
+          <div style={{ fontWeight: 600, fontSize: T.body }}>{s.data.espece || t(lang, "observation_biodiversite")}</div>
+          <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginTop: 3 }}>{new Date(s.data.created_at).toLocaleDateString("fr-FR")}</div>
+          <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginTop: 6 }}>{s.data.description || t(lang, "aucune_description")}</div>
         </>
       );
     }
     return (
       <>
         <MediaThumb src={s.data.photo_url} style={{ width: "100%", maxHeight: 180, objectFit: "cover", borderRadius: 10, marginBottom: 8 }} />
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{s.data.nom}</div>
-        <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginTop: 3 }}>{t(lang, "plante_le")}{s.data.date}</div>
+        <div style={{ fontWeight: 600, fontSize: T.body }}>{s.data.nom}</div>
+        <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginTop: 3 }}>{t(lang, "plante_le")}{s.data.date}</div>
       </>
     );
   }
@@ -1019,12 +1020,12 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
       <SectionTitle sub={t(lang, "sub_carte_intelligente")}>{t(lang, "titre_carte_intelligente")}</SectionTitle>
 
       {/* Statut réseau / synchronisation — visible en permanence (section 9 : Synchroniser). */}
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontSize: 11.5 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 10, fontSize: T.small }}>
         <span style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 20, background: online ? "rgba(22,163,74,0.12)" : "rgba(220,38,38,0.12)", color: online ? "#16a34a" : "#dc2626", fontWeight: 600 }}>
           {online ? <IconWifi size={12} /> : <IconWifiOff size={12} />} {online ? t(lang, "en_ligne") : t(lang, "hors_ligne")}
         </span>
         {pendingQueueCount > 0 && (
-          <button onClick={() => onFlushQueue && onFlushQueue()} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 20, border: "none", background: "var(--c-warning)", color: "#fff", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>
+          <button onClick={() => onFlushQueue && onFlushQueue()} style={{ display: "flex", alignItems: "center", gap: 5, padding: "4px 9px", borderRadius: 20, border: "none", background: "var(--c-warning)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>
             <IconCloudDownload size={12} /> {pendingQueueCount} {t(lang, "en_attente_synchro")}
           </button>
         )}
@@ -1035,21 +1036,21 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
           flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 10,
           border: showLayers ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
           background: showLayers ? "var(--c-accent-dark)" : "var(--c-surface)", color: showLayers ? "#fff" : "var(--c-text)",
-          fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+          fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
           <IconLayers size={14} /> {t(lang, "couches_btn")} {!aucuneCoucheActive && `(${Object.values(layersOn).filter(Boolean).length})`}
         </button>
         <button onClick={() => showFilters ? setShowFilters(false) : ouvrirPanneau(setShowFilters)} style={{
           flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 10,
           border: filtresActifs ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
           background: filtresActifs ? "var(--c-accent-dark)" : "var(--c-surface)", color: filtresActifs ? "#fff" : "var(--c-text)",
-          fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+          fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
           <IconTarget size={14} /> {t(lang, "filtres_btn")} {filtresActifs && "●"}
         </button>
         <button onClick={() => showTools ? setShowTools(false) : ouvrirPanneau(setShowTools)} style={{
           flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 10,
           border: showTools ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
           background: showTools ? "var(--c-accent-dark)" : "var(--c-surface)", color: showTools ? "#fff" : "var(--c-text)",
-          fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+          fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
           <IconEdit size={14} /> {t(lang, "outils_btn")}
         </button>
       </div>
@@ -1059,35 +1060,35 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
           flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 10,
           border: addMode ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
           background: addMode ? "var(--c-accent-dark)" : "var(--c-surface)", color: addMode ? "#fff" : "var(--c-text)",
-          fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+          fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
           <IconMapPin size={14} /> {t(lang, "ajouter_btn")}
         </button>
         <button onClick={() => showSearch ? setShowSearch(false) : ouvrirPanneau(setShowSearch)} style={{
           flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 10,
           border: showSearch ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
           background: showSearch ? "var(--c-accent-dark)" : "var(--c-surface)", color: showSearch ? "#fff" : "var(--c-text)",
-          fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+          fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
           <IconSearch size={14} /> {t(lang, "rechercher_btn")}
         </button>
         <button onClick={() => showOffline ? setShowOffline(false) : ouvrirPanneau(setShowOffline)} style={{
           flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 10,
           border: showOffline ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
           background: showOffline ? "var(--c-accent-dark)" : "var(--c-surface)", color: showOffline ? "#fff" : "var(--c-text)",
-          fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+          fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
           <IconCloudDownload size={14} /> {t(lang, "hors_ligne")}
         </button>
         <button onClick={() => showComparaison ? setShowComparaison(false) : ouvrirPanneau(setShowComparaison)} style={{
           flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 10,
           border: (showComparaison || compareActif) ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
           background: (showComparaison || compareActif) ? "var(--c-accent-dark)" : "var(--c-surface)", color: (showComparaison || compareActif) ? "#fff" : "var(--c-text)",
-          fontWeight: 600, fontSize: 12.5, cursor: "pointer" }} title="Comparaison satellite Sentinel-2">
+          fontWeight: 600, fontSize: T.body, cursor: "pointer" }} title="Comparaison satellite Sentinel-2">
           <IconTrendingUp size={14} /> Évolution
         </button>
         <button onClick={() => showParcoursPanel ? setShowParcoursPanel(false) : ouvrirPanneau(setShowParcoursPanel)} style={{
           flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 10,
           border: showParcoursPanel ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)",
           background: showParcoursPanel ? "var(--c-accent-dark)" : "var(--c-surface)", color: showParcoursPanel ? "#fff" : "var(--c-text)",
-          fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+          fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
           <IconRoute size={14} /> {t(lang, "parcours_btn")}
         </button>
       </div>
@@ -1095,89 +1096,89 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
       {addMode && (
         <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-accent-dark)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
           {!addPoint && (
-            <div style={{ fontSize: 12, color: "var(--c-text-secondary)" }}>{t(lang, "toucher_carte_ajouter")}</div>
+            <div style={{ fontSize: T.small, color: "var(--c-text-secondary)" }}>{t(lang, "toucher_carte_ajouter")}</div>
           )}
           {addPoint && !addType && (
             <>
-              <div style={{ fontSize: 11, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>
+              <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>
                 {t(lang, "point_choisi_prefix")}{addPoint[0].toFixed(5)}, {addPoint[1].toFixed(5)}{t(lang, "point_choisi_suffix")}
               </div>
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6 }}>
-                <button onClick={() => setAddType("signalement")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>🚩 {t(lang, "type_signalement")}</button>
-                <button onClick={() => setAddType("arbre")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>🌳 {t(lang, "type_arbre")}</button>
-                <button onClick={() => setAddType("observation")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>🦋 {t(lang, "type_observation")}</button>
-                <button onClick={() => setAddType("zone")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>⬠ {t(lang, "type_zone")}</button>
+                <button onClick={() => setAddType("signalement")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>🚩 {t(lang, "type_signalement")}</button>
+                <button onClick={() => setAddType("arbre")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>🌳 {t(lang, "type_arbre")}</button>
+                <button onClick={() => setAddType("observation")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>🦋 {t(lang, "type_observation")}</button>
+                <button onClick={() => setAddType("zone")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>⬠ {t(lang, "type_zone")}</button>
               </div>
             </>
           )}
           {addPoint && addType === "signalement" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <select value={fCategorie} onChange={e => setFCategorie(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }}>
+              <select value={fCategorie} onChange={e => setFCategorie(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }}>
                 {[...CATEGORIES, ...Object.keys(ENV_PROBLEMES_INDEX).filter(code => !CATEGORIES.some(c => c.id === code)).map(code => ({ id: code }))].map(c => <option key={c.id} value={c.id}>{categorieLabel(lang, c.id)}</option>)}
               </select>
-              <select value={fUrgence} onChange={e => setFUrgence(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }}>
+              <select value={fUrgence} onChange={e => setFUrgence(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }}>
                 {URGENCE.map(u => <option key={u.id} value={u.id}>{urgenceLabel(lang, u.id)}</option>)}
               </select>
-              <textarea value={fDescription} onChange={e => setFDescription(e.target.value)} placeholder={t(lang, "description_optionnel")} rows={2} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)", resize: "vertical" }} />
+              <textarea value={fDescription} onChange={e => setFDescription(e.target.value)} placeholder={t(lang, "description_optionnel")} rows={2} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)", resize: "vertical" }} />
             </div>
           )}
           {addPoint && addType === "arbre" && (
-            <input value={fNom} onChange={e => setFNom(e.target.value)} placeholder={t(lang, "essence_nom_arbre")} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }} />
+            <input value={fNom} onChange={e => setFNom(e.target.value)} placeholder={t(lang, "essence_nom_arbre")} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }} />
           )}
           {addPoint && addType === "observation" && (
             <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-              <input value={fEspece} onChange={e => setFEspece(e.target.value)} placeholder={t(lang, "espece_observee_placeholder")} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }} />
-              <textarea value={fDescription} onChange={e => setFDescription(e.target.value)} placeholder={t(lang, "description_optionnel")} rows={2} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)", resize: "vertical" }} />
+              <input value={fEspece} onChange={e => setFEspece(e.target.value)} placeholder={t(lang, "espece_observee_placeholder")} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }} />
+              <textarea value={fDescription} onChange={e => setFDescription(e.target.value)} placeholder={t(lang, "description_optionnel")} rows={2} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)", resize: "vertical" }} />
             </div>
           )}
           {addPoint && addType === "zone" && (
-            <input value={fZoneNom} onChange={e => setFZoneNom(e.target.value)} placeholder={t(lang, "nom_zone_placeholder")} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }} />
+            <input value={fZoneNom} onChange={e => setFZoneNom(e.target.value)} placeholder={t(lang, "nom_zone_placeholder")} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }} />
           )}
           {addPoint && addType && (
             <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-              <button onClick={() => setAddType(null)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{t(lang, "retour_btn")}</button>
-              <button onClick={validerAjout} disabled={addSaving} style={{ flex: 2, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: addSaving ? "default" : "pointer", opacity: addSaving ? 0.7 : 1 }}>{addSaving ? t(lang, "enregistrement_encours") : t(lang, "enregistrer")}</button>
+              <button onClick={() => setAddType(null)} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>{t(lang, "retour_btn")}</button>
+              <button onClick={validerAjout} disabled={addSaving} style={{ flex: 2, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontSize: T.small, fontWeight: 600, cursor: addSaving ? "default" : "pointer", opacity: addSaving ? 0.7 : 1 }}>{addSaving ? t(lang, "enregistrement_encours") : t(lang, "enregistrer")}</button>
             </div>
           )}
-          <button onClick={annulerAjout} style={{ marginTop: 8, width: "100%", padding: "6px 0", borderRadius: 8, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: 11, cursor: "pointer" }}>{t(lang, "annuler_ajout")}</button>
+          <button onClick={annulerAjout} style={{ marginTop: 8, width: "100%", padding: "6px 0", borderRadius: 8, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: T.meta, cursor: "pointer" }}>{t(lang, "annuler_ajout")}</button>
         </div>
       )}
 
       {showSearch && (
         <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
-          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder={t(lang, "rechercher_placeholder")} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)", marginBottom: 8 }} autoFocus />
+          <input value={searchQuery} onChange={e => setSearchQuery(e.target.value)} placeholder={t(lang, "rechercher_placeholder")} style={{ width: "100%", padding: "9px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)", marginBottom: 8 }} autoFocus />
           {searchLocalResults.length > 0 && (
             <div style={{ marginBottom: 6 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: "var(--c-text-muted)", margin: "4px 0" }}>{t(lang, "donnees_pace")}</div>
+              <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-muted)", margin: "4px 0" }}>{t(lang, "donnees_pace")}</div>
               {searchLocalResults.map((r, i) => (
-                <div key={i} onClick={() => allerVers(r.lat, r.lng)} style={{ padding: "7px 4px", fontSize: 12.5, color: "var(--c-text)", cursor: "pointer", borderBottom: "1px solid var(--c-border)" }}>{r.label} <span style={{ color: "var(--c-text-muted)", fontSize: 11 }}>· {r.sub}</span></div>
+                <div key={i} onClick={() => allerVers(r.lat, r.lng)} style={{ padding: "7px 4px", fontSize: T.body, color: "var(--c-text)", cursor: "pointer", borderBottom: "1px solid var(--c-border)" }}>{r.label} <span style={{ color: "var(--c-text-muted)", fontSize: T.meta }}>· {r.sub}</span></div>
               ))}
             </div>
           )}
           {searchPlaceResults.length > 0 && (
             <div>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: "var(--c-text-muted)", margin: "4px 0" }}>{t(lang, "lieux_osm")}</div>
+              <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-muted)", margin: "4px 0" }}>{t(lang, "lieux_osm")}</div>
               {searchPlaceResults.map((r, i) => (
-                <div key={i} onClick={() => allerVers(r.lat, r.lng, 14)} style={{ padding: "7px 4px", fontSize: 12.5, color: "var(--c-text)", cursor: "pointer", borderBottom: "1px solid var(--c-border)" }}>{r.label}</div>
+                <div key={i} onClick={() => allerVers(r.lat, r.lng, 14)} style={{ padding: "7px 4px", fontSize: T.body, color: "var(--c-text)", cursor: "pointer", borderBottom: "1px solid var(--c-border)" }}>{r.label}</div>
               ))}
             </div>
           )}
-          {searchLoading && <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>{t(lang, "recherche_encours")}</div>}
+          {searchLoading && <div style={{ fontSize: T.small, color: "var(--c-text-muted)" }}>{t(lang, "recherche_encours")}</div>}
           {!searchLoading && searchQuery.trim().length >= 2 && searchLocalResults.length === 0 && searchPlaceResults.length === 0 && (
-            <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>{t(lang, "aucun_resultat")}</div>
+            <div style={{ fontSize: T.small, color: "var(--c-text-muted)" }}>{t(lang, "aucun_resultat")}</div>
           )}
         </div>
       )}
 
       {showOffline && (
         <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Carte hors connexion</div>
-          <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Carte hors connexion</div>
+          <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
             Télécharge la zone actuellement affichée pour pouvoir naviguer, mesurer et collecter des données sans réseau. Les données collectées hors ligne sont conservées et envoyées automatiquement dès que la connexion revient.
           </div>
-          <div style={{ fontSize: 12, marginBottom: 10 }}>{tilesCachedCount} tuile{tilesCachedCount > 1 ? "s" : ""} déjà en cache sur cet appareil.</div>
+          <div style={{ fontSize: T.small, marginBottom: 10 }}>{tilesCachedCount} tuile{tilesCachedCount > 1 ? "s" : ""} déjà en cache sur cet appareil.</div>
           {!satellite && (
-            <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", background: "var(--c-bg)", borderRadius: 8, padding: 8, marginBottom: 10, lineHeight: 1.5 }}>
+            <div style={{ fontSize: T.small, color: "var(--c-text-muted)", background: "var(--c-bg)", borderRadius: 8, padding: 8, marginBottom: 10, lineHeight: 1.5 }}>
               Le téléchargement hors-ligne n'est disponible que pour le fond satellite pour le moment. Passe en vue satellite pour pré-télécharger cette zone.
             </div>
           )}
@@ -1186,19 +1187,19 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
               <div style={{ height: 8, borderRadius: 4, background: "var(--c-bg)", overflow: "hidden", marginBottom: 6 }}>
                 <div style={{ height: "100%", width: `${offlineProgress.total ? (offlineProgress.done / offlineProgress.total) * 100 : 0}%`, background: "var(--c-accent-dark)" }} />
               </div>
-              <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginBottom: 8 }}>{offlineProgress.done} / {offlineProgress.total} tuiles téléchargées</div>
-              <button onClick={annulerTelechargement} style={{ width: "100%", padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Arrêter le téléchargement</button>
+              <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginBottom: 8 }}>{offlineProgress.done} / {offlineProgress.total} tuiles téléchargées</div>
+              <button onClick={annulerTelechargement} style={{ width: "100%", padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>Arrêter le téléchargement</button>
             </>
           ) : (
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={telechargerZoneHorsLigne} disabled={!satellite} style={{ flex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 8, border: "none", background: satellite ? "var(--c-accent-dark)" : "var(--c-border)", color: satellite ? "#fff" : "var(--c-text-faint)", fontSize: 12, fontWeight: 600, cursor: satellite ? "pointer" : "not-allowed" }}>
+              <button onClick={telechargerZoneHorsLigne} disabled={!satellite} style={{ flex: 2, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 8, border: "none", background: satellite ? "var(--c-accent-dark)" : "var(--c-border)", color: satellite ? "#fff" : "var(--c-text-faint)", fontSize: T.small, fontWeight: 600, cursor: satellite ? "pointer" : "not-allowed" }}>
                 <IconCloudDownload size={14} /> Télécharger cette zone
               </button>
-              <button onClick={viderCacheHorsLigne} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Vider</button>
+              <button onClick={viderCacheHorsLigne} style={{ flex: 1, padding: "9px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>Vider</button>
             </div>
           )}
           {!offlineDownloading && tilesCachedCount > 0 && (
-            <button onClick={capturerImageZone} disabled={captureEnCours} style={{ width: "100%", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: 12, fontWeight: 600, cursor: captureEnCours ? "default" : "pointer" }}>
+            <button onClick={capturerImageZone} disabled={captureEnCours} style={{ width: "100%", marginTop: 8, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: T.small, fontWeight: 600, cursor: captureEnCours ? "default" : "pointer" }}>
               <IconCamera size={14} /> {captureEnCours ? "Génération…" : "Enregistrer une image de cette zone"}
             </button>
           )}
@@ -1207,26 +1208,26 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
 
       {showParcoursPanel && (
         <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Parcours GPS de terrain</div>
+          <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Parcours GPS de terrain</div>
           {parcoursRecording ? (
             <>
-              <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 8 }}>⏺ Enregistrement… {formatDuree(parcoursElapsed)} · {parcoursPoints.length} points</div>
-              <button onClick={() => arreterParcours(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 8, border: "none", background: "#dc2626", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 8 }}>⏺ Enregistrement… {formatDuree(parcoursElapsed)} · {parcoursPoints.length} points</div>
+              <button onClick={() => arreterParcours(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 8, border: "none", background: "#dc2626", color: "#fff", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>
                 <IconSquareStop size={13} /> Arrêter et enregistrer
               </button>
             </>
           ) : (
-            <button onClick={demarrerParcours} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer", marginBottom: 10 }}>
+            <button onClick={demarrerParcours} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "9px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontSize: T.small, fontWeight: 600, cursor: "pointer", marginBottom: 10 }}>
               <IconPlay size={13} /> Démarrer un parcours
             </button>
           )}
           {savedParcours.length > 0 && (
             <div style={{ marginTop: 10 }}>
-              <div style={{ fontSize: 10.5, fontWeight: 600, color: "var(--c-text-muted)", marginBottom: 6 }}>Parcours enregistrés</div>
+              <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-muted)", marginBottom: 6 }}>Parcours enregistrés</div>
               {savedParcours.map(p => (
                 <div key={p.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "6px 0", borderBottom: "1px solid var(--c-border)" }}>
                   <IconRoute size={13} color="var(--c-sky)" />
-                  <span style={{ fontSize: 12, flex: 1 }}>{(p.distance_m / 1000).toFixed(2)} km · {formatDuree(p.duree_s)}</span>
+                  <span style={{ fontSize: T.small, flex: 1 }}>{(p.distance_m / 1000).toFixed(2)} km · {formatDuree(p.duree_s)}</span>
                   <button onClick={() => supprimerParcours(p.id)} style={{ background: "none", border: "none", color: "var(--c-text-muted)", cursor: "pointer" }}><IconX size={13} /></button>
                 </div>
               ))}
@@ -1237,42 +1238,42 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
 
       {showTools && (
         <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Outils d'analyse géographique</div>
+          <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Outils d'analyse géographique</div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginBottom: 10 }}>
-            <button onClick={() => { setCoordMode(!coordMode); setClimatMode(false); setClickedCoord(null); }} style={{ padding: "8px 6px", borderRadius: 8, border: coordMode ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)", background: coordMode ? "var(--c-accent-dark)" : "var(--c-bg)", color: coordMode ? "#fff" : "var(--c-text)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>📍 Coordonnées GPS</button>
-            <button onClick={() => startDraw("marker")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>📌 Créer un point</button>
-            <button onClick={() => startDraw("polyline")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>📏 Mesurer une distance</button>
-            <button onClick={() => startDraw("polygon")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: 11.5, fontWeight: 600, cursor: "pointer" }}>⬠ Zone / superficie</button>
+            <button onClick={() => { setCoordMode(!coordMode); setClimatMode(false); setClickedCoord(null); }} style={{ padding: "8px 6px", borderRadius: 8, border: coordMode ? "1px solid var(--c-accent-dark)" : "1px solid var(--c-border)", background: coordMode ? "var(--c-accent-dark)" : "var(--c-bg)", color: coordMode ? "#fff" : "var(--c-text)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>📍 Coordonnées GPS</button>
+            <button onClick={() => startDraw("marker")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>📌 Créer un point</button>
+            <button onClick={() => startDraw("polyline")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>📏 Mesurer une distance</button>
+            <button onClick={() => startDraw("polygon")} style={{ padding: "8px 6px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-bg)", color: "var(--c-text)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>⬠ Zone / superficie</button>
           </div>
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 8, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 8, lineHeight: 1.5 }}>
             "Zone / superficie" dessine un polygone : calcule sa surface et analyse automatiquement les données des couches actives à l'intérieur.
           </div>
 
           {clickedCoord && (
-            <div style={{ background: "var(--c-surface-soft)", borderRadius: 8, padding: 8, fontSize: 12, marginBottom: 8 }}>
+            <div style={{ background: "var(--c-surface-soft)", borderRadius: 8, padding: 8, fontSize: T.small, marginBottom: 8 }}>
               Coordonnées : {clickedCoord[0].toFixed(5)}, {clickedCoord[1].toFixed(5)}
             </div>
           )}
           {measureResult && (
-            <div style={{ background: "var(--c-surface-soft)", borderRadius: 8, padding: 8, fontSize: 12, marginBottom: 8 }}>
+            <div style={{ background: "var(--c-surface-soft)", borderRadius: 8, padding: 8, fontSize: T.small, marginBottom: 8 }}>
               {measureResult.texte}
             </div>
           )}
           {zoneAnalysis && (
             <div style={{ background: "var(--c-surface-soft)", borderRadius: 8, padding: 10, marginBottom: 8 }}>
-              <div style={{ fontSize: 12, fontWeight: 600, marginBottom: 4 }}>{zoneAnalysis.total} donnée{zoneAnalysis.total > 1 ? "s" : ""} dans la zone</div>
+              <div style={{ fontSize: T.small, fontWeight: 600, marginBottom: 4 }}>{zoneAnalysis.total} donnée{zoneAnalysis.total > 1 ? "s" : ""} dans la zone</div>
               {Object.entries(zoneAnalysis.parType).map(([t, n]) => (
-                <div key={t} style={{ fontSize: 11.5, color: "var(--c-text-secondary)" }}>{t} : {n}</div>
+                <div key={t} style={{ fontSize: T.small, color: "var(--c-text-secondary)" }}>{t} : {n}</div>
               ))}
-              {zoneAnalysis.total === 0 && <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Aucune donnée des couches actives dans cette zone.</div>}
+              {zoneAnalysis.total === 0 && <div style={{ fontSize: T.small, color: "var(--c-text-muted)" }}>Aucune donnée des couches actives dans cette zone.</div>}
             </div>
           )}
           <div style={{ display: "flex", gap: 8 }}>
             {(measureResult || zoneAnalysis || clickedCoord) && (
-              <button onClick={clearAnalyse} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>Effacer</button>
+              <button onClick={clearAnalyse} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>Effacer</button>
             )}
             {zoneAnalysis && zoneAnalysis.total > 0 && (
-              <button onClick={exporterAnalyse} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+              <button onClick={exporterAnalyse} style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>
                 <IconDownload size={13} /> Exporter
               </button>
             )}
@@ -1282,44 +1283,44 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
 
       {showComparaison && (
         <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Comparaison satellite temporelle (Sentinel-2)</div>
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Comparaison satellite temporelle (Sentinel-2)</div>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 10, lineHeight: 1.5 }}>
             Compare deux mosaïques annuelles Sentinel-2 (Copernicus) sur la zone actuellement affichée — déplacez ou zoomez la carte <b>avant</b> d'activer la comparaison pour choisir la zone, car le déplacement/zoom de la carte est momentanément suspendu pendant que la comparaison est active (le glissement sur l'image sert alors à comparer, pas à déplacer la carte). Fonctionne indépendamment du fond satellite Esri.
           </div>
           <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 10.5, color: "var(--c-text-muted)", display: "block", marginBottom: 4 }}>Avant</label>
-              <select value={compareAnnee1} onChange={e => setCompareAnnee1(Number(e.target.value))} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }}>
+              <label style={{ fontSize: T.meta, color: "var(--c-text-muted)", display: "block", marginBottom: 4 }}>Avant</label>
+              <select value={compareAnnee1} onChange={e => setCompareAnnee1(Number(e.target.value))} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }}>
                 {anneesSentinel.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
             <div style={{ flex: 1 }}>
-              <label style={{ fontSize: 10.5, color: "var(--c-text-muted)", display: "block", marginBottom: 4 }}>Après</label>
-              <select value={compareAnnee2} onChange={e => setCompareAnnee2(Number(e.target.value))} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }}>
+              <label style={{ fontSize: T.meta, color: "var(--c-text-muted)", display: "block", marginBottom: 4 }}>Après</label>
+              <select value={compareAnnee2} onChange={e => setCompareAnnee2(Number(e.target.value))} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }}>
                 {anneesSentinel.map(a => <option key={a} value={a}>{a}</option>)}
               </select>
             </div>
           </div>
           {anneesSentinelVerifiees === null && (
-            <div style={{ fontSize: 10, color: "var(--c-text-muted)", marginBottom: 8 }}>Vérification des mosaïques réellement disponibles…</div>
+            <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 8 }}>Vérification des mosaïques réellement disponibles…</div>
           )}
           {anneesSentinelVerifiees === false && (
-            <div style={{ fontSize: 10, color: "var(--c-warning)", marginBottom: 8, lineHeight: 1.4 }}>
+            <div style={{ fontSize: T.meta, color: "var(--c-warning)", marginBottom: 8, lineHeight: 1.4 }}>
               Liste d'années non confirmée par le service (vérification injoignable) : si une année choisie n'existe pas réellement, ce côté restera vide — essayez-en une autre le cas échéant.
             </div>
           )}
-          <button onClick={() => { setCompareActif(v => !v); setCompareSwipePos(50); }} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: "none", background: compareActif ? "var(--c-warning)" : "var(--c-accent-dark)", color: "#fff", fontSize: 12.5, fontWeight: 600, cursor: "pointer", marginBottom: 8 }}>
+          <button onClick={() => { setCompareActif(v => !v); setCompareSwipePos(50); }} style={{ width: "100%", padding: "9px 0", borderRadius: 8, border: "none", background: compareActif ? "var(--c-warning)" : "var(--c-accent-dark)", color: "#fff", fontSize: T.body, fontWeight: 600, cursor: "pointer", marginBottom: 8 }}>
             {compareActif ? "Désactiver la comparaison" : "Activer la comparaison"}
           </button>
           {compareAnnee1 === compareAnnee2 && (
-            <div style={{ fontSize: 10.5, color: "var(--c-warning)", marginBottom: 8 }}>Choisissez deux années différentes pour une comparaison utile.</div>
+            <div style={{ fontSize: T.meta, color: "var(--c-warning)", marginBottom: 8 }}>Choisissez deux années différentes pour une comparaison utile.</div>
           )}
           {compareActif && (
-            <button onClick={lierComparaisonAuSignalement} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
+            <button onClick={lierComparaisonAuSignalement} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>
               <IconMapPin size={13} /> Lier cette observation à un signalement
             </button>
           )}
-          <div style={{ fontSize: 9.5, color: "var(--c-text-faint)", marginTop: 8, lineHeight: 1.4 }}>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-faint)", marginTop: 8, lineHeight: 1.4 }}>
             Source : Sentinel-2 cloudless, © EOX IT Services GmbH — contient des données Copernicus Sentinel modifiées. Mosaïques annuelles (pas une date de prise de vue exacte). Un changement visible ici n'est pas en soi une preuve d'infraction : à recouper avec une vérification de terrain.
           </div>
         </div>
@@ -1327,64 +1328,64 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
 
       {showLayers && (
         <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>{t(lang, "donnees_pace")}</div>
+          <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>{t(lang, "donnees_pace")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
             {LAYER_DEFS.map(l => (
               <label key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", cursor: "pointer" }}>
                 <input type="checkbox" checked={layersOn[l.id]} onChange={() => toggleLayer(l.id)} style={{ width: 16, height: 16, accentColor: "var(--c-accent-dark)" }} />
                 <l.icon size={14} color={l.color} />
-                <span style={{ fontSize: 12.5, color: "var(--c-text)" }}>{t(lang, l.labelKey)}</span>
-                <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--c-text-muted)" }}>{visibleCount[l.id]}</span>
+                <span style={{ fontSize: T.body, color: "var(--c-text)" }}>{t(lang, l.labelKey)}</span>
+                <span style={{ marginLeft: "auto", fontSize: T.meta, color: "var(--c-text-muted)" }}>{visibleCount[l.id]}</span>
               </label>
             ))}
           </div>
           <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", cursor: "pointer" }}>
             <input type="checkbox" checked={showZones} onChange={() => setShowZones(!showZones)} style={{ width: 16, height: 16, accentColor: "var(--c-accent-dark)" }} />
             <IconMapPin size={14} color="var(--c-warning)" />
-            <span style={{ fontSize: 12.5, color: "var(--c-text)" }}>{t(lang, "zones_enregistrees_local")}</span>
-            <span style={{ marginLeft: "auto", fontSize: 11, color: "var(--c-text-muted)" }}>{zonesLocales.length}</span>
+            <span style={{ fontSize: T.body, color: "var(--c-text)" }}>{t(lang, "zones_enregistrees_local")}</span>
+            <span style={{ marginLeft: "auto", fontSize: T.meta, color: "var(--c-text-muted)" }}>{zonesLocales.length}</span>
           </label>
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 10, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 10, lineHeight: 1.5 }}>
             {t(lang, "projets_suivi_admin")}
           </div>
 
           <div style={{ height: 1, background: "var(--c-border)", margin: "12px 0" }} />
 
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Sources environnementales externes</div>
+          <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Sources environnementales externes</div>
           <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", cursor: "pointer" }}>
             <input type="checkbox" checked={climatMode} onChange={() => { setClimatMode(!climatMode); setCoordMode(false); setClickedCoord(null); }} style={{ width: 16, height: 16, accentColor: "var(--c-accent-dark)" }} />
             <IconCloudRain size={14} color="var(--c-sky)" />
-            <span style={{ fontSize: 12.5, color: "var(--c-text)" }}>Climat (Open-Meteo)</span>
-            {climatLoading && <span style={{ marginLeft: "auto", fontSize: 10.5, color: "var(--c-text-muted)" }}>…</span>}
+            <span style={{ fontSize: T.body, color: "var(--c-text)" }}>Climat (Open-Meteo)</span>
+            {climatLoading && <span style={{ marginLeft: "auto", fontSize: T.meta, color: "var(--c-text-muted)" }}>…</span>}
           </label>
           {climatMode && (
-            <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", padding: "2px 4px 6px", lineHeight: 1.5 }}>
+            <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", padding: "2px 4px 6px", lineHeight: 1.5 }}>
               Touche n'importe où sur la carte pour voir la météo actuelle à cet endroit.
             </div>
           )}
           <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", cursor: "pointer" }}>
             <input type="checkbox" checked={coucheOccupationSol} onChange={() => setCoucheOccupationSol(v => !v)} style={{ width: 16, height: 16, accentColor: "var(--c-accent-dark)" }} />
             <IconGlobe size={14} color="var(--c-accent)" />
-            <span style={{ fontSize: 12.5, color: "var(--c-text)" }}>Occupation des sols (Esri)</span>
+            <span style={{ fontSize: T.body, color: "var(--c-text)" }}>Occupation des sols (Esri)</span>
           </label>
           <label style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", cursor: "pointer" }}>
             <input type="checkbox" checked={coucheHydrologie} onChange={() => setCoucheHydrologie(v => !v)} style={{ width: 16, height: 16, accentColor: "var(--c-accent-dark)" }} />
             <IconWaves size={14} color="var(--c-sky)" />
-            <span style={{ fontSize: 12.5, color: "var(--c-text)" }}>Hydrologie (Esri)</span>
+            <span style={{ fontSize: T.body, color: "var(--c-text)" }}>Hydrologie (Esri)</span>
           </label>
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", opacity: 0.5 }}>
             <IconLayers size={14} color="var(--c-text-muted)" />
-            <span style={{ fontSize: 12.5, color: "var(--c-text-muted)" }}>Imagerie satellite</span>
-            <span style={{ marginLeft: "auto", fontSize: 9.5, fontWeight: 700, color: "var(--c-accent-dark)" }}>via le bouton dédié ↗</span>
+            <span style={{ fontSize: T.body, color: "var(--c-text-muted)" }}>Imagerie satellite</span>
+            <span style={{ marginLeft: "auto", fontSize: T.meta, fontWeight: 700, color: "var(--c-accent-dark)" }}>via le bouton dédié ↗</span>
           </div>
           {EXTERNAL_LAYERS_NON_CONNECTEES.map(l => (
             <div key={l.id} style={{ display: "flex", alignItems: "center", gap: 8, padding: "7px 4px", opacity: 0.45 }}>
               <l.icon size={14} color="var(--c-text-muted)" />
-              <span style={{ fontSize: 12.5, color: "var(--c-text-muted)" }}>{l.label}</span>
-              <span style={{ marginLeft: "auto", fontSize: 9.5, fontWeight: 700, color: "var(--c-text-faint)" }}>Non connecté</span>
+              <span style={{ fontSize: T.body, color: "var(--c-text-muted)" }}>{l.label}</span>
+              <span style={{ marginLeft: "auto", fontSize: T.meta, fontWeight: 700, color: "var(--c-text-faint)" }}>Non connecté</span>
             </div>
           ))}
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 8, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 8, lineHeight: 1.5 }}>
             Ces sources ne sont pas encore branchées à une donnée réelle vérifiée — elles apparaissent pour montrer où elles s'intégreront, sans rien afficher de fictif.
           </div>
         </div>
@@ -1392,28 +1393,28 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
 
       {showFilters && (
         <div style={{ background: "var(--c-surface)", border: "1px solid var(--c-border)", borderRadius: 14, padding: 12, marginBottom: 10 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>{t(lang, "filtres_titre")}</div>
+          <div style={{ fontSize: T.meta, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>{t(lang, "filtres_titre")}</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            <select value={filtreCategorie} onChange={e => setFiltreCategorie(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }}>
+            <select value={filtreCategorie} onChange={e => setFiltreCategorie(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }}>
               <option value="">{t(lang, "toutes_categories")}</option>
               {[...CATEGORIES, ...Object.keys(ENV_PROBLEMES_INDEX).filter(code => !CATEGORIES.some(c => c.id === code)).map(code => ({ id: code }))].map(c => <option key={c.id} value={c.id}>{categorieLabel(lang, c.id)}</option>)}
             </select>
-            <select value={filtreStatut} onChange={e => setFiltreStatut(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }}>
+            <select value={filtreStatut} onChange={e => setFiltreStatut(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }}>
               <option value="">{t(lang, "tous_statuts")}</option>
               <option value="resolu">{t(lang, "resolu")}</option>
               <option value="en_cours">{t(lang, "statut_en_cours")}</option>
               <option value="en_attente">{t(lang, "en_attente")}</option>
             </select>
             <div>
-              <label style={{ fontSize: 11, color: "var(--c-text-muted)", display: "block", marginBottom: 4 }}>{t(lang, "depuis_le")}</label>
-              <input type="date" value={filtreDepuis} onChange={e => setFiltreDepuis(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }} />
+              <label style={{ fontSize: T.meta, color: "var(--c-text-muted)", display: "block", marginBottom: 4 }}>{t(lang, "depuis_le")}</label>
+              <input type="date" value={filtreDepuis} onChange={e => setFiltreDepuis(e.target.value)} style={{ width: "100%", padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }} />
             </div>
-            {layersOn.enquetes && <select value={filtreGraviteEnquete} onChange={e => setFiltreGraviteEnquete(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-bg)", color: "var(--c-text)" }}>
+            {layersOn.enquetes && <select value={filtreGraviteEnquete} onChange={e => setFiltreGraviteEnquete(e.target.value)} style={{ padding: "8px 10px", borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-bg)", color: "var(--c-text)" }}>
               <option value="">Enquêtes — toutes gravités</option>
               {ENQ_NIVEAUX.filter(n => n[0] !== "a_determiner").map(([v, l]) => <option key={v} value={v}>Enquêtes — {l}</option>)}
             </select>}
             {filtresActifs && (
-              <button onClick={resetFiltres} style={{ padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>{t(lang, "reinitialiser_filtres")}</button>
+              <button onClick={resetFiltres} style={{ padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text-secondary)", fontSize: T.small, fontWeight: 600, cursor: "pointer" }}>{t(lang, "reinitialiser_filtres")}</button>
             )}
           </div>
         </div>
@@ -1446,7 +1447,7 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
           <div style={{
             position: "absolute", bottom: fullscreen ? 16 : 10, left: fullscreen ? 16 : 10,
             background: "rgba(20,20,20,0.72)", color: "#fff", borderRadius: 8, padding: "5px 10px",
-            fontSize: 10.5, fontWeight: 600, zIndex: 10000, display: "flex", alignItems: "center", gap: 5, maxWidth: "70%" }}>
+            fontSize: T.meta, fontWeight: 600, zIndex: 10000, display: "flex", alignItems: "center", gap: 5, maxWidth: "70%" }}>
             <IconClock size={11} />
             {dateImagerie === undefined ? "Recherche de la date de l'imagerie…"
               : dateImagerie === null ? "Date de l'imagerie inconnue pour cette zone"
@@ -1471,7 +1472,7 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
         </button>
 
         {showGps && (
-          <div style={{ position: "absolute", top: fullscreen ? 18 : 10, right: fullscreen ? 66 : 56, background: "var(--c-surface)", borderRadius: 12, padding: "10px 12px", fontSize: 11.5, color: "var(--c-text)", boxShadow: "0 2px 10px rgba(0,0,0,0.25)", zIndex: 10000, minWidth: 180 }}>
+          <div style={{ position: "absolute", top: fullscreen ? 18 : 10, right: fullscreen ? 66 : 56, background: "var(--c-surface)", borderRadius: 12, padding: "10px 12px", fontSize: T.small, color: "var(--c-text)", boxShadow: "0 2px 10px rgba(0,0,0,0.25)", zIndex: 10000, minWidth: 180 }}>
             {!gpsData ? (
               <div style={{ color: "var(--c-text-muted)" }}>{t(lang, "gps_recherche_signal")}</div>
             ) : (
@@ -1485,7 +1486,7 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
                 <div>{t(lang, "gps_altitude_label")} : {gpsData.altitude != null ? Math.round(gpsData.altitude) + " m" : "—"}</div>
                 <div>{t(lang, "gps_vitesse_label")} : {formatVitesse(gpsData.speed)}</div>
                 <div>{t(lang, "gps_cap_label")} : {formatCap(gpsData.heading)}</div>
-                <div style={{ marginTop: 4, color: "var(--c-text-muted)", fontSize: 10.5 }}>{new Date(gpsData.timestamp).toLocaleTimeString("fr-FR")}</div>
+                <div style={{ marginTop: 4, color: "var(--c-text-muted)", fontSize: T.meta }}>{new Date(gpsData.timestamp).toLocaleTimeString("fr-FR")}</div>
               </>
             )}
           </div>
@@ -1517,13 +1518,13 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
             <div style={{ position: "absolute", top: "50%", left: `${compareSwipePos}%`, transform: "translate(-50%, -50%)", width: 34, height: 34, borderRadius: "50%", background: "#fff", boxShadow: "0 2px 6px rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 9001, pointerEvents: "none" }}>
               <IconTrendingUp size={15} color="var(--c-accent-dark)" />
             </div>
-            <div style={{ position: "absolute", top: fullscreen ? 16 : 10, left: fullscreen ? 16 : 10, background: "rgba(20,20,20,0.72)", color: "#fff", borderRadius: 8, padding: "5px 9px", fontSize: 10.5, fontWeight: 600, zIndex: 10000 }}>
+            <div style={{ position: "absolute", top: fullscreen ? 16 : 10, left: fullscreen ? 16 : 10, background: "rgba(20,20,20,0.72)", color: "#fff", borderRadius: 8, padding: "5px 9px", fontSize: T.meta, fontWeight: 600, zIndex: 10000 }}>
               {compareAnnee1}
             </div>
-            <div style={{ position: "absolute", top: fullscreen ? 16 : 10, right: fullscreen ? 66 : 56, background: "rgba(20,20,20,0.72)", color: "#fff", borderRadius: 8, padding: "5px 9px", fontSize: 10.5, fontWeight: 600, zIndex: 10000 }}>
+            <div style={{ position: "absolute", top: fullscreen ? 16 : 10, right: fullscreen ? 66 : 56, background: "rgba(20,20,20,0.72)", color: "#fff", borderRadius: 8, padding: "5px 9px", fontSize: T.meta, fontWeight: 600, zIndex: 10000 }}>
               {compareAnnee2}
             </div>
-            <div style={{ position: "absolute", bottom: fullscreen ? 16 : 10, left: fullscreen ? 16 : 10, right: fullscreen ? 16 : 10, background: (compareErreurAvant || compareErreurApres || compareVerif === "identiques" || compareVerif === "erreur") ? "#B5451B" : compareVerif === "distinctes" ? "rgba(22,101,52,0.85)" : "rgba(20,20,20,0.72)", color: "#fff", borderRadius: 8, padding: "5px 10px", fontSize: 9.5, fontWeight: 600, zIndex: 10000, textAlign: "center" }}>
+            <div style={{ position: "absolute", bottom: fullscreen ? 16 : 10, left: fullscreen ? 16 : 10, right: fullscreen ? 16 : 10, background: (compareErreurAvant || compareErreurApres || compareVerif === "identiques" || compareVerif === "erreur") ? "#B5451B" : compareVerif === "distinctes" ? "rgba(22,101,52,0.85)" : "rgba(20,20,20,0.72)", color: "#fff", borderRadius: 8, padding: "5px 10px", fontSize: T.meta, fontWeight: 600, zIndex: 10000, textAlign: "center" }}>
               {compareErreurAvant && compareErreurApres
                 ? `Aucune des deux mosaïques (${compareAnnee1} et ${compareAnnee2}) n'a pu être chargée — vérifiez la connexion ou essayez d'autres années.`
                 : compareErreurAvant
@@ -1541,7 +1542,7 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
                 : `Sentinel-2 cloudless (EOX/Copernicus) — glissez pour comparer ${compareAnnee1} et ${compareAnnee2}`}
             </div>
             {mapRef.current && mapRef.current.getZoom() > SENTINEL2_ZOOM_NATIF_MAX && (
-              <div style={{ position: "absolute", bottom: fullscreen ? 46 : 40, left: fullscreen ? 16 : 10, right: fullscreen ? 16 : 10, background: "rgba(20,20,20,0.72)", color: "#fff", borderRadius: 8, padding: "4px 10px", fontSize: 9, zIndex: 10000, textAlign: "center" }}>
+              <div style={{ position: "absolute", bottom: fullscreen ? 46 : 40, left: fullscreen ? 16 : 10, right: fullscreen ? 16 : 10, background: "rgba(20,20,20,0.72)", color: "#fff", borderRadius: 8, padding: "4px 10px", fontSize: T.meta, zIndex: 10000, textAlign: "center" }}>
                 Zoom au-delà de la résolution native Sentinel-2 (~10 m/pixel, zoom ≈{SENTINEL2_ZOOM_NATIF_MAX}) : l'image est interpolée pour les deux dates, ce qui peut donner une impression de flou indépendante d'un vrai changement.
               </div>
             )}
@@ -1549,20 +1550,20 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
         )}
 
         {locating && (
-          <div style={{ position: "absolute", top: fullscreen ? 18 : 10, left: fullscreen ? 16 : 10, background: "var(--c-surface)", borderRadius: 20, padding: "5px 12px", fontSize: 11.5, color: "var(--c-text-secondary)", boxShadow: "0 2px 6px rgba(0,0,0,0.15)", zIndex: 10000 }}>
+          <div style={{ position: "absolute", top: fullscreen ? 18 : 10, left: fullscreen ? 16 : 10, background: "var(--c-surface)", borderRadius: 20, padding: "5px 12px", fontSize: T.small, color: "var(--c-text-secondary)", boxShadow: "0 2px 6px rgba(0,0,0,0.15)", zIndex: 10000 }}>
             {t(lang, "geoloc_en_cours")}
           </div>
         )}
 
         {locateError && !locating && (
-          <div style={{ position: "absolute", bottom: fullscreen ? 16 : 10, left: fullscreen ? 16 : 10, right: fullscreen ? 16 : 10, background: "#B5451B", color: "#fff", borderRadius: 10, padding: "9px 12px", fontSize: 11.5, boxShadow: "0 2px 8px rgba(0,0,0,0.25)", zIndex: 10000, display: "flex", alignItems: "center", gap: 8 }}>
+          <div style={{ position: "absolute", bottom: fullscreen ? 16 : 10, left: fullscreen ? 16 : 10, right: fullscreen ? 16 : 10, background: "#B5451B", color: "#fff", borderRadius: 10, padding: "9px 12px", fontSize: T.small, boxShadow: "0 2px 8px rgba(0,0,0,0.25)", zIndex: 10000, display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{ flex: 1 }}>{locateError}</span>
-            <button onClick={() => setLocateError("")} style={{ background: "none", border: "none", color: "#fff", fontSize: 14, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
+            <button onClick={() => setLocateError("")} style={{ background: "none", border: "none", color: "#fff", fontSize: T.body, cursor: "pointer", padding: 0, lineHeight: 1 }}>✕</button>
           </div>
         )}
 
         {aucuneCoucheActive && !locating && (
-          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: "var(--c-surface)", borderRadius: 14, padding: "12px 16px", fontSize: 12, color: "var(--c-text-secondary)", boxShadow: "0 2px 10px rgba(0,0,0,0.15)", zIndex: 9998, textAlign: "center", maxWidth: 220 }}>
+          <div style={{ position: "absolute", top: "50%", left: "50%", transform: "translate(-50%,-50%)", background: "var(--c-surface)", borderRadius: 14, padding: "12px 16px", fontSize: T.small, color: "var(--c-text-secondary)", boxShadow: "0 2px 10px rgba(0,0,0,0.15)", zIndex: 9998, textAlign: "center", maxWidth: 220 }}>
             {t(lang, "aucune_couche_active")}
           </div>
         )}
@@ -1576,7 +1577,7 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
 
       {!fullscreen && (
         <>
-          <div style={{ display: "flex", gap: 14, marginTop: 12, fontSize: 11.5, color: "var(--c-text-secondary)", flexWrap: "wrap" }}>
+          <div style={{ display: "flex", gap: 14, marginTop: 12, fontSize: T.small, color: "var(--c-text-secondary)", flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}><span style={{ width: 10, height: 10, borderRadius: "50% 50% 50% 0", background: "#B5451B", transform: "rotate(-45deg)", display: "inline-block" }}></span> {t(lang, "type_signalement")}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}><IconTree size={13} color="var(--c-accent)" /> {t(lang, "legend_arbre_plante")}</div>
             <div style={{ display: "flex", alignItems: "center", gap: 4 }}><IconSprout size={13} color="var(--c-sky)" /> {t(lang, "layer_biodiversite")}</div>
@@ -1590,14 +1591,14 @@ export function Carte({ signalements, arbres, observations, enquetesCarte, onAdd
             ))}
           </div>
 
-          <div style={{ fontFamily: "Fraunces, serif", fontSize: 14.5, fontWeight: 600, color: "var(--c-accent-dark)", marginTop: 18, marginBottom: 10 }}>{t(lang, "tableau_bord_zone")}</div>
+          <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginTop: 18, marginBottom: 10 }}>{t(lang, "tableau_bord_zone")}</div>
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(120px, 1fr))", gap: 8 }}>
             <StatCard label={t(lang, "stat_donnees_affichees")} value={totalVisible} unit="" accent="var(--c-accent-dark)" />
             <StatCard label={t(lang, "layer_arbres")} value={visibleCount.arbres} unit="" accent="var(--c-accent)" />
             <StatCard label={t(lang, "stat_signalements")} value={visibleCount.dechets + visibleCount.pollution + visibleCount.signalements} unit="" accent="#B5451B" />
             <StatCard label={t(lang, "layer_biodiversite")} value={visibleCount.biodiversite} unit="" accent="var(--c-sky)" />
           </div>
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 6, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 6, lineHeight: 1.5 }}>
             {t(lang, "note_reboisement")}
           </div>
 

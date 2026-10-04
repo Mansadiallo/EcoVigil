@@ -3,6 +3,7 @@ import { IconSend, IconSparkles } from "../components/icons.jsx";
 import { Screen, SectionTitle } from "../components/ui.jsx";
 import { categorieMeta } from "../lib/categories.jsx";
 import { co2EstimeParArbre } from "../lib/utils.js";
+import { T } from "../lib/typo.jsx";
 
 const ASSISTANT_KB = [
   { id: "dechets", keywords: ["déchet", "dechets", "recycl", "tri", "plastique", "poubelle", "ordure", "compost"],
@@ -91,7 +92,7 @@ export function AssistantIA({ onBack, signalements, arbres, observations, actual
 
   return (
     <Screen>
-      <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 12.5, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Retour</button>
+      <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.body, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Retour</button>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 14 }}>
         <div style={{ background: "var(--c-surface-soft)", borderRadius: 10, padding: 8 }}><IconSparkles size={17} color="var(--c-accent)" /></div>
         <SectionTitle sub="Mode simplifié, sans IA — réponses par mots-clés.">Assistant de Décisions Environnementales</SectionTitle>
@@ -104,14 +105,14 @@ export function AssistantIA({ onBack, signalements, arbres, observations, actual
               maxWidth: "82%", padding: "10px 13px", borderRadius: 14,
               background: m.role === "user" ? "var(--c-accent-dark)" : "var(--c-surface)",
               color: m.role === "user" ? "#fff" : "var(--c-text)",
-              border: m.role === "user" ? "none" : "1px solid var(--c-border)", fontSize: 13, lineHeight: 1.5 }}>
+              border: m.role === "user" ? "none" : "1px solid var(--c-border)", fontSize: T.body, lineHeight: 1.5 }}>
               {m.text}
             </div>
           </div>
         ))}
         {busy && (
           <div style={{ display: "flex", justifyContent: "flex-start" }}>
-            <div style={{ padding: "10px 13px", borderRadius: 14, background: "var(--c-surface)", border: "1px solid var(--c-border)", fontSize: 13, color: "var(--c-text-muted)" }}>
+            <div style={{ padding: "10px 13px", borderRadius: 14, background: "var(--c-surface)", border: "1px solid var(--c-border)", fontSize: T.body, color: "var(--c-text-muted)" }}>
               …
             </div>
           </div>
@@ -123,7 +124,7 @@ export function AssistantIA({ onBack, signalements, arbres, observations, actual
         <div style={{ display: "flex", alignItems: "flex-end", gap: 8 }}>
           <textarea value={input} onChange={e => setInput(e.target.value)} placeholder="Pose ta question…" rows={1}
             onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); send(); } }}
-            style={{ flex: 1, border: "none", outline: "none", resize: "none", fontSize: 13, fontFamily: "Work Sans, sans-serif", maxHeight: 80 }} />
+            style={{ flex: 1, border: "none", outline: "none", resize: "none", fontSize: T.field, maxHeight: 80 }} />
           <button onClick={send} disabled={busy || !input.trim()} style={{
             background: (busy || !input.trim()) ? "var(--c-text-faint)" : "var(--c-accent-dark)", border: "none", borderRadius: "50%",
             width: 32, height: 32, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", flexShrink: 0 }}>

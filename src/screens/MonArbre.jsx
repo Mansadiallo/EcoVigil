@@ -7,6 +7,7 @@ import { LocationPrecision, ZoneReboisementMap } from "../lib/carteUtils.jsx";
 import { t } from "../lib/i18n.js";
 import { DEVICE_ID } from "../lib/supabase.js";
 import { formatCoordonnees } from "../lib/utils.js";
+import { T } from "../lib/typo.jsx";
 
 const ETAT_SUIVI = { vivant: { label: "En bonne santé", color: "var(--c-accent)" }, stresse: { label: "En difficulté", color: "var(--c-warning)" }, mort: { label: "Mort", color: "#B5451B" } };
 
@@ -139,73 +140,73 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat 
       <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--c-border)", marginBottom: 14 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <IconLayers size={15} color="var(--c-accent-dark)" />
-          <div style={{ fontSize: 13, fontWeight: 600 }}>Surface à reboiser</div>
+          <div style={{ fontSize: T.body, fontWeight: 600 }}>Surface à reboiser</div>
         </div>
 
         {zoneReboisement === undefined ? (
-          <div style={{ fontSize: 12, color: "var(--c-text-muted)" }}>Chargement…</div>
+          <div style={{ fontSize: T.small, color: "var(--c-text-muted)" }}>Chargement…</div>
         ) : !showEditeurZone && zoneReboisement ? (
           <div>
-            <div style={{ fontSize: 12.5, marginBottom: 4 }}>
+            <div style={{ fontSize: T.body, marginBottom: 4 }}>
               Superficie déclarée : <b>{formatSuperficie(zoneReboisement.superficie_m2)}</b> ({zoneReboisement.points.length} points)
             </div>
             {typeof zoneReboisement.superficie_estimee_m2 === "number" && (
-              <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 2 }}>
+              <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 2 }}>
                 Estimation d'après le contour : {formatSuperficie(zoneReboisement.superficie_estimee_m2)}
               </div>
             )}
-            <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 10 }}>
+            <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 10 }}>
               Définie le {new Date(zoneReboisement.date).toLocaleDateString("fr-FR")}
             </div>
             <ZoneReboisementMap points={zoneReboisement.points} superficieAffichee={formatSuperficie(zoneReboisement.superficie_m2)} />
             <div style={{ display: "flex", gap: 8 }}>
-              <button onClick={ouvrirEditeurZone} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>
+              <button onClick={ouvrirEditeurZone} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>
                 Redéfinir la surface
               </button>
-              <button onClick={supprimerZoneReboisementCitoyen} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--c-danger-border-soft)", background: "var(--c-surface)", color: "#B5451B", fontWeight: 600, fontSize: 11.5, cursor: "pointer" }}>
+              <button onClick={supprimerZoneReboisementCitoyen} style={{ padding: "7px 12px", borderRadius: 8, border: "1px solid var(--c-danger-border-soft)", background: "var(--c-surface)", color: "#B5451B", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>
                 Supprimer définitivement
               </button>
             </div>
           </div>
         ) : !showEditeurZone && !zoneReboisement ? (
           <div>
-            <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
+            <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
               Avant d'enregistrer des arbres, définissez la surface à reboiser en plaçant au moins 4 points de coordonnées délimitant son contour, puis renseignez la superficie réelle du terrain (m² ou ha).
             </div>
-            <button onClick={ouvrirEditeurZone} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "9px 14px", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+            <button onClick={ouvrirEditeurZone} style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "9px 14px", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
               <IconPlus size={15} /> Définir la surface à reboiser
             </button>
           </div>
         ) : (
           <div>
-            <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
+            <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
               Ajoutez au moins 4 points de coordonnées pour délimiter le contour de la surface.
             </div>
 
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
               <input value={latPointTemp} onChange={e => setLatPointTemp(e.target.value)} placeholder="Latitude" inputMode="decimal"
-                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, boxSizing: "border-box" }} />
+                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
               <input value={lngPointTemp} onChange={e => setLngPointTemp(e.target.value)} placeholder="Longitude" inputMode="decimal"
-                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, boxSizing: "border-box" }} />
-              <button onClick={ajouterPointManuel} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 12, cursor: "pointer", whiteSpace: "nowrap" }}>
+                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
+              <button onClick={ajouterPointManuel} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Ajouter
               </button>
             </div>
 
             <div style={{ marginBottom: 10 }}>
               <LocationPrecision coordFormat={coordFormat} onUpdate={setGpsPointTemp} compact />
-              <button onClick={ajouterPointDepuisGps} disabled={!gpsPointTemp} style={{ marginTop: 6, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: gpsPointTemp ? "var(--c-text)" : "var(--c-text-faint)", fontWeight: 600, fontSize: 11.5, cursor: gpsPointTemp ? "pointer" : "default" }}>
+              <button onClick={ajouterPointDepuisGps} disabled={!gpsPointTemp} style={{ marginTop: 6, padding: "7px 12px", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: gpsPointTemp ? "var(--c-text)" : "var(--c-text-faint)", fontWeight: 600, fontSize: T.small, cursor: gpsPointTemp ? "pointer" : "default" }}>
                 Ajouter ma position actuelle comme point
               </button>
             </div>
 
-            {erreurZone && <div role="alert" style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>{erreurZone}</div>}
+            {erreurZone && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 8 }}>{erreurZone}</div>}
 
             {pointsZoneTemp.length > 0 && (
               <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 10 }}>
                 {pointsZoneTemp.map((p, i) => (
-                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--c-bg)", borderRadius: 8, padding: "6px 10px", fontSize: 11.5 }}>
-                    <span>Point {i + 1} — {formatCoordonnees(p.lat, p.lng, coordFormat)}</span>
+                  <div key={i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", background: "var(--c-bg)", borderRadius: 8, padding: "6px 10px", fontSize: T.small }}>
+                    <span style={{ fontVariantNumeric: "tabular-nums" }}>Point {i + 1} — {formatCoordonnees(p.lat, p.lng, coordFormat)}</span>
                     <button onClick={() => retirerPoint(i)} aria-label="Retirer" style={{ background: "none", border: "none", color: "#B5451B", cursor: "pointer", padding: 2 }}><IconTrash size={13} /></button>
                   </div>
                 ))}
@@ -219,21 +220,21 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat 
               />
             )}
 
-            <div style={{ fontSize: 11.5, color: "var(--c-text-muted)", marginBottom: 8 }}>
+            <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginBottom: 8 }}>
               Estimation d'après le contour {pointsZoneTemp.length < 4 ? "(ajoutez au moins 4 points)" : ""} : {formatSuperficie(superficieTempM2)}
             </div>
 
-            <div style={{ fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>
+            <div style={{ fontSize: T.body, fontWeight: 600, marginBottom: 6 }}>
               Superficie à reboiser (obligatoire)
             </div>
-            <div style={{ fontSize: 11, color: "var(--c-text-secondary)", marginBottom: 8, lineHeight: 1.5 }}>
+            <div style={{ fontSize: T.meta, color: "var(--c-text-secondary)", marginBottom: 8, lineHeight: 1.5 }}>
               Renseignez la superficie réelle du terrain (ex. relevé topographique ou titre foncier) ; l'estimation ci-dessus n'est qu'indicative.
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
               <input value={superficieSaisie} onChange={e => setSuperficieSaisie(e.target.value)} placeholder="Superficie" inputMode="decimal"
-                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, boxSizing: "border-box" }} />
+                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
               <select value={uniteSuperficieSaisie} onChange={e => setUniteSuperficieSaisie(e.target.value)}
-                style={{ padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, background: "var(--c-surface)", color: "var(--c-text)" }}>
+                style={{ padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-surface)", color: "var(--c-text)" }}>
                 <option value="m2">m²</option>
                 <option value="ha">ha</option>
               </select>
@@ -241,11 +242,11 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat 
 
             <button onClick={enregistrerZoneReboisement} disabled={pointsZoneTemp.length < 4 || !superficieSaisie.trim()} style={{
               padding: "9px 14px", borderRadius: 10, border: "none",
-              background: (pointsZoneTemp.length < 4 || !superficieSaisie.trim()) ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 12.5,
+              background: (pointsZoneTemp.length < 4 || !superficieSaisie.trim()) ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body,
               cursor: (pointsZoneTemp.length < 4 || !superficieSaisie.trim()) ? "default" : "pointer", marginRight: 8 }}>
               Enregistrer la surface
             </button>
-            <button onClick={() => setShowEditeurZone(false)} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>
+            <button onClick={() => setShowEditeurZone(false)} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-text-secondary)", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
               Annuler
             </button>
           </div>
@@ -253,24 +254,24 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat 
       </div>
 
       {!showForm && zoneReboisement && (
-        <button onClick={() => setShowForm(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer", marginBottom: 16 }}>
+        <button onClick={() => setShowForm(true)} style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "12px 0", borderRadius: 12, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 16 }}>
           <IconPlus size={16} /> {t(lang, "btn_planter")}
         </button>
       )}
       {showForm && (
         <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: 14, border: "1px solid var(--c-border)", marginBottom: 16 }}>
           <PhotoCaptureButton photo={photo} onChange={setPhoto} label="Photo de l'arbre" previewMaxHeight={130} />
-          <input value={nom} onChange={e => { setNom(e.target.value); if (erreur) setErreur(""); }} placeholder="Espèce (ex : Manguier, Teck...)" style={{ width: "100%", padding: 10, borderRadius: 10, border: erreur ? "1px solid var(--c-danger)" : "1px solid var(--c-border)", fontSize: 13, marginBottom: erreur ? 4 : 10, boxSizing: "border-box" }} />
-          {erreur && <div style={{ color: "var(--c-danger)", fontSize: 11.5, marginBottom: 10 }}>{erreur}</div>}
+          <input value={nom} onChange={e => { setNom(e.target.value); if (erreur) setErreur(""); }} placeholder="Espèce (ex : Manguier, Teck...)" style={{ width: "100%", padding: 10, borderRadius: 10, border: erreur ? "1px solid var(--c-danger)" : "1px solid var(--c-border)", fontSize: T.field, marginBottom: erreur ? 4 : 10, boxSizing: "border-box" }} />
+          {erreur && <div style={{ color: "var(--c-danger)", fontSize: T.small, marginBottom: 10 }}>{erreur}</div>}
           <LocationPrecision coordFormat={coordFormat} onUpdate={(fix) => { setGpsFix(fix); if (erreur) setErreur(""); }} compact />
           <div style={{ display: "flex", gap: 8 }}>
-            <button onClick={() => { setShowForm(false); setErreur(""); }} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: 13 }}>Annuler</button>
-            <button onClick={submit} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 13 }}>Enregistrer</button>
+            <button onClick={() => { setShowForm(false); setErreur(""); }} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: T.body }}>Annuler</button>
+            <button onClick={submit} style={{ flex: 1, padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: T.body }}>Enregistrer</button>
           </div>
         </div>
       )}
       {arbres.length === 0 && !showForm && (
-        <div style={{ color: "var(--c-text-muted)", fontSize: 13.5, background: "var(--c-surface)", padding: 16, borderRadius: 12, border: "1px dashed var(--c-border-soft)", textAlign: "center" }}>
+        <div style={{ color: "var(--c-text-muted)", fontSize: T.body, background: "var(--c-surface)", padding: 16, borderRadius: 12, border: "1px dashed var(--c-border-soft)", textAlign: "center" }}>
           <IconSprout size={22} /><div style={{marginTop: 6}}>Aucun arbre enregistré pour le moment.</div>
         </div>
       )}
@@ -295,17 +296,17 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat 
                 )}
               </div>
               <div style={{ flex: 1 }}>
-                <div style={{ fontWeight: 600, fontSize: 13.5, color: "var(--c-text)" }}>{a.nom}</div>
-                <div style={{ fontSize: 11.5, color: "var(--c-text-muted)" }}>Planté le {a.date}</div>
-                {etatInfo && <div style={{ fontSize: 10.5, fontWeight: 600, color: etatInfo.color, marginTop: 2 }}>{etatInfo.label} · suivi il y a {jours} j</div>}
+                <div style={{ fontWeight: 600, fontSize: T.body, color: "var(--c-text)" }}>{a.nom}</div>
+                <div style={{ fontSize: T.small, color: "var(--c-text-muted)" }}>Planté le {a.date}</div>
+                {etatInfo && <div style={{ fontSize: T.meta, fontWeight: 600, color: etatInfo.color, marginTop: 2 }}>{etatInfo.label} · suivi il y a {jours} j</div>}
               </div>
               <button onClick={() => shareContent("Mon arbre sur EcoVigil", `Je viens d'enregistrer un ${a.nom} sur EcoVigil 🌱 Ensemble pour un avenir durable.`)}
                 style={{ background: "none", border: "none", cursor: "pointer", color: "var(--c-text-muted)", padding: 6 }}><IconShare size={16} /></button>
-              <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 13, color: "var(--c-accent)", fontWeight: 600 }}>{growth(a)}%</div>
+              <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: T.body, color: "var(--c-accent)", fontWeight: 600 }}>{growth(a)}%</div>
             </div>
 
             {rappel && suiviOuvert !== a.id && (
-              <div style={{ marginTop: 8, fontSize: 11, fontWeight: 600, color: "var(--c-warning)", background: "var(--c-warning-bg)", borderRadius: 8, padding: "6px 8px" }}>
+              <div style={{ marginTop: 8, fontSize: T.meta, fontWeight: 600, color: "var(--c-warning)", background: "var(--c-warning-bg)", borderRadius: 8, padding: "6px 8px" }}>
                 🔔 Suivi recommandé — dernière preuve de croissance il y a {jours} jours
               </div>
             )}
@@ -313,7 +314,7 @@ export function MonArbre({ arbres, suivis, onAdd, onAddSuivi, lang, coordFormat 
             {suiviOuvert === a.id ? (
               <SuiviForm arbre={a} onCancel={() => setSuiviOuvert(null)} onSave={async (payload) => { await onAddSuivi(a.id, payload); setSuiviOuvert(null); }} />
             ) : (
-              <button onClick={() => setSuiviOuvert(a.id)} style={{ marginTop: 8, width: "100%", padding: "8px 0", borderRadius: 8, border: "1px dashed var(--c-text-faint)", background: "var(--c-surface-dashed)", color: "var(--c-text-secondary)", fontSize: 12, cursor: "pointer" }}>
+              <button onClick={() => setSuiviOuvert(a.id)} style={{ marginTop: 8, width: "100%", padding: "8px 0", borderRadius: 8, border: "1px dashed var(--c-text-faint)", background: "var(--c-surface-dashed)", color: "var(--c-text-secondary)", fontSize: T.small, cursor: "pointer" }}>
                 + Ajouter une preuve de suivi (photo récente)
               </button>
             )}
@@ -334,13 +335,13 @@ function SuiviForm({ onSave, onCancel }) {
   return (
     <div style={{ marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--c-border-soft)" }}>
       <PhotoCaptureButton photo={photo} onChange={setPhoto} label="Photo de suivi" previewMaxHeight={120} compact />
-      <select value={etat} onChange={e => setEtat(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, marginBottom: 8, boxSizing: "border-box" }}>
+      <select value={etat} onChange={e => setEtat(e.target.value)} style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" }}>
         {Object.entries(ETAT_SUIVI).map(([id, v]) => <option key={id} value={id}>{v.label}</option>)}
       </select>
-      <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optionnel)" style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: 12.5, marginBottom: 8, boxSizing: "border-box" }} />
+      <input value={note} onChange={e => setNote(e.target.value)} placeholder="Note (optionnel)" style={{ width: "100%", padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" }} />
       <div style={{ display: "flex", gap: 8 }}>
-        <button onClick={onCancel} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: 12.5 }}>Annuler</button>
-        <button disabled={busy} onClick={async () => { setBusy(true); await onSave({ photo, etat, note }); setBusy(false); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: 12.5 }}>
+        <button onClick={onCancel} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "1px solid var(--c-border)", background: "var(--c-surface)", cursor: "pointer", fontSize: T.body }}>Annuler</button>
+        <button disabled={busy} onClick={async () => { setBusy(true); await onSave({ photo, etat, note }); setBusy(false); }} style={{ flex: 1, padding: "8px 0", borderRadius: 8, border: "none", background: "var(--c-accent)", color: "#fff", fontWeight: 600, cursor: "pointer", fontSize: T.body }}>
           {busy ? "Envoi…" : "Enregistrer le suivi"}
         </button>
       </div>
