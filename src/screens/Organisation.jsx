@@ -5,6 +5,7 @@ import { IconAlert, IconCheck, IconClock, IconEdit, IconShield } from "../compon
 import { champTexte } from "../lib/categories.jsx";
 import { persistSession, supabase, urlRedirectionAuth } from "../lib/supabase.js";
 import { ProfilEditeur, ProfilGate } from "./Profil.jsx";
+import { T, TITRE_SOUS, TITRE_SECTION } from "../lib/typo.jsx";
 
 const VERIF_DOC_TYPE_AGREMENT = "Récépissé / agrément officiel";
 
@@ -265,23 +266,23 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
       <div style={{ marginTop: 14, background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)" }}>
         <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
           <IconShield size={17} color="var(--c-accent-dark)" />
-          <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)" }}>Compte Organisation</div>
+          <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)" }}>Compte Organisation</div>
         </div>
-        <div style={{ display: "inline-block", fontSize: 10.5, fontWeight: 700, color: "#fff", background: info.couleur, borderRadius: 999, padding: "3px 10px", marginBottom: 8 }}>{info.label}</div>
-        <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.5 }}>{info.texte}</div>
+        <div style={{ display: "inline-block", fontSize: T.meta, fontWeight: 700, color: "#fff", background: info.couleur, borderRadius: 999, padding: "3px 10px", marginBottom: 8 }}>{info.label}</div>
+        <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", lineHeight: 1.5 }}>{info.texte}</div>
         {organisationEtapeMotif && organisationStatut === "en_attente" && (
-          <div style={{ fontSize: 11.5, color: "var(--c-text-secondary)", lineHeight: 1.5, marginTop: 6, fontStyle: "italic" }}>{organisationEtapeMotif}</div>
+          <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", lineHeight: 1.5, marginTop: 6, fontStyle: "italic" }}>{organisationEtapeMotif}</div>
         )}
       </div>
     );
   }
 
-  const champStyle = { width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8, boxSizing: "border-box" };
-  const labelStyle = { fontSize: 11, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 4 };
+  const champStyle = { width: "100%", padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8, boxSizing: "border-box" };
+  const labelStyle = { fontSize: T.meta, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 4 };
   const sectionTitre = (n, titre) => (
     <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "16px 0 8px" }}>
-      <span style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--c-accent-dark)", color: "#fff", fontSize: 10.5, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{n}</span>
-      <span style={{ fontFamily: "Fraunces, serif", fontSize: 13.5, fontWeight: 600, color: "var(--c-text)" }}>{titre}</span>
+      <span style={{ width: 20, height: 20, borderRadius: "50%", background: "var(--c-accent-dark)", color: "#fff", fontSize: T.meta, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 }}>{n}</span>
+      <span style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-text)" }}>{titre}</span>
     </div>
   );
 
@@ -289,62 +290,62 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
     <div style={{ marginTop: 14, background: "var(--c-surface)", borderRadius: 14, padding: 16, border: "1px solid var(--c-border)" }}>
       <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
         <IconShield size={17} color="var(--c-accent-dark)" />
-        <div style={{ fontFamily: "Fraunces, serif", fontSize: 15, fontWeight: 600, color: "var(--c-accent-dark)" }}>Compte Organisation</div>
+        <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)" }}>Compte Organisation</div>
       </div>
 
       {done ? (
-        <div style={{ fontSize: 12.5, color: "var(--c-accent)", display: "flex", alignItems: "flex-start", gap: 6, lineHeight: 1.5 }}>
+        <div style={{ fontSize: T.body, color: "var(--c-accent)", display: "flex", alignItems: "flex-start", gap: 6, lineHeight: 1.5 }}>
           <IconCheck size={14} style={{ marginTop: 2, flexShrink: 0 }} />
           <span>Votre dossier a été transmis avec succès et est actuellement en attente de vérification. Confirme d'abord ton e-mail, puis attends la vérification par l'équipe EcoVigil.</span>
         </div>
       ) : mode === "choix" ? (
         <>
-          <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", marginBottom: 10 }}>Pour une ONG ou une administration publique intervenant dans un ou plusieurs domaines environnementaux.</div>
-          <button onClick={() => setMode(profilInfo ? "inscription" : "profil_requis")} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-accent-dark)", background: "var(--c-surface)", color: "var(--c-accent-dark)", fontWeight: 600, fontSize: 12.5, cursor: "pointer", marginRight: 8, marginBottom: 8 }}>Constituer un dossier</button>
-          <button onClick={() => setMode("connexion")} style={{ padding: "9px 14px", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontWeight: 600, fontSize: 12.5, cursor: "pointer", marginBottom: 8 }}>Déjà inscrit ? Se connecter</button>
+          <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginBottom: 10 }}>Pour une ONG ou une administration publique intervenant dans un ou plusieurs domaines environnementaux.</div>
+          <button onClick={() => setMode(profilInfo ? "inscription" : "profil_requis")} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-accent-dark)", background: "var(--c-surface)", color: "var(--c-accent-dark)", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginRight: 8, marginBottom: 8 }}>Constituer un dossier</button>
+          <button onClick={() => setMode("connexion")} style={{ padding: "9px 14px", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 8 }}>Déjà inscrit ? Se connecter</button>
           <div>
-            <button onClick={() => setMode("membre")} style={{ padding: "9px 14px", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontWeight: 600, fontSize: 12.5, cursor: "pointer" }}>Membre invité par une organisation ? Saisir mon code</button>
+            <button onClick={() => setMode("membre")} style={{ padding: "9px 14px", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>Membre invité par une organisation ? Saisir mon code</button>
           </div>
         </>
       ) : mode === "connexion" ? (
         <form onSubmit={seConnecter}>
           <input required type="email" value={loginEmail} onChange={e => setLoginEmail(e.target.value)} placeholder="Adresse e-mail de l'organisation" style={champStyle} />
           <PasswordInput value={loginPassword} onChange={e => setLoginPassword(e.target.value)} placeholder="Mot de passe"
-            style={{ padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 6 }} />
-          <button type="button" onClick={motDePasseOublie} disabled={oublieBusy} style={{ display: "block", marginLeft: "auto", background: "none", border: "none", color: "var(--c-accent-dark)", fontSize: 11.5, fontWeight: 600, cursor: "pointer", padding: "2px 0 8px" }}>
+            style={{ padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 6 }} />
+          <button type="button" onClick={motDePasseOublie} disabled={oublieBusy} style={{ display: "block", marginLeft: "auto", background: "none", border: "none", color: "var(--c-accent-dark)", fontSize: T.small, fontWeight: 600, cursor: "pointer", padding: "2px 0 8px" }}>
             {oublieBusy ? "…" : "Mot de passe oublié ?"}
           </button>
-          {oublieMessage && <div role="status" style={{ fontSize: 12, color: "var(--c-text-secondary)", marginBottom: 10 }}>{oublieMessage}</div>}
-          {loginErreur && <div role="alert" style={{ fontSize: 12, color: "#B5451B", marginBottom: 10 }}>{loginErreur}</div>}
-          <button type="button" onClick={seConnecter} disabled={loginBusy} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 8 }}>
+          {oublieMessage && <div role="status" style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginBottom: 10 }}>{oublieMessage}</div>}
+          {loginErreur && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 10 }}>{loginErreur}</div>}
+          <button type="button" onClick={seConnecter} disabled={loginBusy} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 8 }}>
             {loginBusy ? "…" : "Se connecter"}
           </button>
-          <button type="button" onClick={() => setMode("choix")} style={{ width: "100%", padding: "8px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: 12, cursor: "pointer" }}>Retour</button>
+          <button type="button" onClick={() => setMode("choix")} style={{ width: "100%", padding: "8px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: T.small, cursor: "pointer" }}>Retour</button>
         </form>
       ) : mode === "membre" ? (
         <div>
-          <div style={{ fontSize: 12, color: "var(--c-text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginBottom: 10, lineHeight: 1.5 }}>
             Si le compte principal de ton organisation t'a donné un code d'invitation (ou te l'a envoyé sur WhatsApp), saisis-le ici pour accéder à l'Espace Organisation.
           </div>
           {membreRejoint ? (
-            <div style={{ fontSize: 12.5, color: "var(--c-accent)", fontWeight: 600 }}>
+            <div style={{ fontSize: T.body, color: "var(--c-accent)", fontWeight: 600 }}>
               Tu as bien rejoint « {membreRejoint} ». L'Espace Organisation est accessible depuis l'accueil.
             </div>
           ) : (
             <form onSubmit={rejoindreParCode}>
               <input required value={codeMembre} onChange={e => setCodeMembre(e.target.value.toUpperCase())} placeholder="Code d'invitation (ex. A1B2C3D4)"
                 style={{ ...champStyle, textTransform: "uppercase", letterSpacing: 1 }} />
-              {membreErreur && <div role="alert" style={{ fontSize: 12, color: "#B5451B", marginBottom: 10 }}>{membreErreur}</div>}
-              <button type="button" onClick={rejoindreParCode} disabled={membreBusy} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 8 }}>
+              {membreErreur && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 10 }}>{membreErreur}</div>}
+              <button type="button" onClick={rejoindreParCode} disabled={membreBusy} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 8 }}>
                 {membreBusy ? "…" : "Valider le code"}
               </button>
-              <button type="button" onClick={() => setMode("choix")} style={{ width: "100%", padding: "8px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: 12, cursor: "pointer" }}>Retour</button>
+              <button type="button" onClick={() => setMode("choix")} style={{ width: "100%", padding: "8px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: T.small, cursor: "pointer" }}>Retour</button>
             </form>
           )}
         </div>
       ) : mode === "recapitulatif" ? (
         <div>
-          <div style={{ fontSize: 12, color: "var(--c-text-muted)", marginBottom: 10, lineHeight: 1.5 }}>Vérifie les informations avant de soumettre ton dossier. Tu peux revenir en arrière pour corriger.</div>
+          <div style={{ fontSize: T.small, color: "var(--c-text-muted)", marginBottom: 10, lineHeight: 1.5 }}>Vérifie les informations avant de soumettre ton dossier. Tu peux revenir en arrière pour corriger.</div>
           {[
             ["Type d'organisation", type === "ong" ? `ONG${typeOng ? " · " + ({ nationale: "nationale", etrangere: "étrangère", autre: "autre catégorie" })[typeOng] : ""}` : "Gouvernement"],
             ["Nom officiel", nom],
@@ -366,22 +367,22 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
             ["Code d'inscription bénévoles", codeInscription.toUpperCase()],
             ["E-mail de connexion", email],
           ].map(([k, v]) => (
-            <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: 12, padding: "6px 0", borderBottom: "1px solid var(--c-border)" }}>
+            <div key={k} style={{ display: "flex", justifyContent: "space-between", gap: 10, fontSize: T.small, padding: "6px 0", borderBottom: "1px solid var(--c-border)" }}>
               <span style={{ color: "var(--c-text-muted)", flexShrink: 0 }}>{k}</span>
               <span style={{ color: "var(--c-text)", textAlign: "right" }}>{v}</span>
             </div>
           ))}
 
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", lineHeight: 1.5, margin: "12px 0" }}>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", lineHeight: 1.5, margin: "12px 0" }}>
             En soumettant ce dossier, tu confirmes l'exactitude des informations fournies. EcoVigil ne délivre, ne renouvelle ni ne remplace aucun agrément légal : la vérification effectuée porte uniquement sur la cohérence du dossier soumis sur la plateforme.
           </div>
 
-          {erreur && <div role="alert" style={{ fontSize: 12.5, color: "#B5451B", background: "var(--c-danger-border-soft)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{erreur}</div>}
+          {erreur && <div role="alert" style={{ fontSize: T.body, color: "#B5451B", background: "var(--c-danger-border-soft)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{erreur}</div>}
 
-          <button type="button" onClick={soumettre} disabled={busy} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 8 }}>
+          <button type="button" onClick={soumettre} disabled={busy} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 8 }}>
             {busy ? "…" : "Soumettre le dossier d'inscription"}
           </button>
-          <button type="button" onClick={() => setMode("inscription")} disabled={busy} style={{ width: "100%", padding: "8px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: 12, cursor: "pointer" }}>Modifier le dossier</button>
+          <button type="button" onClick={() => setMode("inscription")} disabled={busy} style={{ width: "100%", padding: "8px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: T.small, cursor: "pointer" }}>Modifier le dossier</button>
         </div>
       ) : mode === "profil_requis" ? (
         <ProfilGate profilInfo={profilInfo}>
@@ -389,7 +390,7 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
             <ProfilEditeur profilInfo={profilInfo} onSaved={() => { setShowEditProfil(false); onProfilChange && onProfilChange(); }} onCancel={() => setShowEditProfil(false)} />
           ) : (
           <div>
-            <div style={{ fontSize: 12.5, color: "var(--c-accent)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
+            <div style={{ fontSize: T.body, color: "var(--c-accent)", marginBottom: 10, display: "flex", alignItems: "center", gap: 6 }}>
               {profilInfo && profilInfo.photo_url ? (
                 <img src={profilInfo.photo_url} alt="" style={{ width: 20, height: 20, borderRadius: "50%", objectFit: "cover" }} />
               ) : (
@@ -400,7 +401,7 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
                 <IconEdit size={13} />
               </button>
             </div>
-            <button type="button" onClick={() => setMode("inscription")} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer" }}>
+            <button type="button" onClick={() => setMode("inscription")} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>
               Continuer vers le dossier d'organisation
             </button>
           </div>
@@ -412,7 +413,7 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
           <div style={{ display: "flex", gap: 8, marginBottom: 4 }}>
             {[["ong", "ONG"], ["gouvernement", "Gouvernement"]].map(([id, label]) => (
               <button key={id} type="button" onClick={() => setType(id)} style={{
-                flex: 1, padding: "9px 0", borderRadius: 10, fontSize: 12.5, fontWeight: 600, cursor: "pointer",
+                flex: 1, padding: "9px 0", borderRadius: 10, fontSize: T.body, fontWeight: 600, cursor: "pointer",
                 border: type === id ? "2px solid var(--c-accent)" : "1px solid var(--c-border)",
                 background: type === id ? "var(--c-surface-soft)" : "var(--c-surface)", color: type === id ? "var(--c-accent)" : "var(--c-text-secondary)" }}>{label}</button>
             ))}
@@ -421,7 +422,7 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
             <div style={{ display: "flex", gap: 6, marginBottom: 8, marginTop: 6 }}>
               {[["nationale", "ONG nationale"], ["etrangere", "ONG étrangère"], ["autre", "Autre catégorie"]].map(([id, label]) => (
                 <button key={id} type="button" onClick={() => setTypeOng(id)} style={{
-                  flex: 1, padding: "6px 4px", borderRadius: 8, fontSize: 10.5, fontWeight: 600, cursor: "pointer",
+                  flex: 1, padding: "6px 4px", borderRadius: 8, fontSize: T.meta, fontWeight: 600, cursor: "pointer",
                   border: typeOng === id ? "1.5px solid var(--c-accent)" : "1px solid var(--c-border)",
                   background: typeOng === id ? "var(--c-surface-soft)" : "var(--c-surface)", color: typeOng === id ? "var(--c-accent)" : "var(--c-text-secondary)" }}>{label}</button>
               ))}
@@ -433,7 +434,7 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
           <input value={pays} onChange={e => setPays(e.target.value)} placeholder="Pays" style={champStyle} />
           <input value={ville} onChange={e => setVille(e.target.value)} placeholder="Ville" style={champStyle} />
           <textarea value={description} onChange={e => setDescription(e.target.value)} rows={2} placeholder="Brève description (optionnel)"
-            style={{ ...champStyle, fontFamily: "Work Sans, sans-serif", resize: "none" }} />
+            style={{ ...champStyle, fontFamily: "inherit", resize: "none" }} />
 
           {type === "ong" && (
             <>
@@ -452,7 +453,7 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
               <input required value={autoriteDelivrance} onChange={e => setAutoriteDelivrance(e.target.value)} placeholder="Autorité ayant délivré l'agrément ou l'acte légal" style={champStyle} />
 
               {sectionTitre(4, "Documents justificatifs")}
-              <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 8 }}>Formats acceptés : PDF, JPG, PNG. 10 Mo maximum par document.</div>
+              <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 8 }}>Formats acceptés : PDF, JPG, PNG. 10 Mo maximum par document.</div>
               <VerifFileInput value={docAgrementUrl} onChange={setDocAgrementUrl} label="Acte d'agrément ou document légal (obligatoire)" />
               <VerifFileInput value={docStatutsUrl} onChange={setDocStatutsUrl} label="Statuts de l'organisation (obligatoire)" />
               <VerifFileInput value={docIdentiteUrl} onChange={setDocIdentiteUrl} label="Pièce d'identité du représentant légal (optionnel)" />
@@ -464,20 +465,20 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
           )}
 
           {sectionTitre(6, "Domaines d'activité")}
-          <div style={{ fontSize: 12, fontWeight: 600, color: "var(--c-text)", marginBottom: 6 }}>Domaine(s) d'activité *</div>
+          <div style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text)", marginBottom: 6 }}>Domaine(s) d'activité *</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginBottom: 10 }}>
             {defisDisponibles.map(d => {
               const actif = defisChoisis.includes(d.id);
               return (
                 <button key={d.id} type="button" onClick={() => toggleDefi(d.id)} style={{
-                  padding: "6px 10px", borderRadius: 20, fontSize: 11.5, fontWeight: 600, cursor: "pointer",
+                  padding: "6px 10px", borderRadius: 20, fontSize: T.small, fontWeight: 600, cursor: "pointer",
                   border: actif ? "1.5px solid var(--c-accent)" : "1px solid var(--c-border)",
                   background: actif ? "var(--c-surface-soft)" : "var(--c-surface)", color: actif ? "var(--c-accent)" : "var(--c-text-secondary)" }}>
                   {champTexte(d.nom) || d.id}
                 </button>
               );
             })}
-            {defisDisponibles.length === 0 && <div style={{ fontSize: 11, color: "var(--c-text-muted)" }}>Aucun défi publié pour le moment.</div>}
+            {defisDisponibles.length === 0 && <div style={{ fontSize: T.meta, color: "var(--c-text-muted)" }}>Aucun défi publié pour le moment.</div>}
           </div>
 
           {sectionTitre(7, "Coordonnées officielles")}
@@ -488,24 +489,24 @@ export function OrganisationCard({ lang, organisationStatut, organisationEtapeDo
 
           {sectionTitre(8, "Code d'inscription des bénévoles")}
           <input required value={codeInscription} onChange={e => setCodeInscription(e.target.value)} placeholder="Code d'inscription de l'organisation (ex : ECO01)" style={{ ...champStyle, marginBottom: 4 }} />
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 8, lineHeight: 1.5 }}>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 8, lineHeight: 1.5 }}>
             Créez un code unique permettant à vos bénévoles d'identifier votre organisation lors de leur inscription sur Pace Connect. Communiquez ce code uniquement aux bénévoles que vous souhaitez rattacher à votre organisation. Ce code ne constitue pas une preuve d'agrément, de reconnaissance légale ou de conformité.
           </div>
 
           {sectionTitre(9, "Identifiants de connexion")}
-          <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", margin: "2px 0 8px" }}>Un compte réel (e-mail + mot de passe) permet à plusieurs membres de ton équipe de se connecter. Conseil : évite une adresse contenant des informations confidentielles ou sensibles.</div>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", margin: "2px 0 8px" }}>Un compte réel (e-mail + mot de passe) permet à plusieurs membres de ton équipe de se connecter. Conseil : évite une adresse contenant des informations confidentielles ou sensibles.</div>
           <input required type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="Adresse e-mail de connexion" style={champStyle} />
           <PasswordInput value={password} onChange={e => setPassword(e.target.value)} placeholder="Mot de passe (8 caractères minimum)"
-            style={{ padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 8 }} />
+            style={{ padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 8 }} />
           <PasswordInput value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)} placeholder="Confirme le mot de passe"
-            style={{ padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 10 }} />
+            style={{ padding: 9, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 10 }} />
 
-          {erreur && <div role="alert" style={{ fontSize: 12.5, color: "#B5451B", background: "var(--c-danger-border-soft)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{erreur}</div>}
+          {erreur && <div role="alert" style={{ fontSize: T.body, color: "#B5451B", background: "var(--c-danger-border-soft)", borderRadius: 10, padding: "9px 12px", marginBottom: 10 }}>{erreur}</div>}
 
-          <button type="button" onClick={allerAuRecapitulatif} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13, cursor: "pointer", marginBottom: 8 }}>
+          <button type="button" onClick={allerAuRecapitulatif} style={{ width: "100%", padding: "10px 0", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer", marginBottom: 8 }}>
             Vérifier et continuer
           </button>
-          <button type="button" onClick={() => setMode("choix")} style={{ width: "100%", padding: "8px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: 12, cursor: "pointer" }}>Retour</button>
+          <button type="button" onClick={() => setMode("choix")} style={{ width: "100%", padding: "8px 0", borderRadius: 10, border: "none", background: "none", color: "var(--c-text-muted)", fontSize: T.small, cursor: "pointer" }}>Retour</button>
         </form>
       )}
     </div>
@@ -536,8 +537,8 @@ export function BenevoleAccesBloque({ statut }) {
       <div style={{ background: "var(--c-surface-soft)", borderRadius: "50%", width: 64, height: 64, display: "flex", alignItems: "center", justifyContent: "center" }}>
         {info.icon}
       </div>
-      <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, color: "var(--c-text)" }}>{info.titre}</div>
-      <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", lineHeight: 1.6, maxWidth: 320 }}>{info.texte}</div>
+      <div style={{ ...TITRE_SECTION, fontWeight: 600, color: "var(--c-text)" }}>{info.titre}</div>
+      <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", lineHeight: 1.6, maxWidth: 320 }}>{info.texte}</div>
     </div>
   );
 }
