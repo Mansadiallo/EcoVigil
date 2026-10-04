@@ -1,3 +1,5 @@
+import { T, TITRE_GRAND } from "../lib/typo.jsx";
+
 export function TreeRing({ pct = 0, size = 56, stroke = 6, color = "var(--c-accent)", bg = "var(--c-border-soft)" }) {
   const r = (size - stroke) / 2;
   const c = 2 * Math.PI * r;
@@ -16,8 +18,8 @@ export function Screen({ children }) { return <div style={{ padding: "16px 16px 
 export function SectionTitle({ children, sub }) {
   return (
     <div style={{ marginBottom: 14 }}>
-      <div style={{ fontFamily: "Fraunces, serif", fontSize: 22, fontWeight: 600, color: "var(--c-accent-dark)" }}>{children}</div>
-      {sub && <div style={{ fontSize: 13, color: "var(--c-text-secondary)", marginTop: 2 }}>{sub}</div>}
+      <div style={{ ...TITRE_GRAND, fontWeight: 600, color: "var(--c-accent-dark)" }}>{children}</div>
+      {sub && <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginTop: 2 }}>{sub}</div>}
     </div>
   );
 }
@@ -26,9 +28,9 @@ export function StatCard({ label, value, unit, accent }) {
   return (
     <div style={{ background: "var(--c-surface)", borderRadius: 14, padding: "12px 14px", flex: 1, border: "1px solid var(--c-border)" }}>
       <div style={{ fontFamily: "IBM Plex Mono, monospace", fontSize: 22, fontWeight: 600, color: accent || "var(--c-accent-dark)" }}>
-        {value}<span style={{ fontSize: 12, marginLeft: 3, color: "var(--c-text-muted)" }}>{unit}</span>
+        {value}<span style={{ fontSize: T.small, marginLeft: 3, color: "var(--c-text-muted)" }}>{unit}</span>
       </div>
-      <div style={{ fontSize: 11.5, color: "var(--c-text-secondary)", marginTop: 2, lineHeight: 1.3 }}>{label}</div>
+      <div style={{ fontSize: T.small, color: "var(--c-text-secondary)", marginTop: 2, lineHeight: 1.3 }}>{label}</div>
     </div>
   );
 }

@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { IconCamera, IconImage, IconPlay, IconRotateCcw, IconX } from "./icons.jsx";
 import { DEVICE_ID, supabase } from "../lib/supabase.js";
+import { T } from "../lib/typo.jsx";
 
 export function shareContent(title, text) {
   if (navigator.share) {
@@ -249,7 +250,7 @@ function CameraCapture({ onCapture, onClose }) {
     <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 4000, display: "flex", flexDirection: "column" }}>
       <div style={{ position: "relative", flex: 1, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {error ? (
-          <div style={{ color: "#fff", textAlign: "center", padding: 28, fontSize: 13, lineHeight: 1.5 }}>
+          <div style={{ color: "#fff", textAlign: "center", padding: 28, fontSize: T.body, lineHeight: 1.5 }}>
             {error === "permission"
               ? "Accès à la caméra ou au micro refusé. Autorise l'accès dans les réglages du navigateur, ou choisis un fichier depuis la galerie."
               : "Caméra indisponible sur cet appareil. Choisis un fichier depuis la galerie."}
@@ -258,7 +259,7 @@ function CameraCapture({ onCapture, onClose }) {
           <video ref={videoRef} playsInline muted autoPlay style={{ width: "100%", height: "100%", objectFit: "cover", transform: facingMode === "user" ? "scaleX(-1)" : "none" }} />
         )}
         {isRecording && (
-          <div style={{ position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)", background: "rgba(181,69,27,0.9)", color: "#fff", fontSize: 12.5, fontWeight: 600, padding: "5px 12px", borderRadius: 20, display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)", background: "rgba(181,69,27,0.9)", color: "#fff", fontSize: T.body, fontWeight: 600, padding: "5px 12px", borderRadius: 20, display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff", display: "inline-block" }} />
             {fmtTime(elapsed)}
           </div>
@@ -274,13 +275,13 @@ function CameraCapture({ onCapture, onClose }) {
       </div>
       <div style={{ background: "#000", padding: "14px 0 28px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
         {error ? (
-          <button onClick={onClose} style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.3)", background: "transparent", color: "#fff", fontSize: 13, cursor: "pointer" }}>Fermer</button>
+          <button onClick={onClose} style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.3)", background: "transparent", color: "#fff", fontSize: T.body, cursor: "pointer" }}>Fermer</button>
         ) : (
           <React.Fragment>
             {!isRecording && (
               <div style={{ display: "flex", gap: 6, background: "rgba(255,255,255,0.12)", borderRadius: 20, padding: 3 }}>
-                <button onClick={() => setMode("photo")} style={{ padding: "6px 16px", borderRadius: 16, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: mode === "photo" ? "#fff" : "transparent", color: mode === "photo" ? "#17211C" : "#fff" }}>Photo</button>
-                <button onClick={() => setMode("video")} style={{ padding: "6px 16px", borderRadius: 16, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: mode === "video" ? "#fff" : "transparent", color: mode === "video" ? "#17211C" : "#fff" }}>Vidéo</button>
+                <button onClick={() => setMode("photo")} style={{ padding: "6px 16px", borderRadius: 16, border: "none", cursor: "pointer", fontSize: T.small, fontWeight: 600, background: mode === "photo" ? "#fff" : "transparent", color: mode === "photo" ? "#17211C" : "#fff" }}>Photo</button>
+                <button onClick={() => setMode("video")} style={{ padding: "6px 16px", borderRadius: 16, border: "none", cursor: "pointer", fontSize: T.small, fontWeight: 600, background: mode === "video" ? "#fff" : "transparent", color: mode === "video" ? "#17211C" : "#fff" }}>Vidéo</button>
               </div>
             )}
             <button onClick={handleMainButton} disabled={!ready} aria-label={mode === "photo" ? "Prendre la photo" : (isRecording ? "Arrêter l'enregistrement" : "Démarrer l'enregistrement")} style={{
@@ -294,7 +295,7 @@ function CameraCapture({ onCapture, onClose }) {
               )}
             </button>
             {mode === "video" && (
-              <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>
+              <div style={{ color: "rgba(255,255,255,0.7)", fontSize: T.meta }}>
                 {isRecording ? `Max. ${CAMERA_VIDEO_MAX_SECONDS}s — appuie pour arrêter` : "Appuie pour filmer"}
               </div>
             )}
@@ -370,11 +371,11 @@ export function AudioRecorder({ onCapture }) {
   function arreter() { clearTimer(); if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop(); setState("pret"); }
   function recommencer() { if (previewRef.current) URL.revokeObjectURL(previewRef.current.url); previewRef.current = null; setPreview(null); setElapsed(0); setState("idle"); onCapture(null); }
   function fmt(s) { const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, "0")}`; }
-  const miniBtn = { padding: "6px 12px", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text)", fontSize: 12, cursor: "pointer" };
+  const miniBtn = { padding: "6px 12px", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text)", fontSize: T.small, cursor: "pointer" };
 
   if (error) {
     return (
-      <div style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>
+      <div style={{ fontSize: T.small, color: "#B5451B", marginBottom: 8 }}>
         {error === "permission" ? "Accès au micro refusé. Autorise l'accès, ou choisis un fichier audio existant." : "Microphone indisponible sur cet appareil. Choisis un fichier audio existant."}
       </div>
     );
@@ -382,14 +383,14 @@ export function AudioRecorder({ onCapture }) {
   return (
     <div style={{ marginBottom: 10 }}>
       {state === "idle" && (
-        <button type="button" onClick={demarrer} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-accent-dark)", background: "none", color: "var(--c-accent-dark)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+        <button type="button" onClick={demarrer} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-accent-dark)", background: "none", color: "var(--c-accent-dark)", fontSize: T.body, fontWeight: 600, cursor: "pointer" }}>
           🎙️ Démarrer l'enregistrement
         </button>
       )}
       {(state === "recording" || state === "paused") && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, border: "1px solid var(--c-border)" }}>
           <span style={{ width: 9, height: 9, borderRadius: "50%", background: state === "recording" ? "#B5451B" : "var(--c-text-muted)", flex: "none" }} />
-          <span style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums" }}>{fmt(elapsed)}</span>
+          <span style={{ fontSize: T.body, fontVariantNumeric: "tabular-nums" }}>{fmt(elapsed)}</span>
           {state === "recording"
             ? <button type="button" onClick={pause} style={miniBtn}>Pause</button>
             : <button type="button" onClick={reprendre} style={miniBtn}>Reprendre</button>}
@@ -399,7 +400,7 @@ export function AudioRecorder({ onCapture }) {
       {state === "pret" && preview && (
         <div>
           <audio src={preview.url} controls style={{ width: "100%", marginBottom: 6 }} />
-          <button type="button" onClick={recommencer} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer", padding: 0 }}>Recommencer l'enregistrement</button>
+          <button type="button" onClick={recommencer} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.small, cursor: "pointer", padding: 0 }}>Recommencer l'enregistrement</button>
         </div>
       )}
     </div>
@@ -463,7 +464,7 @@ export function PhotoCaptureButton({ photo, onChange, label, previewMaxHeight = 
           <button onClick={() => supportsCamera ? setShowCamera(true) : fileRef.current.click()} style={{
             flex: 1, border: "1.5px dashed var(--c-text-faint)", borderRadius: compact ? 10 : 12,
             padding: compact ? 12 : 14, background: "var(--c-surface-dashed)", color: "var(--c-text-secondary)",
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: compact ? 12 : 12.5 }}>
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: T.body }}>
             <IconCamera size={compact ? 15 : 16} /> {label || "Ajouter une photo"}
           </button>
           {supportsCamera && (
