@@ -1,24 +1,17 @@
 import { Component } from "react";
 import { Screen } from "./ui.jsx";
-import { T } from "../lib/typo.jsx";
+import { langCourante, t } from "../lib/i18n.js";
 
-const MESSAGES = {
-  fr: { charge: "Chargement…", erreur: "Cet écran n'a pas pu être chargé (réseau indisponible ?).", recharger: "Recharger" },
-  en: { charge: "Loading…", erreur: "This screen could not be loaded (network unavailable?).", recharger: "Reload" },
-  pt: { charge: "A carregar…", erreur: "Não foi possível carregar este ecrã (sem rede?).", recharger: "Recarregar" },
-  es: { charge: "Cargando…", erreur: "No se pudo cargar esta pantalla (¿sin red?).", recharger: "Recargar" },
-};
 function messages() {
-  let l = "fr";
-  try { l = localStorage.getItem("pace-lang") || "fr"; } catch (e) {}
-  return MESSAGES[l] || MESSAGES.fr;
+  const L = langCourante();
+  return { charge: t(L, "chargement"), erreur: t(L, "ecran_erreur"), recharger: t(L, "recharger") };
 }
 
 /* Affiché le temps que le code d'un écran (chargé à la demande) arrive. */
 export function EcranChargement() {
   return (
     <Screen>
-      <div role="status" style={{ textAlign: "center", padding: "60px 0", color: "var(--c-text-muted)", fontSize: T.body }}>{messages().charge}</div>
+      <div role="status" style={{ textAlign: "center", padding: "60px 0", color: "var(--c-text-muted)", fontSize: 13 }}>{messages().charge}</div>
     </Screen>
   );
 }
@@ -34,7 +27,7 @@ export class BoundaireErreur extends Component {
     const m = messages();
     return (
       <Screen>
-        <div style={{ textAlign: "center", padding: "50px 16px", color: "var(--c-text)", fontSize: T.body, lineHeight: 1.5 }}>
+        <div style={{ textAlign: "center", padding: "50px 16px", color: "var(--c-text)", fontSize: 13.5, lineHeight: 1.5 }}>
           <div style={{ marginBottom: 14 }}>{m.erreur}</div>
           <button onClick={() => window.location.reload()} style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>{m.recharger}</button>
         </div>

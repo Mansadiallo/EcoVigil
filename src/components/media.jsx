@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from "react";
 import { IconCamera, IconImage, IconPlay, IconRotateCcw, IconX } from "./icons.jsx";
 import { DEVICE_ID, supabase } from "../lib/supabase.js";
-import { T } from "../lib/typo.jsx";
+import { langCourante, t, tf } from "../lib/i18n.js";
 
 export function shareContent(title, text) {
   if (navigator.share) {
     navigator.share({ title, text }).catch(() => {});
   } else if (navigator.clipboard) {
-    navigator.clipboard.writeText(text).then(() => alert("Copié ! Colle-le où tu veux le partager."));
+    navigator.clipboard.writeText(text).then(() => alert(t(langCourante(), "share_copie")));
   }
 }
 
@@ -119,6 +119,7 @@ export function mediaHtml(url, maxHeight = 110) {
 const CAMERA_VIDEO_MAX_SECONDS = 60;
 
 function CameraCapture({ onCapture, onClose }) {
+  const L = langCourante();
   const videoRef = useRef(null);
   const streamRef = useRef(null);
   const audioStreamRef = useRef(null);
@@ -250,41 +251,39 @@ function CameraCapture({ onCapture, onClose }) {
     <div style={{ position: "fixed", inset: 0, background: "#000", zIndex: 4000, display: "flex", flexDirection: "column" }}>
       <div style={{ position: "relative", flex: 1, overflow: "hidden", display: "flex", alignItems: "center", justifyContent: "center" }}>
         {error ? (
-          <div style={{ color: "#fff", textAlign: "center", padding: 28, fontSize: T.body, lineHeight: 1.5 }}>
-            {error === "permission"
-              ? "Accès à la caméra ou au micro refusé. Autorise l'accès dans les réglages du navigateur, ou choisis un fichier depuis la galerie."
-              : "Caméra indisponible sur cet appareil. Choisis un fichier depuis la galerie."}
+          <div style={{ color: "#fff", textAlign: "center", padding: 28, fontSize: 13, lineHeight: 1.5 }}>
+            {error === "permission" ? t(L, "cam_err_permission") : t(L, "cam_err_unavailable")}
           </div>
         ) : (
           <video ref={videoRef} playsInline muted autoPlay style={{ width: "100%", height: "100%", objectFit: "cover", transform: facingMode === "user" ? "scaleX(-1)" : "none" }} />
         )}
         {isRecording && (
-          <div style={{ position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)", background: "rgba(181,69,27,0.9)", color: "#fff", fontSize: T.body, fontWeight: 600, padding: "5px 12px", borderRadius: 20, display: "flex", alignItems: "center", gap: 6 }}>
+          <div style={{ position: "absolute", top: 16, left: "50%", transform: "translateX(-50%)", background: "rgba(181,69,27,0.9)", color: "#fff", fontSize: 12.5, fontWeight: 600, padding: "5px 12px", borderRadius: 20, display: "flex", alignItems: "center", gap: 6 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: "#fff", display: "inline-block" }} />
             {fmtTime(elapsed)}
           </div>
         )}
-        <button onClick={handleClose} aria-label="Fermer la caméra" style={{ position: "absolute", top: 16, left: 16, background: "rgba(0,0,0,0.45)", border: "none", borderRadius: "50%", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+        <button onClick={handleClose} aria-label={t(L, "cam_fermer")} style={{ position: "absolute", top: 16, left: 16, background: "rgba(0,0,0,0.45)", border: "none", borderRadius: "50%", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
           <IconX size={18} color="#fff" />
         </button>
         {!error && !isRecording && (
-          <button onClick={() => setFacingMode(m => m === "environment" ? "user" : "environment")} aria-label="Changer de caméra" style={{ position: "absolute", top: 16, right: 16, background: "rgba(0,0,0,0.45)", border: "none", borderRadius: "50%", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
+          <button onClick={() => setFacingMode(m => m === "environment" ? "user" : "environment")} aria-label={t(L, "cam_changer")} style={{ position: "absolute", top: 16, right: 16, background: "rgba(0,0,0,0.45)", border: "none", borderRadius: "50%", width: 38, height: 38, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer" }}>
             <IconRotateCcw size={17} color="#fff" />
           </button>
         )}
       </div>
       <div style={{ background: "#000", padding: "14px 0 28px", display: "flex", flexDirection: "column", alignItems: "center", gap: 14 }}>
         {error ? (
-          <button onClick={onClose} style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.3)", background: "transparent", color: "#fff", fontSize: T.body, cursor: "pointer" }}>Fermer</button>
+          <button onClick={onClose} style={{ padding: "10px 22px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.3)", background: "transparent", color: "#fff", fontSize: 13, cursor: "pointer" }}>{t(L, "fermer")}</button>
         ) : (
           <React.Fragment>
             {!isRecording && (
               <div style={{ display: "flex", gap: 6, background: "rgba(255,255,255,0.12)", borderRadius: 20, padding: 3 }}>
-                <button onClick={() => setMode("photo")} style={{ padding: "6px 16px", borderRadius: 16, border: "none", cursor: "pointer", fontSize: T.small, fontWeight: 600, background: mode === "photo" ? "#fff" : "transparent", color: mode === "photo" ? "#17211C" : "#fff" }}>Photo</button>
-                <button onClick={() => setMode("video")} style={{ padding: "6px 16px", borderRadius: 16, border: "none", cursor: "pointer", fontSize: T.small, fontWeight: 600, background: mode === "video" ? "#fff" : "transparent", color: mode === "video" ? "#17211C" : "#fff" }}>Vidéo</button>
+                <button onClick={() => setMode("photo")} style={{ padding: "6px 16px", borderRadius: 16, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: mode === "photo" ? "#fff" : "transparent", color: mode === "photo" ? "#17211C" : "#fff" }}>{t(L, "cam_photo")}</button>
+                <button onClick={() => setMode("video")} style={{ padding: "6px 16px", borderRadius: 16, border: "none", cursor: "pointer", fontSize: 12, fontWeight: 600, background: mode === "video" ? "#fff" : "transparent", color: mode === "video" ? "#17211C" : "#fff" }}>{t(L, "cam_video")}</button>
               </div>
             )}
-            <button onClick={handleMainButton} disabled={!ready} aria-label={mode === "photo" ? "Prendre la photo" : (isRecording ? "Arrêter l'enregistrement" : "Démarrer l'enregistrement")} style={{
+            <button onClick={handleMainButton} disabled={!ready} aria-label={mode === "photo" ? t(L, "cam_prendre_photo") : (isRecording ? t(L, "cam_arreter_enreg") : t(L, "cam_demarrer_enreg"))} style={{
               width: 68, height: 68, borderRadius: "50%", border: `4px solid ${mode === "video" ? "#B5451B" : "#fff"}`,
               background: ready ? "rgba(255,255,255,0.15)" : "rgba(255,255,255,0.05)",
               cursor: ready ? "pointer" : "default", display: "flex", alignItems: "center", justifyContent: "center" }}>
@@ -295,8 +294,8 @@ function CameraCapture({ onCapture, onClose }) {
               )}
             </button>
             {mode === "video" && (
-              <div style={{ color: "rgba(255,255,255,0.7)", fontSize: T.meta }}>
-                {isRecording ? `Max. ${CAMERA_VIDEO_MAX_SECONDS}s — appuie pour arrêter` : "Appuie pour filmer"}
+              <div style={{ color: "rgba(255,255,255,0.7)", fontSize: 11 }}>
+                {isRecording ? tf(L, "cam_max_fmt", { s: CAMERA_VIDEO_MAX_SECONDS }) : t(L, "cam_appuie_filmer")}
               </div>
             )}
           </React.Fragment>
@@ -315,6 +314,7 @@ function CameraCapture({ onCapture, onClose }) {
 const AUDIO_RECORD_MAX_SECONDS = 600; // 10 minutes : cohérent avec la durée d'une interview de terrain
 
 export function AudioRecorder({ onCapture }) {
+  const L = langCourante();
   const streamRef = useRef(null);
   const recorderRef = useRef(null);
   const chunksRef = useRef([]);
@@ -371,36 +371,36 @@ export function AudioRecorder({ onCapture }) {
   function arreter() { clearTimer(); if (recorderRef.current && recorderRef.current.state !== "inactive") recorderRef.current.stop(); setState("pret"); }
   function recommencer() { if (previewRef.current) URL.revokeObjectURL(previewRef.current.url); previewRef.current = null; setPreview(null); setElapsed(0); setState("idle"); onCapture(null); }
   function fmt(s) { const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, "0")}`; }
-  const miniBtn = { padding: "6px 12px", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text)", fontSize: T.small, cursor: "pointer" };
+  const miniBtn = { padding: "6px 12px", borderRadius: 8, border: "1px solid var(--c-border)", background: "none", color: "var(--c-text)", fontSize: 12, cursor: "pointer" };
 
   if (error) {
     return (
-      <div style={{ fontSize: T.small, color: "#B5451B", marginBottom: 8 }}>
-        {error === "permission" ? "Accès au micro refusé. Autorise l'accès, ou choisis un fichier audio existant." : "Microphone indisponible sur cet appareil. Choisis un fichier audio existant."}
+      <div style={{ fontSize: 11.5, color: "#B5451B", marginBottom: 8 }}>
+        {error === "permission" ? t(L, "audio_err_permission") : t(L, "audio_err_unavailable")}
       </div>
     );
   }
   return (
     <div style={{ marginBottom: 10 }}>
       {state === "idle" && (
-        <button type="button" onClick={demarrer} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-accent-dark)", background: "none", color: "var(--c-accent-dark)", fontSize: T.body, fontWeight: 600, cursor: "pointer" }}>
-          🎙️ Démarrer l'enregistrement
+        <button type="button" onClick={demarrer} style={{ padding: "9px 14px", borderRadius: 10, border: "1px solid var(--c-accent-dark)", background: "none", color: "var(--c-accent-dark)", fontSize: 12.5, fontWeight: 600, cursor: "pointer" }}>
+          🎙️ {t(L, "cam_demarrer_enreg")}
         </button>
       )}
       {(state === "recording" || state === "paused") && (
         <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px", borderRadius: 10, border: "1px solid var(--c-border)" }}>
           <span style={{ width: 9, height: 9, borderRadius: "50%", background: state === "recording" ? "#B5451B" : "var(--c-text-muted)", flex: "none" }} />
-          <span style={{ fontSize: T.body, fontVariantNumeric: "tabular-nums" }}>{fmt(elapsed)}</span>
+          <span style={{ fontSize: 12.5, fontVariantNumeric: "tabular-nums" }}>{fmt(elapsed)}</span>
           {state === "recording"
-            ? <button type="button" onClick={pause} style={miniBtn}>Pause</button>
-            : <button type="button" onClick={reprendre} style={miniBtn}>Reprendre</button>}
-          <button type="button" onClick={arreter} style={{ ...miniBtn, color: "#B5451B", borderColor: "#B5451B" }}>Arrêter</button>
+            ? <button type="button" onClick={pause} style={miniBtn}>{t(L, "audio_pause")}</button>
+            : <button type="button" onClick={reprendre} style={miniBtn}>{t(L, "audio_reprendre")}</button>}
+          <button type="button" onClick={arreter} style={{ ...miniBtn, color: "#B5451B", borderColor: "#B5451B" }}>{t(L, "audio_arreter")}</button>
         </div>
       )}
       {state === "pret" && preview && (
         <div>
           <audio src={preview.url} controls style={{ width: "100%", marginBottom: 6 }} />
-          <button type="button" onClick={recommencer} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.small, cursor: "pointer", padding: 0 }}>Recommencer l'enregistrement</button>
+          <button type="button" onClick={recommencer} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: 11.5, cursor: "pointer", padding: 0 }}>{t(L, "audio_recommencer")}</button>
         </div>
       )}
     </div>
@@ -413,6 +413,7 @@ export function AudioRecorder({ onCapture }) {
 // (data URL pour une image, URL blob locale pour une vidéo) afin de rester compatible avec
 // le flux d'upload existant (uploadPhoto/uploadPhotoGeneric font un fetch() de cette URL).
 export function PhotoCaptureButton({ photo, onChange, label, previewMaxHeight = 160, compact = false }) {
+  const L = langCourante();
   const fileRef = useRef(null);
   const [showCamera, setShowCamera] = useState(false);
   const supportsCamera = typeof navigator !== "undefined" && navigator.mediaDevices && navigator.mediaDevices.getUserMedia;
@@ -455,20 +456,20 @@ export function PhotoCaptureButton({ photo, onChange, label, previewMaxHeight = 
           {isVideo ? (
             <video src={photo} controls playsInline style={{ width: "100%", borderRadius: compact ? 10 : 12, maxHeight: previewMaxHeight, objectFit: "cover", background: "#000" }} />
           ) : (
-            <img src={photo} alt="Aperçu" style={{ width: "100%", borderRadius: compact ? 10 : 12, maxHeight: previewMaxHeight, objectFit: "cover" }} />
+            <img src={photo} alt={t(L, "apercu_photo")} style={{ width: "100%", borderRadius: compact ? 10 : 12, maxHeight: previewMaxHeight, objectFit: "cover" }} />
           )}
-          <button onClick={handleRemove} style={{ position: "absolute", top: 8, right: 8, background: "var(--c-text)bb", border: "none", borderRadius: "50%", width: 26, height: 26, color: "#fff", cursor: "pointer" }}><IconX size={14} /></button>
+          <button onClick={handleRemove} style={{ position: "absolute", top: 8, insetInlineEnd: 8, background: "var(--c-text)bb", border: "none", borderRadius: "50%", width: 26, height: 26, color: "#fff", cursor: "pointer" }}><IconX size={14} /></button>
         </div>
       ) : (
         <div style={{ display: "flex", gap: 8, marginBottom: compact ? 8 : 10 }}>
           <button onClick={() => supportsCamera ? setShowCamera(true) : fileRef.current.click()} style={{
             flex: 1, border: "1.5px dashed var(--c-text-faint)", borderRadius: compact ? 10 : 12,
             padding: compact ? 12 : 14, background: "var(--c-surface-dashed)", color: "var(--c-text-secondary)",
-            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: T.body }}>
-            <IconCamera size={compact ? 15 : 16} /> {label || "Ajouter une photo"}
+            cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6, fontSize: compact ? 12 : 12.5 }}>
+            <IconCamera size={compact ? 15 : 16} /> {label || t(L, "ajouter_photo")}
           </button>
           {supportsCamera && (
-            <button onClick={() => fileRef.current.click()} aria-label="Choisir depuis la galerie" title="Choisir depuis la galerie" style={{
+            <button onClick={() => fileRef.current.click()} aria-label={t(L, "gal_choisir")} title={t(L, "gal_choisir")} style={{
               width: compact ? 40 : 44, flexShrink: 0, border: "1.5px dashed var(--c-text-faint)", borderRadius: compact ? 10 : 12,
               background: "var(--c-surface-dashed)", color: "var(--c-text-secondary)", cursor: "pointer",
               display: "flex", alignItems: "center", justifyContent: "center" }}>
