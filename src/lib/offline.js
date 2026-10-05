@@ -1,6 +1,7 @@
 import { compressImage, uploadPhotoGeneric } from "../components/media.jsx";
 import { uid } from "./categories.jsx";
 import { supabase } from "./supabase.js";
+import { langCourante, t } from "./i18n.js";
 
 /* ---------- File d'attente hors-ligne (signalements, arbres, observations) ----------
    Principe : si l'appareil est hors-ligne (ou si l'envoi échoue), l'action est
@@ -10,7 +11,7 @@ import { supabase } from "./supabase.js";
 const PENDING_QUEUE_KEY = "pace-pending-queue";
 
 export function loadPendingQueue() {
-  try { const v = JSON.parse(localStorage.getItem(PENDING_QUEUE_KEY) || "[]"); return Array.isArray(v) ? v.filter(Boolean) : []; } catch (e) { return []; }
+  try { return JSON.parse(localStorage.getItem(PENDING_QUEUE_KEY) || "[]"); } catch (e) { return []; }
 }
 
 export function savePendingQueue(q) {
@@ -43,20 +44,8 @@ export function dequeuePendingAction(tempId) {
 // sauvegardes locales successives) plutôt qu'une action figée à rejouer telle quelle.
 const ENQ_OFFLINE_KEY = "ecovigil-enquetes-offline";
 
-// Les dossiers lus depuis localStorage peuvent être corrompus ou d'un ancien format (entrée nulle,
-// sans "cols"…) : on les normalise ici pour que l'interface ne plante jamais à l'affichage.
 export function loadOfflineEnquetes() {
-  try {
-    const v = JSON.parse(localStorage.getItem(ENQ_OFFLINE_KEY) || "{}");
-    if (!v || typeof v !== "object" || Array.isArray(v)) return {};
-    const out = {};
-    Object.entries(v).forEach(([k, r]) => {
-      if (!r || typeof r !== "object" || Array.isArray(r)) return;
-      const objet = (x) => x && typeof x === "object" && !Array.isArray(x);
-      out[k] = objet(r.cols) && objet(r.donnees) ? r : { ...r, localId: r.localId || k, cols: objet(r.cols) ? r.cols : {}, donnees: objet(r.donnees) ? r.donnees : {} };
-    });
-    return out;
-  } catch (e) { return {}; }
+  try { return JSON.parse(localStorage.getItem(ENQ_OFFLINE_KEY) || "{}"); } catch (e) { return {}; }
 }
 
 function saveOfflineEnquetes(map) {
@@ -157,7 +146,7 @@ export async function syncOneDossierEnquete(localId) {
   const finRec = getOfflineEnquete(localId);
   const numero = finRec ? finRec.numero : rec.numero;
   if (finRec) putOfflineEnquete({ ...finRec, preuvesLocales: restantes, transcriptionsLocales: transcriptionsRestantes });
-  if (restantes.length > 0 || Object.keys(transcriptionsRestantes).length > 0) throw new Error("Certaines preuves ou transcriptions n'ont pas pu être synchronisées");
+  if (restantes.length > 0 || Object.keys(transcriptionsRestantes).length > 0) throw new Error(t(langCourante(), "err_sync_preuves"));
   // Entièrement synchronisé : plus besoin de la copie locale, la lecture se fait désormais côté serveur.
   removeOfflineEnquete(localId);
   return { remoteId, numero, conflict: false };

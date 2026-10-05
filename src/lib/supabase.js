@@ -1,4 +1,5 @@
 import { uid } from "./categories.jsx";
+import { langCourante, t, tf, traduireErreurServeur } from "./i18n.js";
 
 const SUPABASE_URL = "https://dimdahhvgdwbluwbslzh.supabase.co";
 
@@ -8,6 +9,15 @@ export const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdX
 // Remplace la bibliothèque officielle (chargée depuis jsdelivr.net, bloquée dans l'aperçu du chat)
 // par un client minimal compatible avec l'API REST PostgREST + Auth + Storage de Supabase.
 const REST_URL = SUPABASE_URL + "/rest/v1";
+
+// Fabrique un objet d'erreur : "message" garde le texte brut du serveur (certains écrans le comparent),
+// "messageLocalise" porte la version traduite dans la langue active (voir libelleErreur() dans i18n.js).
+function mkErr(raw, fallbackKey, extra, vars) {
+  const L = langCourante();
+  const repli = tf(L, fallbackKey, vars);
+  return Object.assign({ message: raw || repli, messageLocalise: traduireErreurServeur(raw, L) || raw || repli }, extra || {});
+}
+
 
 export const AUTH_URL = SUPABASE_URL + "/auth/v1";
 
@@ -271,23 +281,22 @@ class PaceQuery {
       if (this._head) {
         const range = res.headers.get("content-range") || "";
         const count = range.includes("/") ? parseInt(range.split("/")[1], 10) : null;
-        return { data: null, error: res.ok ? null : { message: "Erreur serveur" }, count };
+        return { data: null, error: res.ok ? null : mkErr(null, "err_serveur"), count };
       }
       const text = await res.text();
       let json = null;
       if (text) { try { json = JSON.parse(text); } catch (e) { json = null; } }
       if (!res.ok) {
-        const msg = (json && (json.message || json.error_description)) || "Erreur serveur";
-        return { data: null, error: { message: msg } };
+        return { data: null, error: mkErr(json && (json.message || json.error_description), "err_serveur") };
       }
       if (this._single) {
         const row = Array.isArray(json) ? (json[0] || null) : json;
-        if (!row && !this._maybe) return { data: null, error: { message: "Aucune ligne trouvée" } };
+        if (!row && !this._maybe) return { data: null, error: mkErr(null, "err_ligne_introuvable") };
         return { data: row, error: null };
       }
       return { data: json, error: null };
     } catch (e) {
-      return { data: null, error: { message: e.message } };
+      return { data: null, error: mkErr(e.message, "err_reseau") };
     }
   }
 }
@@ -307,11 +316,10 @@ export const supabase = {
       let json = null;
       if (text) { try { json = JSON.parse(text); } catch (e) { json = null; } }
       if (!res.ok) {
-        const msg = (json && (json.message || json.error_description)) || "Erreur serveur";
-        return { data: null, error: { message: msg } };
+        return { data: null, error: mkErr(json && (json.message || json.error_description), "err_serveur") };
       }
       return { data: json, error: null };
-    } catch (e) { return { data: null, error: { message: e.message } }; }
+    } catch (e) { return { data: null, error: mkErr(e.message, "err_reseau") }; }
   },
   storage: {
     from(bucket) {
@@ -324,12 +332,12 @@ export const supabase = {
               body: blob,
             });
             if (!res.ok) {
-              let msg = "Échec de l'envoi";
-              try { const j = await res.json(); msg = j.message || msg; } catch (e) {}
-              return { data: null, error: { message: msg } };
+              let msg = null;
+              try { const j = await res.json(); msg = j.message || null; } catch (e) {}
+              return { data: null, error: mkErr(msg, "err_envoi_echec") };
             }
             return { data: { path }, error: null };
-          } catch (e) { return { data: null, error: { message: e.message } }; }
+          } catch (e) { return { data: null, error: mkErr(e.message, "err_reseau") }; }
         },
         getPublicUrl(path) {
           return { data: { publicUrl: `${SUPABASE_URL}/storage/v1/object/public/${bucket}/${path}` } };
@@ -360,11 +368,11 @@ export const supabase = {
           body: JSON.stringify({ email, password }),
         });
         const json = await res.json().catch(() => ({}));
-        if (!res.ok) return { error: { message: json.error_description || json.msg || "Identifiants incorrects." } };
+        if (!res.ok) return { error: mkErr(json.error_description || json.msg, "err_identifiants") };
         const session = { access_token: json.access_token, refresh_token: json.refresh_token, user: json.user };
         persistActiveSession(session);
         return { data: { session }, error: null };
-      } catch (e) { return { error: { message: e.message } }; }
+      } catch (e) { return { error: mkErr(e.message, "err_reseau") }; }
     },
     async signInWithOtp({ email, options }) {
       try {
@@ -374,9 +382,9 @@ export const supabase = {
           headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
           body: JSON.stringify({ email, create_user: true }),
         });
-        if (!res.ok) { const j = await res.json().catch(() => ({})); return { error: { message: j.error_description || j.msg || "Erreur d'envoi." } }; }
+        if (!res.ok) { const j = await res.json().catch(() => ({})); return { error: mkErr(j.error_description || j.msg, "err_envoi_generique") }; }
         return { error: null };
-      } catch (e) { return { error: { message: e.message } }; }
+      } catch (e) { return { error: mkErr(e.message, "err_reseau") }; }
     },
     // "redirectTo" (optionnel) : URL vers laquelle GoTrue redirige après clic sur le lien reçu par
     // e-mail. Si absent, GoTrue retombe sur le "Site URL" configuré dans le dashboard Supabase — une
@@ -397,7 +405,7 @@ export const supabase = {
         const json = await res.json().catch(() => ({}));
         if (!res.ok) {
           const detail = json.error_description || json.msg || json.error || json.error_code || json.code;
-          return { error: { message: (detail ? String(detail) : `Erreur d'inscription (HTTP ${res.status}).`), status: res.status, code: json.error_code || json.code } };
+          return { error: mkErr(detail ? String(detail) : null, "err_inscription_http", { status: res.status, code: json.error_code || json.code }, { s: res.status }) };
         }
         if (json.access_token) {
           const session = { access_token: json.access_token, refresh_token: json.refresh_token, user: json.user };
@@ -410,7 +418,7 @@ export const supabase = {
         // mais avec "identities: []" et n'envoie AUCUN e-mail — c'est ce cas qu'il faut détecter
         // côté appelant pour ne pas faire croire à tort qu'un e-mail de confirmation part.
         return { data: { session: null, user: json }, error: null };
-      } catch (e) { return { error: { message: e.message } }; }
+      } catch (e) { return { error: mkErr(e.message, "err_reseau") }; }
     },
     async signOut() { persistActiveSession(null); return { error: null }; },
     // Session anonyme Supabase (déjà activée sur ce projet) : sert de base d'identité stable
@@ -424,11 +432,11 @@ export const supabase = {
           body: JSON.stringify({}),
         });
         const json = await res.json().catch(() => ({}));
-        if (!res.ok) return { data: null, error: { message: json.error_description || json.msg || "Erreur de connexion." } };
+        if (!res.ok) return { data: null, error: mkErr(json.error_description || json.msg, "err_connexion") };
         const session = { access_token: json.access_token, refresh_token: json.refresh_token, user: json.user };
         persistActiveSession(session);
         return { data: { session }, error: null };
-      } catch (e) { return { data: null, error: { message: e.message } }; }
+      } catch (e) { return { data: null, error: mkErr(e.message, "err_reseau") }; }
     },
     async resetPasswordForEmail(email, options) {
       try {
@@ -438,9 +446,9 @@ export const supabase = {
           headers: { apikey: SUPABASE_KEY, "Content-Type": "application/json" },
           body: JSON.stringify({ email }),
         });
-        if (!res.ok) { const j = await res.json().catch(() => ({})); return { error: { message: j.error_description || j.msg || "Erreur d'envoi." } }; }
+        if (!res.ok) { const j = await res.json().catch(() => ({})); return { error: mkErr(j.error_description || j.msg, "err_envoi_generique") }; }
         return { error: null };
-      } catch (e) { return { error: { message: e.message } }; }
+      } catch (e) { return { error: mkErr(e.message, "err_reseau") }; }
     },
     async updateUser({ password }, accessToken) {
       try {
@@ -450,9 +458,9 @@ export const supabase = {
           body: JSON.stringify({ password }),
         });
         const json = await res.json().catch(() => ({}));
-        if (!res.ok) return { error: { message: json.error_description || json.msg || "Erreur de mise à jour." } };
+        if (!res.ok) return { error: mkErr(json.error_description || json.msg, "err_maj") };
         return { data: { user: json }, error: null };
-      } catch (e) { return { error: { message: e.message } }; }
+      } catch (e) { return { error: mkErr(e.message, "err_reseau") }; }
     },
     // ===== Double authentification (2FA / TOTP) =====
     // Utilise directement les endpoints MFA de GoTrue (compatibles avec supabase-js) : l'inscription
@@ -468,9 +476,9 @@ export const supabase = {
             body: JSON.stringify({ factor_type: factorType, friendly_name: friendlyName }),
           });
           const json = await res.json().catch(() => ({}));
-          if (!res.ok) return { data: null, error: { message: json.error_description || json.msg || json.message || "Erreur d'activation de la double authentification." } };
+          if (!res.ok) return { data: null, error: mkErr(json.error_description || json.msg || json.message, "err_mfa_activation") };
           return { data: json, error: null };
-        } catch (e) { return { data: null, error: { message: e.message } }; }
+        } catch (e) { return { data: null, error: mkErr(e.message, "err_reseau") }; }
       },
       async challenge({ factorId }) {
         try {
@@ -479,9 +487,9 @@ export const supabase = {
             headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + (getActiveSession() && getActiveSession().access_token), "Content-Type": "application/json" },
           });
           const json = await res.json().catch(() => ({}));
-          if (!res.ok) return { data: null, error: { message: json.error_description || json.msg || json.message || "Erreur lors de la demande de code." } };
+          if (!res.ok) return { data: null, error: mkErr(json.error_description || json.msg || json.message, "err_mfa_challenge") };
           return { data: json, error: null };
-        } catch (e) { return { data: null, error: { message: e.message } }; }
+        } catch (e) { return { data: null, error: mkErr(e.message, "err_reseau") }; }
       },
       // accessToken optionnel : lors du step-up post-connexion, la session courante n'est encore
       // qu'au niveau aal1, on utilise donc explicitement ce token plutôt que la session active
@@ -494,14 +502,14 @@ export const supabase = {
             body: JSON.stringify({ challenge_id: challengeId, code }),
           });
           const json = await res.json().catch(() => ({}));
-          if (!res.ok) return { data: null, error: { message: json.error_description || json.msg || json.message || "Code incorrect ou expiré." } };
+          if (!res.ok) return { data: null, error: mkErr(json.error_description || json.msg || json.message, "err_code_incorrect") };
           if (json.access_token) {
             const session = { access_token: json.access_token, refresh_token: json.refresh_token, user: json.user };
             persistActiveSession(session);
             return { data: { session }, error: null };
           }
           return { data: json, error: null };
-        } catch (e) { return { data: null, error: { message: e.message } }; }
+        } catch (e) { return { data: null, error: mkErr(e.message, "err_reseau") }; }
       },
       async unenroll({ factorId }) {
         try {
@@ -510,9 +518,9 @@ export const supabase = {
             headers: { apikey: SUPABASE_KEY, Authorization: "Bearer " + (getActiveSession() && getActiveSession().access_token), "Content-Type": "application/json" },
           });
           const json = await res.json().catch(() => ({}));
-          if (!res.ok) return { data: null, error: { message: json.error_description || json.msg || json.message || "Erreur lors de la suppression." } };
+          if (!res.ok) return { data: null, error: mkErr(json.error_description || json.msg || json.message, "err_suppression") };
           return { data: json, error: null };
-        } catch (e) { return { data: null, error: { message: e.message } }; }
+        } catch (e) { return { data: null, error: mkErr(e.message, "err_reseau") }; }
       },
     },
   },

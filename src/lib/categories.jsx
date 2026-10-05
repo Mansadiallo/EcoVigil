@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { IconAlert, IconCloudRain, IconDroplet, IconFish, IconFlame, IconFlask, IconGlassWater, IconGlobe, IconHome, IconLayers, IconPaw, IconPick, IconSprout, IconSun, IconTrash, IconTree, IconWaves, IconWind } from "../components/icons.jsx";
 import { supabase } from "./supabase.js";
+import { langCourante, t } from "./i18n.js";
 import { envIcon } from "../screens/Accueil.jsx";
 
 export const CATEGORIES = [
@@ -110,11 +111,13 @@ export async function chargerTaxonomiePubliee() {
 // publié dynamiquement) vers un objet {id, label, icon} — ne renvoie jamais undefined, donc
 // tous les appelants existants qui faisaient CATEGORIES.find(...) peuvent utiliser ceci à la
 // place sans avoir à gérer un cas "introuvable" séparément.
+// Le libellé renvoyé suit la langue active (les écrans qui lisent categorieMeta(id).label sont donc traduits sans modification).
 export function categorieMeta(id) {
+  const L = langCourante();
   const cat = CATEGORIES.find(c => c.id === id);
-  if (cat) return cat;
+  if (cat) return { ...cat, label: categorieLabel(L, id) };
   const p = ENV_PROBLEMES_INDEX[id];
-  if (p) return { id, label: (p.nom && p.nom.fr) || id, icon: envIcon(p.icone) };
+  if (p) return { id, label: categorieLabel(L, id), icon: envIcon(p.icone) };
   return { id, label: id, icon: IconAlert };
 }
 
@@ -147,29 +150,32 @@ async function chargerFicheComplete(code) {
   return fiche;
 }
 
-export function champTexte(champ) { return (champ && champ.fr) || ""; }
+// Contenu multilingue stocké en base sous la forme { fr, en, pt, ... } : on prend la langue active,
+// et à défaut le français.
+export function champTexte(champ, lang) { const L = lang || langCourante(); return (champ && (champ[L] || champ.fr)) || ""; }
 
-function champListe(champ) { return ((champ && champ.fr) || []).join(", "); }
+function champListe(champ, lang) { const L = lang || langCourante(); return ((champ && (champ[L] || champ.fr)) || []).join(", "); }
 
-export function FicheEnvironnementale({ code }) {
+export function FicheEnvironnementale({ code, lang }) {
+  const L = lang || langCourante();
   const [fiche, setFiche] = useState(undefined); // undefined = pas chargé, null = rien de publié pour ce code
   const [ouvert, setOuvert] = useState(false);
   useEffect(() => { if (ouvert && fiche === undefined) chargerFicheComplete(code).then(setFiche); }, [ouvert]);
   return (
     <div style={{ marginBottom: 8 }}>
       <button onClick={() => setOuvert(o => !o)} style={{ fontSize: 10.5, color: "var(--c-accent-dark)", background: "none", border: "none", cursor: "pointer", padding: 0, fontWeight: 600 }}>
-        {ouvert ? "▾" : "▸"} Fiche environnementale
+        {ouvert ? "▾" : "▸"} {t(L, "fiche_titre")}
       </button>
-      {ouvert && fiche === undefined && <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 4 }}>Chargement…</div>}
-      {ouvert && fiche === null && <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 4 }}>Aucune fiche publiée pour ce problème.</div>}
+      {ouvert && fiche === undefined && <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 4 }}>{t(L, "fiche_chargement")}</div>}
+      {ouvert && fiche === null && <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 4 }}>{t(L, "fiche_aucune")}</div>}
       {ouvert && fiche && (
         <div style={{ fontSize: 11, color: "var(--c-text-secondary)", background: "var(--c-surface-soft)", borderRadius: 8, padding: 8, marginTop: 4, lineHeight: 1.6 }}>
-          {fiche.defi && <div><b>Défi :</b> {champTexte(fiche.defi.nom)}</div>}
-          {champListe(fiche.probleme.causes_presumees) && <div><b>Causes probables :</b> {champListe(fiche.probleme.causes_presumees)}</div>}
-          {champListe(fiche.probleme.impacts) && <div><b>Impacts :</b> {champListe(fiche.probleme.impacts)}</div>}
-          {champTexte(fiche.probleme.action_recommandee) && <div><b>Action recommandée :</b> {champTexte(fiche.probleme.action_recommandee)}</div>}
-          {champListe(fiche.probleme.indicateurs) && <div><b>Indicateurs :</b> {champListe(fiche.probleme.indicateurs)}</div>}
-          {champTexte(fiche.probleme.resultat_attendu) && <div><b>Résultat attendu :</b> {champTexte(fiche.probleme.resultat_attendu)}</div>}
+          {fiche.defi && <div><b>{t(L, "fiche_defi")} :</b> {champTexte(fiche.defi.nom, L)}</div>}
+          {champListe(fiche.probleme.causes_presumees, L) && <div><b>{t(L, "fiche_causes")} :</b> {champListe(fiche.probleme.causes_presumees, L)}</div>}
+          {champListe(fiche.probleme.impacts, L) && <div><b>{t(L, "fiche_impacts")} :</b> {champListe(fiche.probleme.impacts, L)}</div>}
+          {champTexte(fiche.probleme.action_recommandee, L) && <div><b>{t(L, "fiche_action")} :</b> {champTexte(fiche.probleme.action_recommandee, L)}</div>}
+          {champListe(fiche.probleme.indicateurs, L) && <div><b>{t(L, "fiche_indicateurs")} :</b> {champListe(fiche.probleme.indicateurs, L)}</div>}
+          {champTexte(fiche.probleme.resultat_attendu, L) && <div><b>{t(L, "fiche_resultat")} :</b> {champTexte(fiche.probleme.resultat_attendu, L)}</div>}
         </div>
       )}
     </div>
