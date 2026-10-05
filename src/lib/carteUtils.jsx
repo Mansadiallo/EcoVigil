@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { IconClock, IconRotateCcw, IconTarget } from "../components/icons.jsx";
 import { formatCoordonnees } from "./utils.js";
-import { langCourante, t, tf } from "./i18n.js";
 
 export const AFRICA_CENTER = [7.1881, 21.0938]; // Centre géographique approximatif du continent africain
 
@@ -36,13 +35,7 @@ export function markerHtml(color, kind, borderColor) {
 // d'organisation, construit une seule fois (voir chargerOrigines dans Carte).
 export const ORIGINE_COULEURS = { benevole: "#2E6B8A", ong: "#1F7A4D", administration: "#7A1F1F" };
 
-// Accesseurs : le libellé suit la langue active à chaque lecture.
-export const ORIGINE_LABELS = {
-  get citoyen() { return t(langCourante(), "origine_citoyen"); },
-  get benevole() { return t(langCourante(), "origine_benevole"); },
-  get ong() { return t(langCourante(), "origine_ong"); },
-  get administration() { return t(langCourante(), "origine_administration"); },
-};
+export const ORIGINE_LABELS = { citoyen: "Citoyen", benevole: "Bénévole", ong: "ONG", administration: "Administration publique" };
 
 export function origineSignalement(s, origineParGroupe) {
   if (s.groupe_id && origineParGroupe[s.groupe_id]) return origineParGroupe[s.groupe_id] === "gouvernement" ? "administration" : "ong";
@@ -100,19 +93,16 @@ export function pointInPolygon(point, vs) {
 
 // ===== GPS: qualité du signal à partir de la précision (accuracy en mètres) =====
 export function gpsQualite(accuracy) {
-  const L = langCourante();
-  const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
-  const mk = (id, couleur) => ({ id, label: cap(t(L, "gps_q_" + id)), couleur });
-  if (accuracy == null || isNaN(accuracy)) return mk("inconnue", "#94a3b8");
-  if (accuracy <= 10) return mk("excellente", "#16a34a");
-  if (accuracy <= 25) return mk("bonne", "#65a30d");
-  if (accuracy <= 50) return mk("moyenne", "#d97706");
-  return mk("faible", "#dc2626");
+  if (accuracy == null || isNaN(accuracy)) return { label: "Inconnue", couleur: "#94a3b8" };
+  if (accuracy <= 10) return { label: "Excellente", couleur: "#16a34a" };
+  if (accuracy <= 25) return { label: "Bonne", couleur: "#65a30d" };
+  if (accuracy <= 50) return { label: "Moyenne", couleur: "#d97706" };
+  return { label: "Faible", couleur: "#dc2626" };
 }
 
 export function formatCap(deg) {
   if (deg == null || isNaN(deg)) return "—";
-  const dirs = t(langCourante(), "cap_dirs").split(",");
+  const dirs = ["N", "NE", "E", "SE", "S", "SO", "O", "NO"];
   const i = Math.round(deg / 45) % 8;
   return `${Math.round(deg)}° (${dirs[i]})`;
 }
@@ -129,8 +119,7 @@ export function formatVitesse(ms) {
 // d'échec, source d'erreurs de localisation). Suit la position en direct (watchPosition) le
 // temps que le formulaire reste ouvert, et remonte le dernier relevé fiable via onUpdate
 // pour que le composant parent l'utilise à l'envoi.
-export function LocationPrecision({ coordFormat, onUpdate, compact = false, lang }) {
-  const L = lang || langCourante();
+export function LocationPrecision({ coordFormat, onUpdate, compact = false }) {
   const [gps, setGps] = useState(null);
   const [error, setError] = useState(null);
   const watchIdRef = useRef(null);
@@ -176,36 +165,36 @@ export function LocationPrecision({ coordFormat, onUpdate, compact = false, lang
     <div style={{ background: "var(--c-surface-soft)", borderRadius: compact ? 10 : 12, padding: compact ? 9 : 11, marginBottom: compact ? 8 : 10, fontSize: 11.5, border: imprecise ? "1px solid #B5451B55" : "1px solid var(--c-border-soft)" }}>
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, color: "var(--c-text)", fontWeight: 600 }}>
-          <IconTarget size={13} color="var(--c-text-muted)" /> {t(L, "gps_titre")}
+          <IconTarget size={13} color="var(--c-text-muted)" /> Position GPS
         </div>
-        <button type="button" onClick={refresh} title={t(L, "gps_actualiser")} aria-label={t(L, "gps_actualiser")} style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex", color: "var(--c-text-muted)" }}>
+        <button type="button" onClick={refresh} title="Actualiser la position" aria-label="Actualiser la position" style={{ background: "none", border: "none", cursor: "pointer", padding: 3, display: "flex", color: "var(--c-text-muted)" }}>
           <IconRotateCcw size={13} />
         </button>
       </div>
       {error ? (
         <div style={{ color: "#B5451B", marginTop: 5, lineHeight: 1.5 }}>
           {error === "permission"
-            ? t(L, "gps_err_permission")
+            ? "Localisation refusée. Autorise l'accès à la position dans les réglages du navigateur pour des coordonnées fiables."
             : error === "unsupported"
-              ? t(L, "gps_err_unsupported")
-              : t(L, "gps_err_unavailable")}
+              ? "La géolocalisation n'est pas disponible sur cet appareil."
+              : "Signal GPS introuvable pour le moment — réessaie dans quelques secondes."}
         </div>
       ) : !gps ? (
         <div style={{ color: "var(--c-text-muted)", marginTop: 5, display: "flex", alignItems: "center", gap: 6 }}>
-          <IconClock size={12} /> {t(L, "gps_recherche_signal")}
+          <IconClock size={12} /> Recherche du signal GPS…
         </div>
       ) : (
         <React.Fragment>
           <div style={{ display: "flex", alignItems: "center", gap: 6, marginTop: 5 }}>
             <span style={{ width: 8, height: 8, borderRadius: "50%", background: qualite.couleur, display: "inline-block", flexShrink: 0 }} />
-            <span style={{ color: "var(--c-text-secondary)" }}>{tf(L, "gps_precision_fmt", { q: t(L, "gps_q_" + qualite.id), m: Math.round(gps.accuracy) })}</span>
+            <span style={{ color: "var(--c-text-secondary)" }}>Précision {qualite.label.toLowerCase()} — ±{Math.round(gps.accuracy)} m</span>
           </div>
-          <div dir="ltr" style={{ marginTop: 4, fontFamily: "IBM Plex Mono, monospace", color: "var(--c-text)", fontSize: 11 }}>
+          <div style={{ marginTop: 4, fontFamily: "IBM Plex Mono, monospace", color: "var(--c-text)", fontSize: 11 }}>
             {formatCoordonnees(gps.lat, gps.lng, coordFormat)}
           </div>
           {imprecise && (
             <div style={{ marginTop: 5, color: "#B5451B", lineHeight: 1.5 }}>
-              {t(L, "gps_imprecise")}
+              Précision faible : sors à l'air libre ou attends quelques secondes avant d'envoyer, pour éviter une localisation erronée.
             </div>
           )}
         </React.Fragment>

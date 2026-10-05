@@ -1,5 +1,3 @@
-import { t, langCourante } from "./i18n.js";
-
 // --- Point 1 : estimation du CO2 selon l'âge de l'arbre plutôt qu'une constante fixe.
 // Approximation : ~6 kg/an la 1ère année (jeune plant), puis ~21 kg/an en rythme de croisière une fois établi.
 export function co2EstimeParArbre(a) {
@@ -22,14 +20,12 @@ export function distanceMetres(lat1, lng1, lat2, lng2) {
 // --- Formats d'affichage des coordonnées GPS : degré décimal (DD), degré/minute/seconde
 // (DMS) et UTM (WGS84, formule standard de projection de Mercator transverse).
 function ddVersDMS(dd, estLatitude) {
-  const pts = t(langCourante(), "cap_dirs").split(","); // points cardinaux selon la langue (N, E, S, O/W)
-  const dir = estLatitude ? (dd >= 0 ? pts[0] : pts[4]) : (dd >= 0 ? pts[2] : pts[6]);
-  // On arrondit d'abord en dixièmes de seconde, puis on décompose : évite d'afficher "60.0" secondes
-  // (ex. 41'59.97" arrondi à 41'60.0" au lieu de 42'0.0").
-  const dixiemes = Math.round(Math.abs(dd) * 3600 * 10);
-  const deg = Math.floor(dixiemes / 36000);
-  const min = Math.floor((dixiemes % 36000) / 600);
-  const sec = ((dixiemes % 600) / 10).toFixed(1);
+  const dir = estLatitude ? (dd >= 0 ? "N" : "S") : (dd >= 0 ? "E" : "O");
+  const abs = Math.abs(dd);
+  const deg = Math.floor(abs);
+  const minFloat = (abs - deg) * 60;
+  const min = Math.floor(minFloat);
+  const sec = ((minFloat - min) * 60).toFixed(1);
   return `${deg}°${min}'${sec}"${dir}`;
 }
 
@@ -90,13 +86,11 @@ export function calculerPriorite(signalement, tousSignalements) {
   return "faible";
 }
 
-// Les libellés sont des accesseurs : ils suivent la langue active à chaque lecture, sans que les
-// écrans qui lisent PRIORITE_INFO[x].label aient besoin d'être modifiés.
 export const PRIORITE_INFO = {
-  critique: { get label() { return t(langCourante(), "priorite_critique"); }, color: "#8B1E1E" },
-  haute: { get label() { return t(langCourante(), "priorite_haute"); }, color: "#B5451B" },
-  moyenne: { get label() { return t(langCourante(), "priorite_moyenne"); }, color: "#E3A73B" },
-  faible: { get label() { return t(langCourante(), "priorite_faible"); }, color: "#4A8B6F" },
+  critique: { label: "Priorité critique", color: "#8B1E1E" },
+  haute: { label: "Priorité haute", color: "#B5451B" },
+  moyenne: { label: "Priorité moyenne", color: "#E3A73B" },
+  faible: { label: "Priorité faible", color: "#4A8B6F" },
 };
 
 // Limite de fréquence par appareil : évite le spam de masse depuis un seul device.
