@@ -294,11 +294,13 @@ class PaceQuery {
 
 export const supabase = {
   from(table) { return new PaceQuery(table); },
-  async rpc(fnName, params) {
+  // extraHeaders (optionnel) : ex. { Authorization: "Bearer <jeton de la session d'appareil>" } pour
+  // signer l'appel avec une identité précise plutôt que celle du compte actif.
+  async rpc(fnName, params, extraHeaders) {
     try {
       const res = await fetch(`${REST_URL}/rpc/${fnName}`, {
         method: "POST",
-        headers: restHeaders({ "Content-Type": "application/json" }),
+        headers: restHeaders(Object.assign({ "Content-Type": "application/json" }, extraHeaders || {})),
         body: JSON.stringify(params || {}),
       });
       const text = await res.text();
