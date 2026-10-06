@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { IconCheck, IconEye, IconEyeOff } from "./icons.jsx";
+import { T } from "../lib/typo.jsx";
 
 export function PasswordInput({ value, onChange, placeholder, ariaLabel, style, disabled }) {
   const [visible, setVisible] = useState(false);
@@ -38,7 +39,7 @@ export function evaluerForceMotDePasseAdmin(pw) {
 export function ExigencesMotDePasseAdmin({ password }) {
   const { regles } = evaluerForceMotDePasseAdmin(password);
   return (
-    <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginBottom: 10, display: "flex", flexDirection: "column", gap: 3 }}>
+    <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginBottom: 10, display: "flex", flexDirection: "column", gap: 3 }}>
       {regles.map(r => (
         <div key={r.id} style={{ display: "flex", alignItems: "center", gap: 5, color: r.ok ? "var(--c-accent)" : "var(--c-text-muted)" }}>
           {r.ok ? <IconCheck size={11} /> : <span style={{ width: 11, display: "inline-block", textAlign: "center" }}>•</span>} {r.label}

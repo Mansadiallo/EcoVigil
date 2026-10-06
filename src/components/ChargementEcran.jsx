@@ -1,5 +1,6 @@
 import { Component } from "react";
 import { Screen } from "./ui.jsx";
+import { T } from "../lib/typo.jsx";
 
 const MESSAGES = {
   fr: { charge: "Chargement…", erreur: "Cet écran n'a pas pu être chargé (réseau indisponible ?).", recharger: "Recharger" },
@@ -17,7 +18,7 @@ function messages() {
 export function EcranChargement() {
   return (
     <Screen>
-      <div role="status" style={{ textAlign: "center", padding: "60px 0", color: "var(--c-text-muted)", fontSize: 13 }}>{messages().charge}</div>
+      <div role="status" style={{ textAlign: "center", padding: "60px 0", color: "var(--c-text-muted)", fontSize: T.body }}>{messages().charge}</div>
     </Screen>
   );
 }
@@ -33,7 +34,7 @@ export class BoundaireErreur extends Component {
     const m = messages();
     return (
       <Screen>
-        <div style={{ textAlign: "center", padding: "50px 16px", color: "var(--c-text)", fontSize: 13.5, lineHeight: 1.5 }}>
+        <div style={{ textAlign: "center", padding: "50px 16px", color: "var(--c-text)", fontSize: T.body, lineHeight: 1.5 }}>
           <div style={{ marginBottom: 14 }}>{m.erreur}</div>
           <button onClick={() => window.location.reload()} style={{ padding: "10px 18px", borderRadius: 10, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, cursor: "pointer" }}>{m.recharger}</button>
         </div>

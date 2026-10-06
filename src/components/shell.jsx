@@ -4,6 +4,7 @@ import { PasswordInput } from "./PasswordInput.jsx";
 import { IconAlert, IconBell, IconHome, IconLock, IconMapPin, IconMonitor, IconMoon, IconSun, IconTree, IconUserCircle } from "./icons.jsx";
 import { t } from "../lib/i18n.js";
 import { supabase } from "../lib/supabase.js";
+import { T, TITRE_SOUS } from "../lib/typo.jsx";
 
 export const TABS = [
   { id: "accueil", label: "Accueil", icon: IconHome },
@@ -49,18 +50,18 @@ export function NotifBell({ email, onNavigate, color }) {
     <div style={{ position: "relative" }}>
       <button onClick={openPanel} style={{ background: "none", border: "none", color: color || "var(--c-text-muted)", cursor: "pointer", padding: 6, position: "relative" }}>
         <IconBell size={18} />
-        {unread > 0 && <span style={{ position: "absolute", top: 2, right: 2, background: "#B5451B", color: "#fff", fontSize: 9, fontWeight: 700, borderRadius: "50%", width: 15, height: 15, display: "flex", alignItems: "center", justifyContent: "center" }}>{unread > 9 ? "9+" : unread}</span>}
+        {unread > 0 && <span style={{ position: "absolute", top: 2, right: 2, background: "#B5451B", color: "#fff", fontSize: T.meta, fontWeight: 700, borderRadius: 9, minWidth: 18, height: 18, padding: "0 4px", boxSizing: "border-box", display: "flex", alignItems: "center", justifyContent: "center" }}>{unread > 9 ? "9+" : unread}</span>}
       </button>
       {open && (
         <div style={{ position: "absolute", top: 34, right: 0, width: 260, background: "var(--c-surface)", borderRadius: 12, border: "1px solid var(--c-border)", boxShadow: "0 6px 20px rgba(0,0,0,0.15)", zIndex: 100, maxHeight: 320, overflowY: "auto" }}>
           {notifs.length === 0 ? (
-            <div style={{ padding: 16, fontSize: 12.5, color: "var(--c-text-muted)", textAlign: "center" }}>Aucune notification.</div>
+            <div style={{ padding: 16, fontSize: T.body, color: "var(--c-text-muted)", textAlign: "center" }}>Aucune notification.</div>
           ) : notifs.map(n => (
             <button key={n.id} onClick={() => { if (n.lien) onNavigate(n.lien); setOpen(false); }} style={{
               display: "block", width: "100%", textAlign: "left", padding: "10px 12px", border: "none", borderBottom: "1px solid var(--c-surface-soft)",
               background: "var(--c-surface)", cursor: "pointer" }}>
-              <div style={{ fontSize: 12, color: "var(--c-text)" }}>{n.message}</div>
-              <div style={{ fontSize: 10, color: "var(--c-text-muted)", marginTop: 3 }}>{new Date(n.created_at).toLocaleDateString("fr-FR")}</div>
+              <div style={{ fontSize: T.small, color: "var(--c-text)" }}>{n.message}</div>
+              <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 3 }}>{new Date(n.created_at).toLocaleDateString("fr-FR")}</div>
             </button>
           ))}
         </div>
@@ -126,12 +127,12 @@ export function ThemePanel({ themeMode, accent, lang, coordFormat, onSetMode, on
       <button aria-label="Fermer les réglages" onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", border: "none", cursor: "pointer" }} />
       <div className="pace-fade-in" style={{ position: "relative", width: "100%", maxWidth: 480, background: "var(--c-surface)", borderRadius: "20px 20px 0 0", padding: 20, boxShadow: "var(--shadow-md)", maxHeight: "92vh", overflowY: "auto" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, color: "var(--c-accent-dark)" }}>Affichage</div>
+          <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)" }}>Affichage</div>
           <button onClick={onClose} aria-label="Fermer" style={{ background: "var(--c-surface-soft)", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", color: "var(--c-text-secondary)" }}>✕</button>
         </div>
 
   {section === "theme" && (<>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Thème</div>
+        <div style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Thème</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           {modes.map(m => {
             const MIcon = m.icon;
@@ -142,7 +143,7 @@ export function ThemePanel({ themeMode, accent, lang, coordFormat, onSetMode, on
                 border: active ? "2px solid var(--c-accent)" : "1px solid var(--c-border)",
                 background: active ? "var(--c-surface-soft)" : "var(--c-surface)", cursor: "pointer" }}>
                 <MIcon size={18} color={active ? "var(--c-accent)" : "var(--c-text-muted)"} />
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: active ? "var(--c-accent)" : "var(--c-text-secondary)" }}>{m.label}</span>
+                <span style={{ fontSize: T.small, fontWeight: 600, color: active ? "var(--c-accent)" : "var(--c-text-secondary)" }}>{m.label}</span>
               </button>
             );
           })}
@@ -150,7 +151,7 @@ export function ThemePanel({ themeMode, accent, lang, coordFormat, onSetMode, on
   </>)}
 
   {section === "accent" && (<>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Couleur d'accent</div>
+        <div style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Couleur d'accent</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           {accents.map(a => {
             const active = accent === a.id;
@@ -160,7 +161,7 @@ export function ThemePanel({ themeMode, accent, lang, coordFormat, onSetMode, on
                 border: active ? `2px solid ${a.color}` : "1px solid var(--c-border)",
                 background: active ? "var(--c-surface-soft)" : "var(--c-surface)", cursor: "pointer" }}>
                 <span style={{ width: 20, height: 20, borderRadius: "50%", background: a.color, display: "block" }} />
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: "var(--c-text-secondary)" }}>{a.label}</span>
+                <span style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text-secondary)" }}>{a.label}</span>
               </button>
             );
           })}
@@ -168,13 +169,13 @@ export function ThemePanel({ themeMode, accent, lang, coordFormat, onSetMode, on
   </>)}
 
   {section === "langue" && (<>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Langue / Language</div>
+        <div style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Langue / Language</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
           {langues.map(l => {
             const active = lang === l.id;
             return (
               <button key={l.id} onClick={() => onSetLang(l.id)} aria-pressed={active} style={{
-                padding: "12px 0", borderRadius: 12, fontSize: 12.5, fontWeight: 600,
+                padding: "12px 0", borderRadius: 12, fontSize: T.body, fontWeight: 600,
                 border: active ? "2px solid var(--c-accent)" : "1px solid var(--c-border)",
                 background: active ? "var(--c-surface-soft)" : "var(--c-surface)", color: active ? "var(--c-accent)" : "var(--c-text-secondary)", cursor: "pointer" }}>
                 {l.label}
@@ -182,13 +183,13 @@ export function ThemePanel({ themeMode, accent, lang, coordFormat, onSetMode, on
             );
           })}
         </div>
-        <div style={{ fontSize: 10.5, color: "var(--c-text-muted)", marginTop: 8, lineHeight: 1.5 }}>
+        <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 8, lineHeight: 1.5 }}>
           La navigation principale et les titres changent de langue immédiatement. La traduction complète du contenu est en cours.
         </div>
   </>)}
 
   {section === "gps" && (<>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Format des coordonnées GPS</div>
+        <div style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Format des coordonnées GPS</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           {[
             { id: "dd", label: "Degré décimal", exemple: "9.535000, -13.680000" },
@@ -201,8 +202,8 @@ export function ThemePanel({ themeMode, accent, lang, coordFormat, onSetMode, on
                 display: "flex", flexDirection: "column", alignItems: "center", gap: 4, padding: "10px 4px", borderRadius: 12,
                 border: active ? "2px solid var(--c-accent)" : "1px solid var(--c-border)",
                 background: active ? "var(--c-surface-soft)" : "var(--c-surface)", cursor: "pointer" }}>
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: active ? "var(--c-accent)" : "var(--c-text-secondary)" }}>{f.label}</span>
-                <span style={{ fontSize: 9, color: "var(--c-text-faint)" }}>{f.exemple}</span>
+                <span style={{ fontSize: T.small, fontWeight: 600, color: active ? "var(--c-accent)" : "var(--c-text-secondary)" }}>{f.label}</span>
+                <span style={{ fontSize: T.meta, color: "var(--c-text-faint)" }}>{f.exemple}</span>
               </button>
             );
           })}
@@ -210,7 +211,7 @@ export function ThemePanel({ themeMode, accent, lang, coordFormat, onSetMode, on
   </>)}
 
       {section === "orientation" && (<>
-        <div style={{ fontSize: 12, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Orientation de l'affichage</div>
+        <div style={{ fontSize: T.small, fontWeight: 600, color: "var(--c-text-secondary)", marginBottom: 8 }}>Orientation de l'affichage</div>
         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
           {orientations.map(o => {
             const active = orientation === o.id;
@@ -220,13 +221,13 @@ export function ThemePanel({ themeMode, accent, lang, coordFormat, onSetMode, on
                 border: active ? "2px solid var(--c-accent)" : "1px solid var(--c-border)",
                 background: active ? "var(--c-surface-soft)" : "var(--c-surface)", cursor: "pointer" }}>
                 <span style={{ width: o.w, height: o.h, borderRadius: 3, boxSizing: "border-box", display: "block", border: `2px ${o.id === "auto" ? "dashed" : "solid"} ${active ? "var(--c-accent)" : "var(--c-text-muted)"}` }} />
-                <span style={{ fontSize: 11.5, fontWeight: 600, color: active ? "var(--c-accent)" : "var(--c-text-secondary)" }}>{o.label}</span>
+                <span style={{ fontSize: T.small, fontWeight: 600, color: active ? "var(--c-accent)" : "var(--c-text-secondary)" }}>{o.label}</span>
               </button>
             );
           })}
         </div>
         {!(typeof screen !== "undefined" && screen.orientation && screen.orientation.lock) && (
-          <div style={{ fontSize: 11, color: "var(--c-text-muted)", marginTop: 10, lineHeight: 1.4 }}>Sur cet appareil, le navigateur ne permet pas de forcer l'orientation : tournez simplement votre téléphone.</div>
+          <div style={{ fontSize: T.meta, color: "var(--c-text-muted)", marginTop: 10, lineHeight: 1.4 }}>Sur cet appareil, le navigateur ne permet pas de forcer l'orientation : tournez simplement votre téléphone.</div>
         )}
       </>)}
       </div>
@@ -248,7 +249,7 @@ export function MenuHamburger({ items, onClose }) {
       <button aria-label="Fermer le menu" onClick={onClose} style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.35)", border: "none", cursor: "pointer" }} />
       <div className="pace-fade-in" style={{ position: "absolute", top: 0, bottom: 0, insetInlineEnd: 0, width: "min(320px, 86%)", overflowY: "auto", background: "var(--c-surface)", borderStartStartRadius: 20, borderEndStartRadius: 20, padding: "calc(16px + env(safe-area-inset-top, 0px)) 16px calc(16px + env(safe-area-inset-bottom, 0px))", boxShadow: "var(--shadow-md)" }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, color: "var(--c-accent-dark)" }}>Menu</div>
+          <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)" }}>Menu</div>
           <button ref={closeRef} onClick={onClose} aria-label="Fermer" style={{ background: "var(--c-surface-soft)", border: "none", borderRadius: "50%", width: 32, height: 32, cursor: "pointer", color: "var(--c-text-secondary)" }}>✕</button>
         </div>
         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -264,8 +265,8 @@ export function MenuHamburger({ items, onClose }) {
                   {item.locked ? <IconLock size={17} color="var(--c-text-muted)" /> : <ItemIcon size={17} color="var(--c-accent)" />}
                 </div>
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: 13, fontWeight: 600, color: "var(--c-text)" }}>{item.label}</div>
-                  {item.note && <div style={{ fontSize: 11, color: "var(--c-text-muted)" }}>{item.note}</div>}
+                  <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-text)" }}>{item.label}</div>
+                  {item.note && <div style={{ fontSize: T.meta, color: "var(--c-text-muted)" }}>{item.note}</div>}
                 </div>
               </button>
             );
@@ -293,7 +294,7 @@ export function SplashScreen({ lang }) {
       <div className="pace-fade-in" style={{ fontFamily: "Fraunces, serif", fontWeight: 700, fontSize: 24, color: "#fff", letterSpacing: 0.4 }}>
         EcoVigil
       </div>
-      <div className="pace-fade-in" style={{ fontSize: 12, color: "rgba(255,255,255,0.85)", marginTop: 4, textAlign: "center", padding: "0 24px" }}>
+      <div className="pace-fade-in" style={{ fontSize: T.small, color: "rgba(255,255,255,0.85)", marginTop: 4, textAlign: "center", padding: "0 24px" }}>
         {t(lang, "devise_ecovigil")}
       </div>
     </div>
@@ -316,7 +317,7 @@ export function Onboarding({ onDone }) {
         <Icon size={36} color="#fff" />
       </div>
       <div style={{ fontFamily: "Fraunces, serif", fontSize: 21, fontWeight: 600, marginBottom: 10 }}>{slide.title}</div>
-      <div style={{ fontSize: 14, opacity: 0.9, lineHeight: 1.5, maxWidth: 280 }}>{slide.text}</div>
+      <div style={{ fontSize: T.body, opacity: 0.9, lineHeight: 1.5, maxWidth: 280 }}>{slide.text}</div>
 
       <div style={{ display: "flex", gap: 6, marginTop: 28, marginBottom: 28 }}>
         {ONBOARDING_SLIDES.map((_, i) => (
@@ -326,15 +327,15 @@ export function Onboarding({ onDone }) {
 
       <div style={{ display: "flex", gap: 10, width: "100%", maxWidth: 300 }}>
         {step > 0 && (
-          <button onClick={() => setStep(step - 1)} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "1px solid rgba(255,255,255,0.4)", background: "transparent", color: "#fff", fontWeight: 600, fontSize: 13.5, cursor: "pointer" }}>Précédent</button>
+          <button onClick={() => setStep(step - 1)} style={{ flex: 1, padding: "12px 0", borderRadius: 12, border: "1px solid rgba(255,255,255,0.4)", background: "transparent", color: "#fff", fontWeight: 600, fontSize: T.body, cursor: "pointer" }}>Précédent</button>
         )}
-        <button onClick={() => last ? onDone() : setStep(step + 1)} style={{ flex: 2, padding: "12px 0", borderRadius: 12, border: "none", background: "var(--c-surface)", color: "var(--c-accent-dark)", fontWeight: 700, fontSize: 13.5, cursor: "pointer" }}>
+        <button onClick={() => last ? onDone() : setStep(step + 1)} style={{ flex: 2, padding: "12px 0", borderRadius: 12, border: "none", background: "var(--c-surface)", color: "var(--c-accent-dark)", fontWeight: 700, fontSize: T.body, cursor: "pointer" }}>
           {last ? "Commencer" : "Suivant"}
         </button>
       </div>
-      <button onClick={onDone} style={{ marginTop: 18, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 20, padding: "8px 20px", color: "#fff", fontSize: 13, fontWeight: 600, cursor: "pointer" }}>Passer l'introduction</button>
+      <button onClick={onDone} style={{ marginTop: 18, background: "rgba(255,255,255,0.12)", border: "1px solid rgba(255,255,255,0.3)", borderRadius: 20, padding: "8px 20px", color: "#fff", fontSize: T.body, fontWeight: 600, cursor: "pointer" }}>Passer l'introduction</button>
       {last && (
-        <div style={{ fontSize: 11, opacity: 0.85, marginTop: 16, maxWidth: 280 }}>
+        <div style={{ fontSize: T.meta, opacity: 0.85, marginTop: 16, maxWidth: 280 }}>
           En continuant, tu acceptes notre politique de confidentialité (consultable à tout moment depuis l'accueil → À propos & Informations légales).
         </div>
       )}
@@ -359,14 +360,14 @@ export function CitoyenNouveauMotDePasse({ token, onDone }) {
   return (
     <div style={{ position: "fixed", inset: 0, background: "var(--c-bg)", zIndex: 1200, display: "flex", alignItems: "center", justifyContent: "center", padding: 20 }}>
       <div style={{ maxWidth: 360, width: "100%", background: "var(--c-surface)", borderRadius: 16, padding: 20, border: "1px solid var(--c-border)" }}>
-        <div style={{ fontFamily: "Fraunces, serif", fontSize: 17, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 6 }}>Nouveau mot de passe</div>
-        <div style={{ fontSize: 12.5, color: "var(--c-text-secondary)", marginBottom: 14 }}>Choisis un nouveau mot de passe pour ton compte.</div>
+        <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 6 }}>Nouveau mot de passe</div>
+        <div style={{ fontSize: T.body, color: "var(--c-text-secondary)", marginBottom: 14 }}>Choisis un nouveau mot de passe pour ton compte.</div>
         <PasswordInput value={newPassword} onChange={e => setNewPassword(e.target.value)} placeholder="Nouveau mot de passe (8 caractères min.)"
-          style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: 13, marginBottom: 10 }} />
-        {error && <div role="alert" style={{ fontSize: 12, color: "#B5451B", marginBottom: 10 }}>{error}</div>}
+          style={{ padding: 10, borderRadius: 10, border: "1px solid var(--c-border)", fontSize: T.field, marginBottom: 10 }} />
+        {error && <div role="alert" style={{ fontSize: T.small, color: "#B5451B", marginBottom: 10 }}>{error}</div>}
         <button onClick={valider} disabled={busy || newPassword.length < 8} style={{
           width: "100%", padding: "11px 0", borderRadius: 10, border: "none",
-          background: newPassword.length < 8 ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: 13.5,
+          background: newPassword.length < 8 ? "var(--c-text-faint)" : "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.body,
           cursor: newPassword.length < 8 ? "default" : "pointer" }}>
           {busy ? "…" : "Valider"}
         </button>
