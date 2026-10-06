@@ -1,32 +1,55 @@
-import { Screen, SectionTitle } from "../components/ui.jsx";
-import { T } from "../lib/typo.jsx";
+import React from "react";
+import { Screen } from "../components/ui.jsx";
+import { T, TITRE_GRAND } from "../lib/typo.jsx";
 
-export const CONTACT_TELEPHONE = "+224 628615181";
-export const CONTACT_EMAILS = ["ecovigilguinee@gmail.com", "wassolonmansa97@gmail.com"];
+// Coordonnées d'EcoVigil affichées dans le menu hamburger (module « Contact »).
+const TELEPHONE = "+224 628615181";
+const EMAILS = ["ecovigilguinee@gmail.com", "wassolonmansa97@gmail.com"];
 
-// Icône « enveloppe » pour l'entrée de menu (même signature que les autres icônes : size, color).
-export function IconContact({ size = 18, color = "currentColor" }) {
+function IconTel({ size = 18 }) {
   return (
-    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
+    </svg>
+  );
+}
+function IconCourriel({ size = 18 }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <rect x="3" y="5" width="18" height="14" rx="2" />
       <path d="m3 7 9 6 9-6" />
     </svg>
   );
 }
 
+const carte = { display: "flex", alignItems: "center", gap: 12, padding: "14px 14px", borderRadius: 14, border: "1px solid var(--c-border)", background: "var(--c-surface)", textDecoration: "none", color: "var(--c-text)", marginBottom: 10 };
+const pastille = { width: 38, height: 38, borderRadius: "50%", background: "var(--c-accent-soft, rgba(0,128,96,0.12))", color: "var(--c-accent-dark)", display: "flex", alignItems: "center", justifyContent: "center", flexShrink: 0 };
+
 export function Contact({ onBack }) {
-  const ligne = { display: "block", padding: "12px 14px", borderRadius: 12, border: "1px solid var(--c-border)", background: "var(--c-surface)", color: "var(--c-accent-dark)", fontSize: T.body, fontWeight: 600, textDecoration: "none", marginBottom: 8, overflowWrap: "anywhere" };
-  const etiquette = { fontSize: T.small, fontWeight: 600, color: "var(--c-text-secondary)", margin: "14px 0 6px" };
+  const tel = TELEPHONE.replace(/\s+/g, "");
   return (
     <Screen>
       <button onClick={onBack} style={{ background: "none", border: "none", color: "var(--c-text-muted)", fontSize: T.body, cursor: "pointer", marginBottom: 10, padding: 0 }}>← Retour</button>
-      <SectionTitle sub="Une question, une suggestion ou un problème ? Écris-nous ou appelle-nous.">Contact</SectionTitle>
+      <div style={{ ...TITRE_GRAND, fontWeight: 700, color: "var(--c-accent-dark)", marginBottom: 4 }}>Contact</div>
+      <div style={{ fontSize: T.body, color: "var(--c-text-muted)", marginBottom: 16 }}>Une question, une suggestion ou besoin d'aide ? Écris-nous ou appelle-nous.</div>
 
-      <div style={etiquette}>Téléphone</div>
-      <a href={"tel:" + CONTACT_TELEPHONE.replace(/\s/g, "")} style={ligne}>{CONTACT_TELEPHONE}</a>
+      <a href={`tel:${tel}`} style={carte}>
+        <span style={pastille}><IconTel /></span>
+        <span style={{ minWidth: 0 }}>
+          <span style={{ display: "block", fontSize: T.small, color: "var(--c-text-muted)" }}>Contact</span>
+          <span style={{ display: "block", fontSize: T.body, fontWeight: 600 }}>{TELEPHONE}</span>
+        </span>
+      </a>
 
-      <div style={etiquette}>E-mails</div>
-      {CONTACT_EMAILS.map(m => <a key={m} href={"mailto:" + m} style={ligne}>{m}</a>)}
+      {EMAILS.map(adresse => (
+        <a key={adresse} href={`mailto:${adresse}`} style={carte}>
+          <span style={pastille}><IconCourriel /></span>
+          <span style={{ minWidth: 0 }}>
+            <span style={{ display: "block", fontSize: T.small, color: "var(--c-text-muted)" }}>Email</span>
+            <span style={{ display: "block", fontSize: T.body, fontWeight: 600, wordBreak: "break-all" }}>{adresse}</span>
+          </span>
+        </a>
+      ))}
     </Screen>
   );
 }
