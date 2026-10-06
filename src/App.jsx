@@ -12,6 +12,7 @@ import { subscribeToPush } from "./lib/push.js";
 import { AUTH_URL, DEVICE_ID, SUPABASE_KEY, authListeners, currentSession, ensureDeviceSession, enterAdminIdentity, exitAdminIdentity, getActiveSession, getBenevoleInfo, persistSession, refreshSessionIfNeeded, retirerEcouteurAuth, supabase } from "./lib/supabase.js";
 import { checkLimiteFrequence, distanceMetres } from "./lib/utils.js";
 import { Accueil } from "./screens/Accueil.jsx";
+import { Contact } from "./screens/Contact.jsx";
 import { MonArbre } from "./screens/MonArbre.jsx";
 import { BenevoleAccesBloque, OrganisationCard } from "./screens/Organisation.jsx";
 import { MurProfilObligatoire, ProfilTab } from "./screens/Profil.jsx";
@@ -28,6 +29,15 @@ const Confidentialite = lazy(() => import("./screens/Confidentialite.jsx").then(
 const EspaceOrganisation = lazy(() => import("./screens/EspaceOrganisation.jsx").then((m) => ({ default: m.EspaceOrganisation })));
 const Evenements = lazy(() => import("./screens/Evenements.jsx").then((m) => ({ default: m.Evenements })));
 const GroupesTerrain = lazy(() => import("./screens/GroupesTerrain.jsx").then((m) => ({ default: m.GroupesTerrain })));
+
+// Icône « téléphone » du module Contact (SVG local : même signature que les icônes du menu).
+function IconContact({ size = 18, color = "currentColor" }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.3a2 2 0 0 1 2.1-.4c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z" />
+    </svg>
+  );
+}
 
 function App() {
   // Deep-linking depuis la page d'accueil publique (pace-accueil.html) ou tout lien externe :
@@ -929,6 +939,7 @@ function App() {
     { id: "groupes_terrain", label: "Groupe terrain", icon: IconUsers, onSelect: () => setTab("groupes_terrain") },
     { id: "enquetes_terrain", label: "Enquêtes terrain", icon: IconSearch, onSelect: () => setTab("enquetes_terrain"), locked: !estBenevoleValide, note: estBenevoleValide ? null : "Réservé aux bénévoles validés" },
     { id: "evenements", label: "Événements", icon: IconCalendar, onSelect: () => setTab("evenements") },
+    { id: "contact", label: "Contact", icon: IconContact, onSelect: () => setTab("contact") },
   ];
 
   return (
@@ -1024,6 +1035,8 @@ function App() {
           </Screen>
         ) : tab === "espace_org" && estOrganisationValidee ? (
           <EspaceOrganisation organisationEmail={citoyenSession && citoyenSession.user && citoyenSession.user.email} organisationUserId={citoyenSession && citoyenSession.user && citoyenSession.user.id} onBack={() => setTab("accueil")} coordFormat={coordFormat}  peutBasculerBenevole={estBenevoleValide} />
+        ) : tab === "contact" ? (
+          <Contact onBack={() => setTab("accueil")} />
         ) : tab === "evenements" ? (
           <Evenements onBack={() => setTab("accueil")} />
         ) : tab === "groupes_terrain" ? (
