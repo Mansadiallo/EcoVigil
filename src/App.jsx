@@ -15,7 +15,6 @@ import { Accueil } from "./screens/Accueil.jsx";
 import { MonArbre } from "./screens/MonArbre.jsx";
 import { BenevoleAccesBloque, OrganisationCard } from "./screens/Organisation.jsx";
 import { MurProfilObligatoire, ProfilTab } from "./screens/Profil.jsx";
-import { Contact, IconContact } from "./screens/Contact.jsx";
 import { Signaler } from "./screens/Signaler.jsx";
 import { FONT_TEXTE, T } from "./lib/typo.jsx";
 
@@ -166,20 +165,50 @@ function App() {
   // via un code d'invitation pour un membre (citoyenSession dans les deux cas, pas device_id).
   // Nécessite une session active pour être vérifié — contrairement au bénévole, il faut se
   // connecter (ou resaisir son code) sur chaque nouvel appareil.
-  const [organisationStatut, setOrganisationStatut] = useState(null);
-  const [organisationEtapeDossier, setOrganisationEtapeDossier] = useState(null);
-  const [organisationEtapeMotif, setOrganisationEtapeMotif] = useState(null);
-  const [organisationChargement, setOrganisationChargement] = useState(true);
+  // Statut organisation mis en cache localement (par utilisateur), comme le statut bénévole : un
+  // membre d'organisation validé garde son accès sans connexion. La vérification serveur tourne
+  // en tâche de fond ; seule une réponse serveur claire modifie ou efface le cache — jamais un
+  // échec réseau.
+  const CLE_CACHE_ORG = "pace-org-cache";
+  function lireOrgCache(userId) {
+    try {
+      const o = JSON.parse(localStorage.getItem(CLE_CACHE_ORG) || "null");
+      return o && o.id === userId ? o : null;
+    } catch (e) { return null; }
+  }
+  function ecrireOrgCache(userId, org) {
+    try {
+      if (org) localStorage.setItem(CLE_CACHE_ORG, JSON.stringify({ id: userId, statut: org.statut, etape: org.etape || null, motif: org.motif || null }));
+      else localStorage.removeItem(CLE_CACHE_ORG);
+    } catch (e) {}
+  }
+  const orgCacheInitial = (() => {
+    const uid = currentSession && currentSession.user && currentSession.user.id;
+    return uid ? lireOrgCache(uid) : null;
+  })();
+  const [organisationStatut, setOrganisationStatut] = useState(orgCacheInitial ? orgCacheInitial.statut : null);
+  const [organisationEtapeDossier, setOrganisationEtapeDossier] = useState(orgCacheInitial ? orgCacheInitial.etape : null);
+  const [organisationEtapeMotif, setOrganisationEtapeMotif] = useState(orgCacheInitial ? orgCacheInitial.motif : null);
+  // Avec un statut en cache, pas d'attente réseau (même principe que benevoleStatutChargement).
+  const [organisationChargement, setOrganisationChargement] = useState(!orgCacheInitial);
   useEffect(() => {
     if (citoyenSession === undefined) return; // session en cours de résolution
     if (!citoyenSession || !citoyenSession.user || !citoyenSession.user.id) {
       setOrganisationStatut(null);
       setOrganisationEtapeDossier(null); setOrganisationEtapeMotif(null);
+      ecrireOrgCache(null, null);
       setOrganisationChargement(false);
       return;
     }
     const emailSession = citoyenSession.user.email || null;
     const userIdSession = citoyenSession.user.id;
+    // Applique une réponse serveur claire (organisation trouvée) et la met en cache.
+    function appliquerOrg(org) {
+      setOrganisationStatut(org.statut);
+      setOrganisationEtapeDossier(org.etape_dossier); setOrganisationEtapeMotif(org.etape_dossier_motif);
+      ecrireOrgCache(userIdSession, { statut: org.statut, etape: org.etape_dossier, motif: org.etape_dossier_motif });
+      setOrganisationChargement(false);
+    }
     (async () => {
       // Confirme automatiquement toute invitation de membre en attente pour cet e-mail (ex.
       // après un clic sur le lien reçu il y a longtemps, pour les tout premiers membres
@@ -190,33 +219,30 @@ function App() {
       // Le compte principal se connecte toujours par e-mail : sans e-mail sur la session
       // (cas d'un membre par code, via une session possiblement anonyme), on saute
       // directement à la recherche via org_membres.
-      const data = emailSession
-        ? (await supabase.from("organisations").select("statut, type, etape_dossier, etape_dossier_motif").eq("email", emailSession).eq("is_deleted", false).order("created_at", { ascending: false }).limit(1)).data
-        : [];
-      if (data && data.length > 0) {
-        setOrganisationStatut(data[0].statut);
-        setOrganisationEtapeDossier(data[0].etape_dossier); setOrganisationEtapeMotif(data[0].etape_dossier_motif);
-        setOrganisationChargement(false);
-        return;
+      let data = [];
+      if (emailSession) {
+        const res = await supabase.from("organisations").select("statut, type, etape_dossier, etape_dossier_motif").eq("email", emailSession).eq("is_deleted", false).order("created_at", { ascending: false }).limit(1);
+        if (res.error) { setOrganisationChargement(false); return; } // échec réseau : on garde le statut en cache
+        data = res.data;
       }
+      if (data && data.length > 0) { appliquerOrg(data[0]); return; }
       if (data && data.length === 0) {
         // Pas de compte principal à cette identité : peut-être un membre confirmé d'une
         // organisation, identifié par e-mail (tout premiers membres) ou par user_id
         // (membres ayant rejoint via un code d'invitation).
         let membreQuery = supabase.from("org_membres").select("organisation_id").eq("statut", "actif").limit(1);
         membreQuery = emailSession ? membreQuery.eq("email", emailSession) : membreQuery.eq("user_id", userIdSession);
-        const { data: membreData } = await membreQuery.maybeSingle();
+        const { data: membreData, error: membreErr } = await membreQuery.maybeSingle();
+        if (membreErr) { setOrganisationChargement(false); return; } // échec réseau : on garde le cache
         if (membreData) {
-          const { data: orgData } = await supabase.from("organisations").select("statut, type, etape_dossier, etape_dossier_motif").eq("id", membreData.organisation_id).eq("is_deleted", false).maybeSingle();
-          if (orgData) {
-            setOrganisationStatut(orgData.statut);
-            setOrganisationEtapeDossier(orgData.etape_dossier); setOrganisationEtapeMotif(orgData.etape_dossier_motif);
-            setOrganisationChargement(false);
-            return;
-          }
+          const { data: orgData, error: orgErr } = await supabase.from("organisations").select("statut, type, etape_dossier, etape_dossier_motif").eq("id", membreData.organisation_id).eq("is_deleted", false).maybeSingle();
+          if (orgErr) { setOrganisationChargement(false); return; } // échec réseau : on garde le cache
+          if (orgData) { appliquerOrg(orgData); return; }
         }
+        // Réponse serveur claire : aucune organisation pour cette identité.
         setOrganisationStatut(null);
         setOrganisationEtapeDossier(null); setOrganisationEtapeMotif(null);
+        ecrireOrgCache(null, null);
       }
       setOrganisationChargement(false);
     })();
@@ -227,11 +253,46 @@ function App() {
   // Profil de base (e-mail + mot de passe) : préalable requis avant de devenir bénévole ou de
   // créer un compte organisation. Partage la même citoyenSession que le compte organisation —
   // un profil n'est pas un compte organisation, mais utilise le même mécanisme d'authentification.
-  const [profilInfo, setProfilInfo] = useState(undefined); // undefined = en cours, null = aucun profil
+  // Le profil est mis en cache localement (comme le statut bénévole) : sans connexion, la lecture
+  // de profils_comptes échoue, et l'app concluait à tort « aucun profil » en affichant la création.
+  const CLE_CACHE_PROFIL = "pace-profil-cache";
+  function lireProfilCache(userId) {
+    try {
+      const o = JSON.parse(localStorage.getItem(CLE_CACHE_PROFIL) || "null");
+      return o && o.id === userId ? o.profil : null;
+    } catch (e) { return null; }
+  }
+  function ecrireProfilCache(userId, profil) {
+    try {
+      if (profil) localStorage.setItem(CLE_CACHE_PROFIL, JSON.stringify({ id: userId, profil }));
+      else localStorage.removeItem(CLE_CACHE_PROFIL);
+    } catch (e) {}
+  }
+  // Valeur initiale : si une session existe déjà, le profil en cache s'affiche immédiatement
+  // (aucune attente réseau) ; la vérification serveur tourne ensuite en tâche de fond.
+  const [profilInfo, setProfilInfo] = useState(() => {
+    const uid = currentSession && currentSession.user && currentSession.user.id;
+    return (uid && lireProfilCache(uid)) || undefined; // undefined = en cours, null = aucun profil
+  });
   async function rafraichirProfil() {
-    if (!citoyenSession || !citoyenSession.user || !citoyenSession.user.id) { setProfilInfo(null); return; }
-    const { data } = await supabase.from("profils_comptes").select("nom, email, pays, ville, photo_url").eq("id", citoyenSession.user.id).maybeSingle();
-    setProfilInfo(data || null);
+    const user = citoyenSession && citoyenSession.user;
+    if (!user || !user.id) { setProfilInfo(null); ecrireProfilCache(null, null); return; }
+    let data = null, echec = false;
+    try {
+      const res = await supabase.from("profils_comptes").select("nom, email, pays, ville, photo_url").eq("id", user.id).maybeSingle();
+      data = res.data || null;
+      echec = !!res.error || (!res.data && typeof navigator !== "undefined" && navigator.onLine === false);
+    } catch (e) { echec = true; }
+    if (echec) {
+      // Panne réseau : on n'en déduit surtout pas « aucun profil ». On garde l'affichage actuel,
+      // sinon le cache local, sinon (compte avec e-mail) les infos saisies à l'inscription.
+      const meta = user.user_metadata || {};
+      const depuisSession = user.email ? { nom: meta.nom || user.email, email: user.email, pays: meta.pays || null, ville: meta.ville || null, photo_url: meta.photo_url || null } : null;
+      setProfilInfo(prev => prev || lireProfilCache(user.id) || depuisSession || null);
+      return;
+    }
+    setProfilInfo(data);
+    ecrireProfilCache(user.id, data);
   }
   useEffect(() => {
     if (citoyenSession === undefined) return;
@@ -362,6 +423,12 @@ function App() {
     const retryTimer = setInterval(() => { if (navigator.onLine) flushPendingQueue(); }, 20000);
     return () => { window.removeEventListener("online", goOnline); window.removeEventListener("offline", goOffline); window.removeEventListener("pace-queue-updated", onQueueUpdated); clearInterval(retryTimer); };
   }, []);
+
+  // Retour de la connexion : relit le profil pour rafraîchir le cache local (effet séparé de celui
+  // ci-dessus, dont les écouteurs sont figés au premier rendu et ne verraient pas la session à jour).
+  useEffect(() => {
+    if (online && citoyenSession !== undefined) rafraichirProfil();
+  }, [online]);
 
   function enableNotif() {
     if (typeof Notification === "undefined") return;
@@ -496,32 +563,6 @@ function App() {
     if (table === "arbres") setArbres(prev => prev.filter(a => a.id !== id));
   }
 
-  // Le citoyen peut supprimer un arbre qu'il a enregistré (ex. mal géolocalisé) : il pourra le
-  // replanter au bon endroit. La fonction serveur supprimer_arbre_citoyen vérifie que l'arbre lui
-  // appartient (citoyen_id, ou à défaut l'en-tête x-device-id) et le retire en suppression douce.
-  async function citoyenSupprimerArbre(arbre) {
-    if (!arbre) return false;
-    if (arbre._pending) {
-      // Pas encore envoyé au serveur : on retire simplement l'élément de la file locale.
-      dequeuePendingAction(arbre.id);
-      setPendingQueueCount(loadPendingQueue().length);
-      setArbres(prev => prev.filter(x => x.id !== arbre.id));
-      return true;
-    }
-    try {
-      const { error } = await supabase.rpc("supprimer_arbre_citoyen", { p_id: arbre.id }, { headers: { "x-device-id": DEVICE_ID } });
-      if (error) throw error;
-      setArbres(prev => prev.filter(x => x.id !== arbre.id));
-      setSuivis(prev => prev.filter(sv => sv.arbre_id !== arbre.id));
-      logActivity("suppression_citoyen", "arbres", arbre.id);
-      return true;
-    } catch (e) {
-      console.error("Suppression de l'arbre :", e);
-      alert("Suppression impossible pour le moment. Vérifie ta connexion et réessaie.");
-      return false;
-    }
-  }
-
   async function adminSoftDeleteArbre(arbre) {
     const email = (getActiveSession() || {}).user ? getActiveSession().user.email : "";
     const { data, error } = await supabase.from("arbres").update({ is_deleted: true, deleted_at: new Date().toISOString(), deleted_by: email }).eq("id", arbre.id).select();
@@ -529,6 +570,50 @@ function App() {
     if (!data || data.length === 0) { alert("Suppression refusée par le serveur (droits admin requis) : l'arbre n'a pas été modifié et réapparaîtra."); return; }
     logActivity("soft_delete", "arbres", arbre.id, arbre.nom || "Arbre");
     setArbres(prev => prev.filter(a => a.id !== arbre.id));
+  }
+
+  // Suppression par le citoyen d'un de ses propres arbres (enregistré par erreur ou incorrect).
+  // Suppression douce, comme côté organisation/admin : l'arbre reste restaurable depuis l'Historique.
+  // Un arbre encore en file d'attente hors-ligne n'existe pas en base : on le retire simplement de la file.
+  async function citoyenSupprimerArbre(arbre) {
+    if (arbre._pending) {
+      dequeuePendingAction(arbre.id);
+      setPendingQueueCount(loadPendingQueue().length);
+      setArbres(prev => prev.filter(a => a.id !== arbre.id));
+      return;
+    }
+    // RPC SECURITY DEFINER : la table arbres n'est pas lisible/modifiable directement par un citoyen (RLS).
+    const sessionAppareil = await ensureDeviceSession();
+    const { error } = await supabase.rpc("supprimer_arbre_citoyen", { p_id: arbre.id }, sessionAppareil ? { Authorization: "Bearer " + sessionAppareil.access_token } : undefined);
+    if (error) throw error;
+    setArbres(prev => prev.filter(a => a.id !== arbre.id));
+  }
+
+  // Abandon manuel des envois en attente (bandeau « Envoi de N élément(s) en attente… » bloqué).
+  // Retire de la file locale tous les éléments pas encore envoyés, ainsi que leurs copies
+  // provisoires affichées dans l'app (marquées _pending).
+  function abandonnerEnvoisEnAttente() {
+    const queue = loadPendingQueue();
+    if (queue.length === 0) { setPendingQueueCount(0); return; }
+    if (!confirm(`Supprimer ${queue.length} élément(s) en attente d'envoi ? Ces données n'ont pas encore été envoyées au serveur et seront perdues définitivement.`)) return;
+    queue.forEach(item => { try { dequeuePendingAction(item.id); } catch (e) {} });
+    setArbres(prev => prev.filter(a => !a._pending));
+    setSignalements(prev => prev.filter(x => !x._pending));
+    setObservations(prev => prev.filter(x => !x._pending));
+    setSuivis(prev => prev.filter(x => !x._pending));
+    setPendingQueueCount(loadPendingQueue().length);
+    logActivity("file_attente_abandonnee", "citoyen", DEVICE_ID, `${queue.length} élément(s)`);
+  }
+
+  // Suppression par un bénévole validé d'un arbre qu'il juge mal enregistré ou mal géolocalisé.
+  // Suppression douce via RPC SECURITY DEFINER (vérifie le statut bénévole côté serveur, journalise
+  // dans audit_logs) : l'arbre reste restaurable par un admin depuis l'Historique.
+  // motif : "mal_enregistre" | "mal_geolocalise"
+  async function benevoleSupprimerArbre(arbre, motif) {
+    const { error } = await supabase.rpc("supprimer_arbre_benevole", { p_id: arbre.id, p_motif: motif });
+    if (error) throw error;
+    setArbres(prev => prev.filter(a => a.id !== arbre.id));
+    logActivity("arbre_supprime_benevole", "arbres", arbre.id, motif);
   }
 
   // Le panneau "Historique" (corbeille) gère sa propre liste indépendamment de l'état
@@ -712,8 +797,20 @@ function App() {
     }
     try {
       const photo_url = await uploadPhoto(photo, "arbres");
-      const { data, error } = await supabase.from("arbres").insert({ ...toInsert, photo_url, device_id: DEVICE_ID, is_deleted: false }).select().single();
+      // .returning(false) (Prefer: return=minimal) : la lecture directe de la table arbres est réservée
+      // aux admins/organisations (RLS), donc demander la ligne en retour ferait rejeter l'INSERT d'un
+      // citoyen (403). L'identifiant est généré ici pour afficher l'arbre sans relire la ligne.
+      const maintenant = new Date().toISOString();
+      const id = (typeof crypto !== "undefined" && crypto.randomUUID) ? crypto.randomUUID() : undefined;
+      // Identité stable de l'appareil (session anonyme), comme pour les signalements : l'arbre est
+      // rattaché à citoyen_id, ce qui permet à son auteur de le supprimer même s'il change de compte.
+      const sessionAppareil = await ensureDeviceSession();
+      const { error } = await supabase.from("arbres")
+        .insert({ ...toInsert, id, photo_url, device_id: DEVICE_ID, citoyen_id: sessionAppareil ? sessionAppareil.user.id : null, is_deleted: false, planted_at: maintenant })
+        .headers(sessionAppareil ? { Authorization: "Bearer " + sessionAppareil.access_token } : {})
+        .returning(false);
       if (error) throw error;
+      const data = { ...toInsert, id: id || opts.tempId || ("local-" + Date.now()), photo_url, device_id: DEVICE_ID, is_deleted: false, valide: false, publie: false, planted_at: maintenant, created_at: maintenant };
       setArbres(prev => {
         const withoutPending = opts.tempId ? prev.filter(x => x.id !== opts.tempId) : prev;
         return [...withoutPending, mapArbre(data)];
@@ -766,6 +863,16 @@ function App() {
     try { window.dispatchEvent(new CustomEvent("pace-queue-syncing", { detail: { syncing: true } })); } catch (e) {}
     const MAX_TENTATIVES = 8;
     try {
+      // Réinitialisation unique : les éléments abandonnés (_failed) à cause de l'ancien rejet RLS
+      // sur l'insertion des arbres sont rejoués une fois avec le correctif.
+      try {
+        if (!localStorage.getItem("pace-queue-reset-v2")) {
+          const q = loadPendingQueue();
+          q.forEach(i => { delete i._failed; i.attempts = 0; });
+          savePendingQueue(q);
+          localStorage.setItem("pace-queue-reset-v2", "1");
+        }
+      } catch (e) {}
       const queue = loadPendingQueue();
       for (const item of queue) {
         if (!navigator.onLine) break; // vraie coupure réseau : on s'arrête, on réessaiera plus tard
@@ -822,7 +929,6 @@ function App() {
     { id: "groupes_terrain", label: "Groupe terrain", icon: IconUsers, onSelect: () => setTab("groupes_terrain") },
     { id: "enquetes_terrain", label: "Enquêtes terrain", icon: IconSearch, onSelect: () => setTab("enquetes_terrain"), locked: !estBenevoleValide, note: estBenevoleValide ? null : "Réservé aux bénévoles validés" },
     { id: "evenements", label: "Événements", icon: IconCalendar, onSelect: () => setTab("evenements") },
-    { id: "contact", label: "Contact", icon: IconContact, onSelect: () => setTab("contact") },
   ];
 
   return (
@@ -885,6 +991,7 @@ function App() {
         {online && pendingQueueCount > 0 && (
           <div style={{ background: "var(--c-warning)", color: "#fff", fontSize: T.small, textAlign: "center", padding: "6px 0", display: "flex", alignItems: "center", justifyContent: "center", gap: 6 }}>
             <IconClock size={13} /> {t(lang, "envoi_en_cours_prefix")} {pendingQueueCount} {t(lang, "envoi_attente_suffix")}
+            <button onClick={abandonnerEnvoisEnAttente} style={{ marginLeft: 6, padding: "2px 10px", borderRadius: 6, border: "1px solid rgba(255,255,255,0.7)", background: "rgba(255,255,255,0.18)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer" }}>Supprimer</button>
           </div>
         )}
 
@@ -894,8 +1001,6 @@ function App() {
           <AdminSpace signalements={signalements} arbres={arbres} onUpdateStatut={adminUpdateStatut} onResolve={adminResolve} onValidate={adminValidate} onValidateArbre={adminValidateArbre} onDelete={adminDelete} onSoftDeleteArbre={adminSoftDeleteArbre} onRevertModeration={adminRevertModeration} onSoftDeleteSignalement={adminSoftDeleteSignalement} onRestaurerItem={onRestaurerItem} onRafraichir={chargerDonneesPrincipales} rafraichissementEnCours={rafraichissementEnCours} onExit={() => { exitAdminIdentity(); setShowAdmin(false); }} />
         ) : tab === "confidentialite" ? (
           <Confidentialite onBack={() => setTab("accueil")} />
-        ) : tab === "contact" ? (
-          <Contact onBack={() => setTab("accueil")} />
         ) : profilInfo === undefined ? (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "center", height: "60vh", color: "var(--c-text-muted)", fontSize: T.body, gap: 8 }}>
             <IconClock size={15} /> Chargement…
@@ -928,7 +1033,7 @@ function App() {
         ) : (
           <div key={tab} className="pace-fade-in">
             {tab === "accueil" && <Accueil signalements={signalements.filter(s => s.device_id === DEVICE_ID)} arbres={arbres.filter(a => a.device_id === DEVICE_ID)} notifState={notifState} onEnableNotif={enableNotif} onOpenAdmin={() => { enterAdminIdentity(); setShowAdmin(true); }} actualites={actualites} onNavigate={setTab} lang={lang} estBenevoleValide={estBenevoleValide} benevoleStatut={benevoleStatut} onBenevoleInscrit={() => { setBenevoleStatut("en_attente"); try { localStorage.setItem("pace-benevole-statut", "en_attente"); } catch (e) {} }} estOrganisationValidee={estOrganisationValidee} organisationStatut={organisationStatut} organisationEtapeDossier={organisationEtapeDossier} organisationEtapeMotif={organisationEtapeMotif} onBasculerStatutSignalement={citoyenBasculerStatutSignalement} profilInfo={profilInfo} onProfilChange={rafraichirProfil} />}
-            {tab === "carte" && accesEtendu && <Carte signalements={signalements} arbres={arbres} observations={observations} enquetesCarte={enquetesCarte} onAddSignalement={addSignalement} onAddArbre={addArbre} onAddObservation={addObservation} online={online} pendingQueueCount={pendingQueueCount} onFlushQueue={flushPendingQueue} lang={lang} coordFormat={coordFormat} />}
+            {tab === "carte" && accesEtendu && <Carte signalements={signalements} arbres={arbres} observations={observations} enquetesCarte={enquetesCarte} onAddSignalement={addSignalement} onAddArbre={addArbre} onAddObservation={addObservation} onSupprimerArbre={estBenevoleValide ? benevoleSupprimerArbre : undefined} online={online} pendingQueueCount={pendingQueueCount} onFlushQueue={flushPendingQueue} lang={lang} coordFormat={coordFormat} />}
             {tab === "signaler" && accesEtendu && <Signaler onSubmit={addSignalement} lang={lang} coordFormat={coordFormat} onNavigate={setTab} />}
             {tab === "arbre" && accesEtendu && <MonArbre arbres={arbres.filter(a => a.device_id === DEVICE_ID)} suivis={suivis} onAdd={addArbre} onAddSuivi={addSuivi} onDelete={citoyenSupprimerArbre} lang={lang} coordFormat={coordFormat} />}
             {tab === "profil" && <ProfilTab profilInfo={profilInfo} onProfilChange={rafraichirProfil} lang={lang} />}
@@ -937,7 +1042,7 @@ function App() {
         </Suspense>
         </BoundaireErreur>
 
-        {!showAdmin && !!profilInfo && !accesBloque && tab !== "biodiversite" && tab !== "confidentialite" && tab !== "assistant" && tab !== "espace_org" && tab !== "compte_org" && tab !== "evenements" && tab !== "groupes_terrain" && tab !== "enquetes_terrain" && tab !== "contact" && (
+        {!showAdmin && !!profilInfo && !accesBloque && tab !== "biodiversite" && tab !== "confidentialite" && tab !== "assistant" && tab !== "espace_org" && tab !== "compte_org" && tab !== "evenements" && tab !== "groupes_terrain" && tab !== "enquetes_terrain" && (
           <div className="pace-bottom-nav" style={{ position: "absolute", bottom: 0, left: 0, right: 0, background: "var(--c-surface)", borderTop: "1px solid var(--c-border)", display: "flex", padding: "8px 6px", borderRadius: "18px 18px 0 0", boxShadow: "0 -4px 16px rgba(0,0,0,0.04)" }}>
             {TABS.map(tabItem => {
               const IconT = tabItem.icon;
