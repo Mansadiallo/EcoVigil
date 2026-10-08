@@ -5,7 +5,7 @@
 // À chaque déploiement qui change index.html, manifest.json ou les icônes, incrémente
 // CACHE_VERSION ci-dessous pour que les appareils déjà installés récupèrent la nouvelle version
 // au lieu de rester bloqués sur une version mise en cache.
-const CACHE_VERSION = "ecovigil-v5";
+const CACHE_VERSION = "ecovigil-v4";
 // Bibliothèques chargées depuis des CDN (Leaflet, XLSX, jsPDF, MapLibre…) : toutes sont épinglées sur une
 // version précise dans index.html, leur contenu ne change donc jamais. On les garde en mémoire après le
 // premier chargement : l'application démarre alors même si le CDN ou le réseau est indisponible.
@@ -61,15 +61,24 @@ self.addEventListener("fetch", (event) => {
   }
   if (url.origin !== self.location.origin) return; // jamais interférer avec Supabase, tuiles de carte, etc.
 
+  // Page (navigation) : seule requête pour laquelle on peut se rabattre sur index.html hors ligne.
+  // Fichiers JS/CSS/images : jamais remplacés par index.html (sinon import() échoue avec une erreur
+  // de type MIME et l'écran affiche « n'a pas pu être chargé »).
+  const estNavigation = event.request.mode === "navigate";
   event.respondWith(
     fetch(event.request)
       .then((reponse) => {
-        const copie = reponse.clone();
-        caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copie));
+        // On ne met en cache que les réponses valides : jamais un 404 ni un index.html servi à la place d'un .js
+        const type = reponse.headers.get("content-type") || "";
+        const htmlPourUnFichier = !estNavigation && /\.(js|css|mjs)(\?|$)/.test(url.pathname) && type.includes("text/html");
+        if (reponse.ok && !htmlPourUnFichier) {
+          const copie = reponse.clone();
+          caches.open(CACHE_VERSION).then((cache) => cache.put(event.request, copie));
+        }
         return reponse;
       })
       .catch(() =>
-        caches.match(event.request).then((reponse) => reponse || caches.match("./index.html"))
+        caches.match(event.request).then((reponse) => reponse || (estNavigation ? caches.match("./index.html") : Response.error()))
       )
   );
 });
