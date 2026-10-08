@@ -294,13 +294,11 @@ class PaceQuery {
 
 export const supabase = {
   from(table) { return new PaceQuery(table); },
-  // extraHeaders (optionnel) : ex. { Authorization: "Bearer <jeton de la session d'appareil>" } pour
-  // signer l'appel avec une identité précise plutôt que celle du compte actif.
-  async rpc(fnName, params, extraHeaders) {
+  async rpc(fnName, params) {
     try {
       const res = await fetch(`${REST_URL}/rpc/${fnName}`, {
         method: "POST",
-        headers: restHeaders(Object.assign({ "Content-Type": "application/json" }, extraHeaders || {})),
+        headers: restHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify(params || {}),
       });
       const text = await res.text();
@@ -565,3 +563,106 @@ export function getBenevoleInfo() {
 export function retirerEcouteurAuth(cb) {
   authListeners = authListeners.filter((f) => f !== cb);
 }
+
+/* ===== Temps réel (Supabase Realtime) pour le client maison =====
+   Le client ci-dessus n'avait ni channel() ni removeChannel() : tout écran qui s'abonnait aux changements
+   (AdminEnquetes, EnquetesStandard, OrgEnquetes…) plantait avec « S.channel is not a function ».
+   Implémentation minimale du protocole Phoenix de Supabase Realtime, compatible avec l'usage :
+     const ch = supabase.channel("nom").on("postgres_changes", { event: "*", schema: "public", table: "enquetes" }, (payload) => {…}).subscribe();
+     supabase.removeChannel(ch);
+   Une seule connexion WebSocket partagée par tous les canaux, reconnexion automatique.
+   Si le WebSocket est indisponible, rien ne plante : l'écran fonctionne simplement sans mise à jour en direct. */
+const RT_URL = SUPABASE_URL.replace(/^http/, "ws") + "/realtime/v1/websocket?apikey=" + SUPABASE_KEY + "&vsn=1.0.0";
+let rtSocket = null, rtOuvert = false, rtRef = 0, rtHeartbeat = null, rtReconnexion = null, rtEssais = 0;
+const rtCanaux = [];
+
+function rtToken() {
+  const s = getActiveSession();
+  return (s && s.access_token) || SUPABASE_KEY;
+}
+
+function rtEnvoyer(msg) {
+  try { if (rtSocket && rtOuvert) { rtSocket.send(JSON.stringify(msg)); return true; } } catch (e) {}
+  return false;
+}
+
+function rtRejoindre(c) {
+  if (c._ferme) return;
+  c._joinRef = String(++rtRef);
+  rtEnvoyer({
+    topic: "realtime:" + c.nom, event: "phx_join", ref: c._joinRef, join_ref: c._joinRef,
+    payload: {
+      config: {
+        broadcast: { ack: false, self: false }, presence: { key: "" }, private: false,
+        postgres_changes: c._ecouteurs.map((l) => ({ event: l.filtre.event || "*", schema: l.filtre.schema || "public", table: l.filtre.table, ...(l.filtre.filter ? { filter: l.filtre.filter } : {}) })),
+      },
+      access_token: rtToken(),
+    },
+  });
+}
+
+function rtMessage(ev) {
+  let m; try { m = JSON.parse(ev.data); } catch (e) { return; }
+  const c = rtCanaux.find((x) => "realtime:" + x.nom === m.topic);
+  if (!c) return;
+  if (m.event === "phx_reply" && m.ref === c._joinRef) {
+    const ok = m.payload && m.payload.status === "ok";
+    // Associe l'identifiant serveur de chaque abonnement à son écouteur local
+    const serveur = (ok && m.payload.response && m.payload.response.postgres_changes) || [];
+    c._ecouteurs.forEach((l, i) => { l.id = serveur[i] && serveur[i].id; });
+    if (c._statut) { try { c._statut(ok ? "SUBSCRIBED" : "CHANNEL_ERROR"); } catch (e) {} }
+  } else if (m.event === "postgres_changes" && m.payload && m.payload.data) {
+    const d = m.payload.data, ids = m.payload.ids || [];
+    const payload = { schema: d.schema, table: d.table, commit_timestamp: d.commit_timestamp, eventType: d.type, new: d.record || {}, old: d.old_record || {}, errors: d.errors || null };
+    c._ecouteurs.forEach((l) => {
+      const evt = l.filtre.event || "*";
+      if ((l.id != null ? ids.includes(l.id) : l.filtre.table === d.table) && (evt === "*" || evt === d.type)) { try { l.cb(payload); } catch (e) { console.error("Realtime :", e); } }
+    });
+  }
+}
+
+function rtConnecter() {
+  if (rtSocket || typeof WebSocket === "undefined" || !rtCanaux.length) return;
+  try { rtSocket = new WebSocket(RT_URL); } catch (e) { rtSocket = null; return; }
+  rtSocket.onopen = () => {
+    rtOuvert = true; rtEssais = 0;
+    rtCanaux.forEach(rtRejoindre);
+    clearInterval(rtHeartbeat);
+    rtHeartbeat = setInterval(() => rtEnvoyer({ topic: "phoenix", event: "heartbeat", payload: {}, ref: String(++rtRef) }), 25000);
+  };
+  rtSocket.onmessage = rtMessage;
+  const perdu = () => {
+    rtOuvert = false; rtSocket = null; clearInterval(rtHeartbeat);
+    rtCanaux.forEach((c) => { if (c._statut) { try { c._statut("CLOSED"); } catch (e) {} } });
+    if (rtCanaux.length) { clearTimeout(rtReconnexion); rtReconnexion = setTimeout(rtConnecter, Math.min(30000, 1000 * Math.pow(2, rtEssais++))); }
+  };
+  rtSocket.onclose = perdu;
+  rtSocket.onerror = () => { try { rtSocket && rtSocket.close(); } catch (e) {} };
+}
+
+function creerCanal(nom) {
+  const c = {
+    nom, _ecouteurs: [], _statut: null, _ferme: false, _joinRef: null,
+    on(type, filtre, cb) { if (type === "postgres_changes") c._ecouteurs.push({ filtre: filtre || {}, cb, id: null }); return c; },
+    subscribe(statut) {
+      c._statut = typeof statut === "function" ? statut : null; c._ferme = false;
+      if (!rtCanaux.includes(c)) rtCanaux.push(c);
+      if (rtOuvert) rtRejoindre(c); else rtConnecter();
+      return c;
+    },
+    unsubscribe() { return supabase.removeChannel(c); },
+  };
+  return c;
+}
+
+supabase.channel = (nom) => creerCanal(nom || "canal-" + (++rtRef));
+supabase.removeChannel = async (c) => {
+  if (!c) return "ok";
+  c._ferme = true;
+  const i = rtCanaux.indexOf(c); if (i >= 0) rtCanaux.splice(i, 1);
+  rtEnvoyer({ topic: "realtime:" + c.nom, event: "phx_leave", payload: {}, ref: String(++rtRef) });
+  if (!rtCanaux.length && rtSocket) { clearTimeout(rtReconnexion); try { rtSocket.close(); } catch (e) {} }
+  return "ok";
+};
+supabase.removeAllChannels = async () => { await Promise.all(rtCanaux.slice().map((c) => supabase.removeChannel(c))); return ["ok"]; };
+supabase.getChannels = () => rtCanaux.slice();
