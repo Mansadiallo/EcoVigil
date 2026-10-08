@@ -1,6 +1,7 @@
 import { compressImage, uploadPhotoGeneric } from "../components/media.jsx";
 import { uid } from "./categories.jsx";
 import { supabase } from "./supabase.js";
+import { langCourante, t } from "./i18n.js";
 
 /* ---------- File d'attente hors-ligne (signalements, arbres, observations) ----------
    Principe : si l'appareil est hors-ligne (ou si l'envoi échoue), l'action est
@@ -10,7 +11,7 @@ import { supabase } from "./supabase.js";
 const PENDING_QUEUE_KEY = "pace-pending-queue";
 
 export function loadPendingQueue() {
-  try { return JSON.parse(localStorage.getItem(PENDING_QUEUE_KEY) || "[]"); } catch (e) { return []; }
+  try { const q = JSON.parse(localStorage.getItem(PENDING_QUEUE_KEY) || "[]"); return Array.isArray(q) ? q.filter(Boolean) : []; } catch (e) { return []; }
 }
 
 export function savePendingQueue(q) {
@@ -44,7 +45,7 @@ export function dequeuePendingAction(tempId) {
 const ENQ_OFFLINE_KEY = "ecovigil-enquetes-offline";
 
 export function loadOfflineEnquetes() {
-  try { return JSON.parse(localStorage.getItem(ENQ_OFFLINE_KEY) || "{}"); } catch (e) { return {}; }
+  try { const m = JSON.parse(localStorage.getItem(ENQ_OFFLINE_KEY) || "{}"); return m && typeof m === "object" && !Array.isArray(m) ? m : {}; } catch (e) { return {}; }
 }
 
 function saveOfflineEnquetes(map) {
@@ -145,7 +146,7 @@ export async function syncOneDossierEnquete(localId) {
   const finRec = getOfflineEnquete(localId);
   const numero = finRec ? finRec.numero : rec.numero;
   if (finRec) putOfflineEnquete({ ...finRec, preuvesLocales: restantes, transcriptionsLocales: transcriptionsRestantes });
-  if (restantes.length > 0 || Object.keys(transcriptionsRestantes).length > 0) throw new Error("Certaines preuves ou transcriptions n'ont pas pu être synchronisées");
+  if (restantes.length > 0 || Object.keys(transcriptionsRestantes).length > 0) throw new Error(t(langCourante(), "err_sync_preuves"));
   // Entièrement synchronisé : plus besoin de la copie locale, la lecture se fait désormais côté serveur.
   removeOfflineEnquete(localId);
   return { remoteId, numero, conflict: false };
