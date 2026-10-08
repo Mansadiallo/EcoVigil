@@ -1,10 +1,10 @@
 <!DOCTYPE html>
-<html lang="fr">
+<html lang="fr" data-theme="light">
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
 <title>EcoVigil</title>
-<meta name="theme-color" content="#007A3D" />
+<meta name="theme-color" content="#1F5C45" />
 <link rel="manifest" href="./manifest.json" />
 <link rel="icon" href="./icon-32.png" sizes="32x32" type="image/png" />
 <link rel="icon" href="./icon-16.png" sizes="16x16" type="image/png" />
@@ -26,100 +26,93 @@
       var meta = document.querySelector('meta[name="apple-mobile-web-app-title"]');
       if (meta) meta.setAttribute("content", "Centre EcoVigil");
       var theme = document.querySelector('meta[name="theme-color"]');
-      if (theme) theme.setAttribute("content", "#8B2E2E"); // teinte différente pour repérer l'onglet/l'appli admin au premier coup d'œil
+      if (theme) theme.setAttribute("content", "#2F5D7C"); // accent ardoise du MASTER : distingue l'espace admin sans sortir de la palette
     } catch (e) {}
   })();
 </script>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@500;600;700&family=Work+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap" rel="stylesheet" />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css" />
 <link href="https://unpkg.com/maplibre-gl@5.24.0/dist/maplibre-gl.css" rel="stylesheet" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.css" />
 <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.5.3/MarkerCluster.Default.css" />
+<link rel="stylesheet" href="./ecovigil-theme.css" />
 <style>
-  /* ===== Thème : variables sémantiques (clair par défaut) ===== */
-  :root {
-    --c-bg: #EEF3EC;
-    --c-surface: #fff;
-    --c-surface-soft: #F1F4EE;
-    --c-surface-dashed: #F8FAF8;
-    --c-border: #E1E9E3;
-    --c-border-soft: #D8E4DA;
-    --c-text: #17211C;
-    --c-text-secondary: #5B6B60;
-    --c-text-muted: #5A6472;
-    --c-text-faint: #7C8E83;
-    --c-warning-bg: #FBEFE3;
-    --c-success-bg: #E3F0E8;
-    --c-danger-border-soft: #F3D9D0;
-    --c-warning-border-soft: #F0D5B8;
-    --c-progress-track: #8FBFA0;
-    --c-danger: #B5451B;
-    --c-warning: #D4A017;
-    --c-warning-text: #8A6318;
-    --shadow-sm: 0 2px 8px rgba(23,33,28,0.06);
-    --shadow-md: 0 6px 20px rgba(23,33,28,0.12);
-    color-scheme: light;
+  /* ===== Alias de compatibilité : --c-* -> --ev-* (MASTER) =====
+     Les valeurs viennent de ecovigil-theme.css. Les composants existants gardent leurs noms --c-*,
+     à remplacer progressivement par --ev-*. */
+  :root, .pace-dark {
+    --c-bg: var(--ev-bg);
+    --c-surface: var(--ev-surface);
+    --c-surface-soft: color-mix(in srgb, var(--ev-text) 5%, var(--ev-surface));
+    --c-surface-dashed: color-mix(in srgb, var(--ev-text) 3%, var(--ev-surface));
+    --c-border: var(--ev-border);
+    --c-border-soft: var(--ev-border);
+    --c-text: var(--ev-text);
+    --c-text-secondary: var(--ev-text-muted);
+    --c-text-muted: var(--ev-text-muted);
+    --c-text-faint: var(--ev-text-muted); /* l'ancien « faint » n'atteignait pas 4,5:1 */
+    --c-warning-bg: color-mix(in srgb, var(--ev-warning) 14%, var(--ev-surface));
+    --c-success-bg: color-mix(in srgb, var(--ev-success) 14%, var(--ev-surface));
+    --c-danger-border-soft: color-mix(in srgb, var(--ev-danger) 25%, var(--ev-surface));
+    --c-warning-border-soft: color-mix(in srgb, var(--ev-warning) 30%, var(--ev-surface));
+    --c-progress-track: color-mix(in srgb, var(--ev-primary) 35%, var(--ev-surface));
+    --c-danger: var(--ev-danger);
+    --c-warning: var(--ev-warning);
+    --c-warning-text: var(--ev-warning);
+    --shadow-sm: var(--ev-shadow);
+    --shadow-md: var(--ev-shadow);
   }
 
-  /* Accents de marque (vert par défaut, bleu, doré) — mêmes valeurs en clair/sombre pour rester vifs */
-  :root, .accent-green { --c-accent-dark: #007A3D; --c-accent: #4CAF50; --c-sky: #0077B6; }
-  .accent-blue         { --c-accent-dark: #123A4A; --c-accent: #2E6E86; --c-sky: #5FB0C9; }
-  .accent-gold         { --c-accent-dark: #4A3610; --c-accent: #8A6318; --c-sky: #C9962E; }
+  /* Accents : vert = principale, bleu = accent ardoise du MASTER (le doré a été retiré, hors MASTER).
+     --c-accent-dark sert de FOND (texte blanc dessus) : il reste à la valeur claire en mode sombre. */
+  :root, .accent-green { --c-accent-dark: #1F5C45; --c-accent: var(--ev-primary); --c-accent-text: var(--ev-primary); --c-sky: var(--ev-accent); }
+  .accent-blue         { --c-accent-dark: #2F5D7C; --c-accent: var(--ev-accent);  --c-accent-text: var(--ev-accent);  --c-sky: var(--ev-primary); }
 
-  /* ===== Mode sombre ===== */
+  /* ===== Mode sombre piloté par l'application (.pace-dark) : mêmes valeurs que le thème MASTER ===== */
   .pace-dark {
-    --c-bg: #12181A;
-    --c-surface: #1C2420;
-    --c-surface-soft: #22302A;
-    --c-surface-dashed: #1A211D;
-    --c-border: #2E3B34;
-    --c-border-soft: #263029;
-    --c-text: #EAF1EC;
-    --c-text-secondary: #A9B8AE;
-    --c-text-muted: #8A9790;
-    --c-text-faint: #5B6B60;
-    --c-warning-bg: #332A1C;
-    --c-success-bg: #1C3327;
-    --c-danger-border-soft: #3A241C;
-    --c-warning-border-soft: #362C1C;
-    --c-progress-track: #3E5A4A;
-    --c-danger: #DE7249;
-    --c-warning: #D4A017;
-    --c-warning-text: #D4A017;
-    --shadow-sm: 0 2px 8px rgba(0,0,0,0.35);
-    --shadow-md: 0 6px 24px rgba(0,0,0,0.45);
+    --ev-primary: #4fb58a;
+    --ev-primary-hover: #66c49c;
+    --ev-on-primary: #0b1511;
+    --ev-accent: #7fb0d1;
+    --ev-accent-hover: #98c0dc;
+    --ev-on-accent: #0b1511;
+    --ev-bg: #0f1715;
+    --ev-surface: #17221f;
+    --ev-text: #e6eeeb;
+    --ev-text-muted: #9db0a9;
+    --ev-border: #26352f;
+    --ev-success: #66bb6a;
+    --ev-warning: #ffb74d;
+    --ev-danger: #f2796f;
+    --ev-on-danger: #0b1511;
+    --ev-border-strong: #667c73;
+    --ev-focus: #7fb0d1;
+    --ev-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 2px 8px rgba(0, 0, 0, 0.3);
     color-scheme: dark;
   }
 
   * { box-sizing: border-box; }
   html, body { margin: 0; padding: 0; }
-  body { background: var(--c-bg); font-family: 'Work Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; line-height: 1.45; transition: background-color .25s ease; }
-  button:focus-visible, input:focus-visible, textarea:focus-visible, a:focus-visible {
-    outline: 2px solid var(--c-accent); outline-offset: 2px;
-  }
+  body { background: var(--ev-bg); color: var(--ev-text); font-family: var(--ev-font); font-size: 16px; line-height: 1.55; }
+  :focus-visible { outline: 3px solid var(--ev-focus); outline-offset: 2px; }
 
-  /* ===== Retour tactile / animations fluides (Material-like) ===== */
-  button { transition: transform .12s ease, opacity .12s ease, background-color .2s ease, box-shadow .2s ease; }
-  button:not(:disabled):active { transform: scale(0.96); }
-  img { transition: opacity .2s ease; }
-
-  @keyframes paceFadeIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
-  @keyframes paceScaleIn { from { opacity: 0; transform: scale(0.92); } to { opacity: 1; transform: scale(1); } }
-  .pace-fade-in { animation: paceFadeIn .28s ease both; }
-  .pace-scale-in { animation: paceScaleIn .3s cubic-bezier(.2,.8,.2,1) both; }
+  /* ===== Mouvement : transitions courtes (150 ms) sur les boutons seulement, aucune animation d'entrée ===== */
+  button { transition: background-color .15s ease; }
+  a[href], button, [role="button"], select, summary { cursor: pointer; }
+  /* Classes conservées pour ne pas casser le JSX existant, mais sans animation (MASTER) */
+  .pace-fade-in, .pace-scale-in { animation: none; }
 
   @media (prefers-reduced-motion: reduce) {
-    * { animation-duration: 0.001ms !important; animation-iteration-count: 1 !important; transition-duration: 0.001ms !important; }
+    *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
   }
 
   /* ===== Responsive : élargissement intelligent tablette / bureau ===== */
   .pace-frame {
     width: 390px;
     max-width: 100vw;
-    transition: width .25s ease;
   }
   @media (min-width: 700px) {
     .pace-frame { width: 480px; }
@@ -127,7 +120,6 @@
   }
   @media (min-width: 1024px) {
     .pace-frame { width: 600px; }
-    body { font-size: 1.03em; }
   }
 
   /* ===== Listes de cartes (admin) : grille responsive — exploite la largeur disponible sur
@@ -156,17 +148,24 @@
     .pace-frame-wide { max-width: 1280px; }
   }
 
-  /* ===== Champs de formulaire : couleurs forcées (indépendant du rendu par défaut du navigateur) ===== */
+  /* ===== Champs de formulaire (MASTER) : 16 px, 44 px de haut, bordure >= 3:1 ===== */
   input, textarea, select {
-    background: var(--c-surface);
-    color: var(--c-text);
-    caret-color: var(--c-accent);
+    background: var(--ev-surface);
+    color: var(--ev-text);
+    caret-color: var(--ev-primary);
+    border: 1px solid var(--ev-border-strong);
+    border-radius: var(--ev-radius);
+    font-family: inherit;
   }
-  input::placeholder, textarea::placeholder { color: var(--c-text-muted); opacity: 1; }
-  select option { background: var(--c-surface); color: var(--c-text); }
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
+  textarea, select { font-size: 16px !important; min-height: var(--ev-tap); }
+  input:focus, textarea:focus, select:focus { outline: 3px solid var(--ev-focus); outline-offset: 0; border-color: var(--ev-focus); }
+  input::placeholder, textarea::placeholder { color: var(--ev-text-muted); opacity: 1; }
+  select option { background: var(--ev-surface); color: var(--ev-text); }
+  input[type="checkbox"], input[type="radio"] { width: 20px; height: 20px; margin: 0; flex: none; }
   input:-webkit-autofill, textarea:-webkit-autofill {
-    -webkit-text-fill-color: var(--c-text);
-    box-shadow: 0 0 0px 1000px var(--c-surface) inset;
+    -webkit-text-fill-color: var(--ev-text);
+    box-shadow: 0 0 0px 1000px var(--ev-surface) inset;
     transition: background-color 9999s ease-in-out 0s;
   }
 
@@ -174,17 +173,9 @@
   html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }  /* pas d'agrandissement auto du texte en paysage (iOS) */
   body { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; overflow-wrap: break-word; }  /* mots longs : coupés au lieu de déborder */
   button, a, input, select, textarea, [role="button"] { touch-action: manipulation; }  /* supprime le délai de double-tap */
-  button, [role="button"] { -webkit-tap-highlight-color: transparent; }  /* le retour tactile existant (scale) suffit */
+  button, [role="button"] { -webkit-tap-highlight-color: transparent; }  /* pas de retour visuel décoratif (MASTER) */
   input[type="checkbox"], input[type="radio"], input[type="range"] { accent-color: var(--c-accent); }
   button:disabled { cursor: not-allowed; }
-
-  /* ===== Mobile uniquement (écrans < 700px) : lisibilité et ergonomie, sans toucher à la structure ===== */
-  @media (max-width: 699px) {
-    /* Saisie : 16px minimum évite le zoom automatique d'iOS au focus (la largeur des champs ne change pas) */
-    input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="file"]):not([type="color"]),
-    textarea, select { font-size: 16px !important; }
-
-  }
 
   /* ===== Barres fixes : l'en-tête reste en haut et la navigation reste en bas, en permanence ===== */
   /* z-index 1100 : au-dessus de la carte (Leaflet monte à 1000), sous les fenêtres et plein écrans (>= 1200) */
