@@ -416,7 +416,7 @@ function IndicateurConnexionEnquetes({ email, deviceId }) {
     const t = setInterval(maj, 5000);
     return () => { window.removeEventListener("pace-enquetes-offline-updated", maj); window.removeEventListener("pace-queue-updated", maj); window.removeEventListener("pace-queue-syncing", onSync); window.removeEventListener("online", onOff); window.removeEventListener("offline", onOff); clearInterval(t); };
   }, []);
-  const mine = Object.values(loadOfflineEnquetes()).filter(r => r && (deviceId ? r.deviceId === deviceId : r.creePar === email) && estEnAttente(r));
+  const mine = Object.values(loadOfflineEnquetes()).filter(r => r && r.cols && (deviceId ? r.deviceId === deviceId : r.creePar === email) && estEnAttente(r));
   const enAttente = mine.filter(r => r.statutSync !== "conflit").length;
   const conflits = mine.filter(r => r.statutSync === "conflit").length;
   const echecs = loadPendingQueue().filter(it => it.type === "enquete" && it._failed).length;
@@ -1004,7 +1004,7 @@ ${imgs.length ? `<h2>Galerie</h2><div class="gal">${imgs.map(p => `<figure><img 
 
   // ---- Liste ----
   if (!ouvert) {
-    const enAttenteLoc = Object.values(loadOfflineEnquetes()).filter(r => r && (deviceId ? r.deviceId === deviceId : r.creePar === email) && estEnAttente(r));
+    const enAttenteLoc = Object.values(loadOfflineEnquetes()).filter(r => r && r.cols && (deviceId ? r.deviceId === deviceId : r.creePar === email) && estEnAttente(r));
     return (
       <div style={{ margin: "14px 0" }}>
         <IndicateurConnexionEnquetes email={email} deviceId={deviceId} />
