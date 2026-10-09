@@ -3,11 +3,78 @@ import { IconLock } from "../components/icons.jsx";
 import { toCSV } from "../components/media.jsx";
 import { StatCard } from "../components/ui.jsx";
 import { logAudit } from "../lib/audit.js";
-import { ENV_DEFI_PAR_CODE, chargerTaxonomiePubliee } from "../lib/categories.jsx";
+import { ENV_DEFI_PAR_CODE, categorieMeta, chargerTaxonomiePubliee } from "../lib/categories.jsx";
 import { downloadCSV, exportExcel, exportPDF, exportWord } from "../lib/exports.js";
 import { supabase } from "../lib/supabase.js";
 import { calculerPriorite } from "../lib/utils.js";
 import { T, TITRE_SOUS } from "../lib/typo.jsx";
+
+// ---- Fiche environnementale (même contenu que sous chaque signalement dans l'application) ----
+// Les textes de la taxonomie sont des objets par langue ({ fr: ... }) ; le rapport est en français,
+// avec repli sur la première langue disponible.
+const texteFiche = (v) => {
+  if (v == null) return "";
+  const x = (typeof v === "object" && !Array.isArray(v)) ? (v.fr !== undefined ? v.fr : Object.values(v)[0]) : v;
+  return Array.isArray(x) ? x.join(", ") : (x == null ? "" : String(x));
+};
+
+export const COLONNES_FICHE = [
+  { key: "details", label: "Détails spécifiques au problème" },
+  { key: "fiche_defi", label: "Fiche — Défi" },
+  { key: "fiche_causes", label: "Fiche — Causes probables" },
+  { key: "fiche_impacts", label: "Fiche — Impacts" },
+  { key: "fiche_action", label: "Fiche — Action recommandée" },
+  { key: "fiche_indicateurs", label: "Fiche — Indicateurs" },
+  { key: "fiche_resultat", label: "Fiche — Résultat attendu" },
+];
+
+// Charge les fiches publiées, indexées par code de problème.
+export async function chargerFichesEnv() {
+  await chargerTaxonomiePubliee(); // pour afficher le nom lisible des catégories dans le rapport
+  const [{ data: problemes }, { data: defis }] = await Promise.all([
+    supabase.from("env_problemes").select("code, defi_id, causes_presumees, impacts, action_recommandee, indicateurs, resultat_attendu, champs_collecte").eq("statut", "publie"),
+    supabase.from("env_defis").select("id, nom").eq("statut", "publie"),
+  ]);
+  const nomDefi = {};
+  (defis || []).forEach(d => { nomDefi[d.id] = texteFiche(d.nom); });
+  const fiches = {};
+  (problemes || []).forEach(p => {
+    fiches[p.code] = {
+      fiche_defi: nomDefi[p.defi_id] || "",
+      fiche_causes: texteFiche(p.causes_presumees),
+      fiche_impacts: texteFiche(p.impacts),
+      fiche_action: texteFiche(p.action_recommandee),
+      fiche_indicateurs: texteFiche(p.indicateurs),
+      fiche_resultat: texteFiche(p.resultat_attendu),
+      // Champs de collecte propres à ce problème : clé -> libellé (les champs photo/fichier sont ignorés).
+      _champs: (Array.isArray(p.champs_collecte) ? p.champs_collecte : []).filter(c => c && c.cle),
+    };
+  });
+  return fiches;
+}
+
+// Ajoute à une ligne de signalement les champs de la fiche correspondant à sa catégorie, et
+// remplace le code de catégorie par son nom lisible.
+export function avecFiche(ligne, fiches) {
+  const { _champs = [], ...fiche } = fiches[ligne.categorie] || {};
+  return { ...ligne, ...fiche, details: detailsSpecifiques(ligne.donnees_collecte, _champs), categorie: categorieMeta(ligne.categorie).label };
+}
+
+// Détails saisis pour CE problème (donnees_collecte), présentés avec les libellés du formulaire de
+// signalement correspondant : « Aspect de l'eau : Trouble ; Usage en aval : irrigation ».
+function detailsSpecifiques(donnees, champs) {
+  if (!donnees || typeof donnees !== "object") return "";
+  const parCle = {}; champs.forEach(c => { parCle[c.cle] = c; });
+  return Object.entries(donnees).map(([cle, valeur]) => {
+    const def = parCle[cle];
+    if (def && ["photo", "fichier", "video", "audio"].includes(def.type)) return null;
+    if (valeur == null || valeur === "" || (Array.isArray(valeur) && valeur.length === 0)) return null;
+    const lib = def ? texteFiche(def.label) : cle.replace(/_/g, " ").replace(/^./, m => m.toUpperCase());
+    const val = Array.isArray(valeur) ? valeur.join(", ") : (typeof valeur === "object" ? JSON.stringify(valeur) : String(valeur));
+    if (!def && /^(preuves?|photos?)$/i.test(cle)) return null;
+    return `${lib} : ${val}`;
+  }).filter(Boolean).join(" ; ");
+}
 
 function weeksAgo(dateStr, n) {
   const d = new Date(dateStr);
@@ -76,14 +143,16 @@ function RepartitionParDefi({ signalements }) {
   );
 }
 
-export function ExportRow({ label, count, getRows, columns, filenamePrefix, title }) {
+export function ExportRow({ label, count, getRows, columns, filenamePrefix, title, choixFormat = false }) {
   const [busy, setBusy] = useState(null);
-  const formats = [
-    { id: "csv", label: "CSV" },
-    { id: "xlsx", label: "Excel" },
-    { id: "doc", label: "Word" },
-    { id: "pdf", label: "PDF" },
+  const [mode, setMode] = useState("tableau"); // si choixFormat : "tableau" (CSV, Excel) ou "narratif" (Word, PDF)
+  const tousFormats = [
+    { id: "csv", label: "CSV", mode: "tableau" },
+    { id: "xlsx", label: "Excel", mode: "tableau" },
+    { id: "doc", label: "Word", mode: "narratif" },
+    { id: "pdf", label: "PDF", mode: "narratif" },
   ];
+  const formats = choixFormat ? tousFormats.filter(f => f.mode === mode) : tousFormats;
   async function lancer(format) {
     setBusy(format);
     try {
@@ -100,6 +169,16 @@ export function ExportRow({ label, count, getRows, columns, filenamePrefix, titl
   return (
     <div style={{ border: "1px solid var(--c-border)", borderRadius: 10, padding: "10px 12px", marginBottom: 8 }}>
       <div style={{ fontSize: T.body, fontWeight: 600, color: "var(--c-text)", marginBottom: 8 }}>{label} ({count})</div>
+      {choixFormat && (
+        <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
+          {[["tableau", "Format tableau"], ["narratif", "Format narratif"]].map(([v, l]) => (
+            <button key={v} type="button" onClick={() => setMode(v)} style={{
+              flex: 1, padding: "7px 0", borderRadius: 8, fontWeight: 600, fontSize: T.meta, cursor: "pointer",
+              border: `1px solid ${mode === v ? "var(--c-accent-dark)" : "var(--c-border)"}`,
+              background: mode === v ? "var(--c-accent-dark)" : "var(--c-surface)", color: mode === v ? "#fff" : "var(--c-text-secondary)" }}>{l}</button>
+          ))}
+        </div>
+      )}
       <div style={{ display: "flex", gap: 6 }}>
         {formats.map(f => (
           <button key={f.id} onClick={() => lancer(f.id)} disabled={busy !== null} style={{
@@ -159,6 +238,7 @@ function AdminRapportOrganisation() {
     { key: "benevole_nom", label: "Bénévole — Nom" }, { key: "benevole_contact", label: "Bénévole — Contact" },
     { key: "benevole_pays", label: "Bénévole — Pays" }, { key: "benevole_ville", label: "Bénévole — Ville" },
     { key: "benevole_quartier", label: "Bénévole — Quartier" },
+    ...COLONNES_FICHE,
   ];
 
   return (
@@ -176,12 +256,13 @@ function AdminRapportOrganisation() {
       {chargement && <div style={{ fontSize: T.small, color: "var(--c-text-muted)", textAlign: "center", padding: 10 }}>Chargement…</div>}
       {rapport && (
         <ExportRow
+          choixFormat
           label={`Signalements du domaine de ${rapport.org.nom}`}
           count={rapport.rows.length}
           columns={colonnes}
           filenamePrefix={`pace-${rapport.org.type}-${(rapport.org.nom || "org").replace(/\s+/g, "-")}`}
           title={`Rapport ${rapport.org.nom}`}
-          getRows={() => rapport.rows.map(s => ({ ...s, date: new Date(s.created_at).toLocaleDateString("fr-FR") }))}
+          getRows={async () => { const fiches = await chargerFichesEnv(); return rapport.rows.map(s => avecFiche({ ...s, date: new Date(s.created_at).toLocaleDateString("fr-FR") }, fiches)); }}
         />
       )}
     </div>
@@ -203,6 +284,7 @@ export function AdminRapports({ signalements, arbres, isSuperAdmin, centreVerrou
     { key: "benevole_nom", label: "Bénévole — Nom" }, { key: "benevole_contact", label: "Bénévole — Contact" },
     { key: "benevole_pays", label: "Bénévole — Pays" }, { key: "benevole_ville", label: "Bénévole — Ville" },
     { key: "benevole_quartier", label: "Bénévole — Quartier" },
+    ...COLONNES_FICHE,
   ];
   const colonnesArbres = [
     { key: "id", label: "ID" }, { key: "nom", label: "Espèce" }, { key: "lat", label: "Latitude" },
@@ -231,8 +313,8 @@ export function AdminRapports({ signalements, arbres, isSuperAdmin, centreVerrou
       <RepartitionParDefi signalements={signalements} />
 
       <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Exporter le rapport</div>
-      <ExportRow label="Signalements" count={signalements.length} columns={colonnesSignalements} filenamePrefix="pace-signalements" title="Rapport EcoVigil — Signalements"
-        getRows={() => signalements.map(s => ({ ...s, defi: ENV_DEFI_PAR_CODE[s.categorie] || "Non classé", priorite: calculerPriorite(s, signalements) }))} />
+      <ExportRow choixFormat label="Signalements" count={signalements.length} columns={colonnesSignalements} filenamePrefix="pace-signalements" title="Rapport EcoVigil — Signalements"
+        getRows={async () => { const fiches = await chargerFichesEnv(); return signalements.map(s => avecFiche({ ...s, defi: ENV_DEFI_PAR_CODE[s.categorie] || "Non classé", priorite: calculerPriorite(s, signalements) }, fiches)); }} />
       <ExportRow label="Arbres plantés" count={arbres.length} columns={colonnesArbres} filenamePrefix="pace-arbres" title="Rapport EcoVigil — Arbres plantés"
         getRows={() => arbres} />
       <ExportRow label="Bénévoles" count={benevolesCount === null ? 0 : benevolesCount} columns={colonnesBenevoles} filenamePrefix="pace-benevoles" title="Rapport EcoVigil — Bénévoles"
