@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { ExportRow } from "../admin/AdminRapports.jsx";
+import { COLONNES_FICHE, ExportRow, avecFiche, chargerFichesEnv } from "../admin/AdminRapports.jsx";
 import { AUDIT_LABELS } from "../admin/constants.js";
 import { IconChevronLeft, IconLayers, IconPlus, IconRotateCcw, IconTrash, IconTree, IconUsers } from "../components/icons.jsx";
 import { MediaThumbSmall, PhotoCaptureButton, uploadPhotoGeneric } from "../components/media.jsx";
@@ -560,6 +560,7 @@ export function EspaceOrganisation({ organisationEmail, organisationUserId, onBa
     { key: "benevole_nom", label: "Bénévole — Nom" }, { key: "benevole_contact", label: "Bénévole — Contact" },
     { key: "benevole_pays", label: "Bénévole — Pays" }, { key: "benevole_ville", label: "Bénévole — Ville" },
     { key: "benevole_quartier", label: "Bénévole — Quartier" },
+    ...COLONNES_FICHE,
   ];
   const rowsExport = (signalements || []).map(s => ({ ...s, date: new Date(s.created_at).toLocaleDateString("fr-FR") }));
 
@@ -608,7 +609,7 @@ export function EspaceOrganisation({ organisationEmail, organisationUserId, onBa
                   <div style={{ display: "flex", gap: 6, marginBottom: 6 }}>
                     <input value={telephoneMembre} onChange={e => setTelephoneMembre(e.target.value)} inputMode="tel"
                       placeholder={(PAYS_INDICATIFS.find(p => p.pays === paysMembre) || {}).indicatif ? `Téléphone du membre (${(PAYS_INDICATIFS.find(p => p.pays === paysMembre) || {}).indicatif}) — optionnel` : "Téléphone du membre — optionnel"}
-                      style={{ flex: "1 1 0", minWidth: 0, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
+                      style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
                     <button onClick={inviterMembre} disabled={busyMembre} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer", whiteSpace: "nowrap" }}>
                       {busyMembre ? "…" : "Générer le code"}
                     </button>
@@ -726,10 +727,10 @@ export function EspaceOrganisation({ organisationEmail, organisationUserId, onBa
 
             <div style={{ display: "flex", gap: 6, marginBottom: 8 }}>
               <input value={latPointTemp} onChange={e => setLatPointTemp(e.target.value)} placeholder="Latitude" inputMode="decimal"
-                style={{ flex: "1 1 0", minWidth: 0, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
+                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
               <input value={lngPointTemp} onChange={e => setLngPointTemp(e.target.value)} placeholder="Longitude" inputMode="decimal"
-                style={{ flex: "1 1 0", minWidth: 0, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
-              <button onClick={ajouterPointManuel} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer", whiteSpace: "nowrap", flexShrink: 0 }}>
+                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
+              <button onClick={ajouterPointManuel} style={{ padding: "8px 12px", borderRadius: 8, border: "none", background: "var(--c-accent-dark)", color: "#fff", fontWeight: 600, fontSize: T.small, cursor: "pointer", whiteSpace: "nowrap" }}>
                 Ajouter
               </button>
             </div>
@@ -773,7 +774,7 @@ export function EspaceOrganisation({ organisationEmail, organisationUserId, onBa
             </div>
             <div style={{ display: "flex", gap: 6, marginBottom: 10 }}>
               <input value={superficieSaisie} onChange={e => setSuperficieSaisie(e.target.value)} placeholder="Superficie" inputMode="decimal"
-                style={{ flex: "1 1 0", minWidth: 0, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
+                style={{ flex: 1, padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, boxSizing: "border-box" }} />
               <select value={uniteSuperficieSaisie} onChange={e => setUniteSuperficieSaisie(e.target.value)}
                 style={{ padding: 8, borderRadius: 8, border: "1px solid var(--c-border)", fontSize: T.field, background: "var(--c-surface)", color: "var(--c-text)" }}>
                 <option value="m2">m²</option>
@@ -1183,7 +1184,7 @@ export function EspaceOrganisation({ organisationEmail, organisationUserId, onBa
       )}
 
       <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Rapport de votre organisation</div>
-      <ExportRow label="Signalements de votre domaine" count={rowsExport.length} columns={colonnes} filenamePrefix={`pace-${org.type}-${(org.nom || "org").replace(/\s+/g, "-")}`} title={`Rapport ${org.nom}`} getRows={() => rowsExport} />
+      <ExportRow choixFormat label="Signalements de votre domaine" count={rowsExport.length} columns={colonnes} filenamePrefix={`pace-${org.type}-${(org.nom || "org").replace(/\s+/g, "-")}`} title={`Rapport ${org.nom}`} getRows={async () => { const fiches = await chargerFichesEnv(); return rowsExport.map(s => avecFiche(s, fiches)); }} />
 
       <div style={{ margin: "20px 0" }}>
         <OrgEnquetes organisationId={org.id} email={organisationEmail} />
