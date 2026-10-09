@@ -55,7 +55,7 @@ Implémentation : `ecovigil-theme.css` (variables `--ev-*`).
 ## Effets et mouvement
 
 - Transitions courtes (150 ms) uniquement sur les boutons et le focus.
-- Aucune animation d'entrée décorative.
+- Aucune animation d'entrée décorative. Seule exception : l'écran d'accueil (cinq pages de message puis logo dessiné, 11 s maximum, au plus une fois toutes les 24 h, fermable d'un toucher, absent avec `prefers-reduced-motion`) : il masque le chargement et ne retarde jamais l'app.
 - `prefers-reduced-motion` respecté (animations désactivées).
 
 ## Composants
