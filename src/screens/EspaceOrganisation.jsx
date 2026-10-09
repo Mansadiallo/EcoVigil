@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { COLONNES_FICHE, ExportRow, avecFiche, chargerFichesEnv } from "../admin/AdminRapports.jsx";
+import { ExportRow, colonnesSignalements, preparerLignesSignalements, rapportSignalements } from "../admin/AdminRapports.jsx";
 import { AUDIT_LABELS } from "../admin/constants.js";
 import { IconChevronLeft, IconLayers, IconPlus, IconRotateCcw, IconTrash, IconTree, IconUsers } from "../components/icons.jsx";
 import { MediaThumbSmall, PhotoCaptureButton, uploadPhotoGeneric } from "../components/media.jsx";
@@ -553,16 +553,7 @@ export function EspaceOrganisation({ organisationEmail, organisationUserId, onBa
 
   if (!org) return <Screen><div style={{ textAlign: "center", padding: 40, color: "var(--c-text-muted)" }}>Chargement…</div></Screen>;
 
-  const colonnes = [
-    { key: "id", label: "ID" }, { key: "categorie", label: "Catégorie" }, { key: "urgence", label: "Urgence" },
-    { key: "statut", label: "Statut" }, { key: "description", label: "Description" },
-    { key: "lat", label: "Latitude" }, { key: "lng", label: "Longitude" }, { key: "date", label: "Date" },
-    { key: "benevole_nom", label: "Bénévole — Nom" }, { key: "benevole_contact", label: "Bénévole — Contact" },
-    { key: "benevole_pays", label: "Bénévole — Pays" }, { key: "benevole_ville", label: "Bénévole — Ville" },
-    { key: "benevole_quartier", label: "Bénévole — Quartier" },
-    ...COLONNES_FICHE,
-  ];
-  const rowsExport = (signalements || []).map(s => ({ ...s, date: new Date(s.created_at).toLocaleDateString("fr-FR") }));
+  const rowsExport = signalements || [];
 
   return (
     <Screen>
@@ -1184,7 +1175,7 @@ export function EspaceOrganisation({ organisationEmail, organisationUserId, onBa
       )}
 
       <div style={{ ...TITRE_SOUS, fontWeight: 600, color: "var(--c-accent-dark)", marginBottom: 10 }}>Rapport de votre organisation</div>
-      <ExportRow choixFormat label="Signalements de votre domaine" count={rowsExport.length} columns={colonnes} filenamePrefix={`pace-${org.type}-${(org.nom || "org").replace(/\s+/g, "-")}`} title={`Rapport ${org.nom}`} getRows={async () => { const fiches = await chargerFichesEnv(); return rowsExport.map(s => avecFiche(s, fiches)); }} />
+      <ExportRow choixFormat label="Signalements de votre domaine" count={rowsExport.length} columns={colonnesSignalements(false)} rapport={rapportSignalements(org.nom)} filenamePrefix={`pace-${org.type}-${(org.nom || "org").replace(/\s+/g, "-")}`} title={`Rapport ${org.nom}`} getRows={() => preparerLignesSignalements(rowsExport)} />
 
       <div style={{ margin: "20px 0" }}>
         <OrgEnquetes organisationId={org.id} email={organisationEmail} />
