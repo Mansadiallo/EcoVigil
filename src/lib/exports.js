@@ -11,8 +11,133 @@ export function downloadCSV(filename, csv) {
 
 function celluleTexte(v) { return (v === null || v === undefined) ? "" : String(v); }
 
-// --- Export Excel (fichier .xlsx réel, via SheetJS déjà chargé en CDN) ---
+// --- Export Excel professionnel : tableau Excel dynamique (filtres et tri sur chaque colonne),
+// texte renvoyé à la ligne dans les cellules, largeurs de colonnes fixes, hauteurs de lignes
+// ajustées (aucun débordement), en-tête figé, mise en page paysage pour l'impression, feuille
+// « Synthèse ». Utilise ExcelJS, chargé à la demande depuis le même CDN que les autres
+// bibliothèques ; sans connexion ou en cas d'échec, on retombe sur l'export SheetJS simple. ---
+let exceljsPromise = null;
+function chargerExcelJS() {
+  if (typeof window !== "undefined" && window.ExcelJS) return Promise.resolve(window.ExcelJS);
+  if (!exceljsPromise) {
+    exceljsPromise = new Promise((resolve, reject) => {
+      const sc = document.createElement("script");
+      sc.src = "https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.4.0/exceljs.min.js";
+      sc.onload = () => (window.ExcelJS ? resolve(window.ExcelJS) : reject(new Error("ExcelJS indisponible")));
+      sc.onerror = () => { exceljsPromise = null; reject(new Error("Chargement d'ExcelJS impossible")); };
+      document.head.appendChild(sc);
+    });
+  }
+  return exceljsPromise;
+}
+
+async function exportExcelPro(E, filename, rows, columns, title, options) {
+  const VERT = "FF2E5A3E", VERT_CLAIR = "FFEAF2EC", GRIS = "FFF4F7F5";
+  const trait = { style: "thin", color: { argb: "FFCFDCD3" } };
+  const bordures = { top: trait, left: trait, bottom: trait, right: trait };
+  const LARG_MAX = 48;
+  const texte = (v) => { const t = celluleTexte(v); return t.length > 32000 ? t.slice(0, 32000) + "…" : t; };
+  const wb = new E.Workbook();
+  wb.creator = "EcoVigil"; wb.created = new Date();
+  const dateExport = `Exporté le ${new Date().toLocaleString("fr-FR")}`;
+
+  // --- Feuille « Synthèse » ---
+  if (options && options.synthese && options.synthese.length) {
+    const ws0 = wb.addWorksheet("Synthèse");
+    ws0.columns = [{ width: 46 }, { width: 14 }];
+    ws0.getCell("A1").value = "ECOVIGIL"; ws0.getCell("A1").font = { bold: true, size: 16, color: { argb: VERT } };
+    ws0.getCell("A2").value = title || "Rapport"; ws0.getCell("A2").font = { bold: true, size: 12 };
+    ws0.getCell("A3").value = dateExport; ws0.getCell("A3").font = { size: 9, color: { argb: "FF777777" } };
+    let r = 5;
+    options.synthese.forEach(g => {
+      const t = ws0.getCell(r, 1); t.value = g.titre;
+      [1, 2].forEach(c => { const cell = ws0.getCell(r, c); cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: VERT } }; cell.font = { bold: true, color: { argb: "FFFFFFFF" } }; });
+      r++;
+      g.lignes.forEach(l => {
+        const a = ws0.getCell(r, 1), b = ws0.getCell(r, 2);
+        a.value = String(l[0]); b.value = l[1];
+        a.alignment = { wrapText: true, vertical: "top" }; b.alignment = { horizontal: "right", vertical: "top" };
+        a.border = bordures; b.border = bordures; r++;
+      });
+      r++;
+    });
+  }
+
+  // --- Feuille « Données » : tableau dynamique ---
+  const nc = columns.length;
+  const LIGNE_ENTETE = 5;
+  const ws = wb.addWorksheet("Données", {
+    views: [{ state: "frozen", ySplit: LIGNE_ENTETE }],
+    pageSetup: { orientation: "landscape", paperSize: 9, fitToPage: true, fitToWidth: 1, fitToHeight: 0, printTitlesRow: `${LIGNE_ENTETE}:${LIGNE_ENTETE}` },
+  });
+  const largeurs = columns.map(c => {
+    const plusLong = rows.reduce((m, r) => Math.max(m, ...texte(r[c.key]).split("\n").map(p => p.length)), 0);
+    return Math.min(LARG_MAX, Math.max(14, Math.ceil(String(c.label).length * 1.15) + 2, plusLong + 2));
+  });
+  largeurs.forEach((w, i) => { ws.getColumn(i + 1).width = w; });
+
+  const titres = [["ECOVIGIL", { bold: true, size: 16, color: { argb: VERT } }], [title || "Rapport", { bold: true, size: 12 }], [dateExport, { size: 9, color: { argb: "FF777777" } }]];
+  titres.forEach(([t, font], i) => {
+    ws.getCell(i + 1, 1).value = t; ws.getCell(i + 1, 1).font = font;
+    if (nc > 1) ws.mergeCells(i + 1, 1, i + 1, nc);
+  });
+
+  const noms = []; const vus = {};
+  columns.forEach(c => { let n = String(c.label); while (vus[n]) n += " "; vus[n] = true; noms.push(n); });
+  ws.addTable({
+    name: "Rapport_" + Date.now(), ref: `A${LIGNE_ENTETE}`, headerRow: true, totalsRow: false,
+    style: { theme: "TableStyleMedium7", showRowStripes: true },
+    columns: noms.map(n => ({ name: n, filterButton: true })),
+    rows: rows.map(r => columns.map(c => texte(r[c.key]))),
+  });
+
+  // En-tête
+  const entete = ws.getRow(LIGNE_ENTETE);
+  entete.height = 34;
+  for (let c = 1; c <= nc; c++) {
+    const cell = entete.getCell(c);
+    cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: VERT } };
+    cell.font = { bold: true, color: { argb: "FFFFFFFF" } };
+    cell.alignment = { wrapText: true, vertical: "middle", horizontal: "left" };
+    cell.border = bordures;
+  }
+  // Données : retour à la ligne + hauteur calculée d'après le contenu (jamais de texte coupé ou débordant)
+  rows.forEach((r, i) => {
+    const ligne = ws.getRow(LIGNE_ENTETE + 1 + i);
+    let maxLignes = 1;
+    columns.forEach((c, j) => {
+      const cell = ligne.getCell(j + 1);
+      cell.alignment = { wrapText: true, vertical: "top", horizontal: "left" };
+      cell.border = bordures;
+      if (i % 2 === 1) cell.fill = { type: "pattern", pattern: "solid", fgColor: { argb: GRIS } };
+      const cpl = Math.max(1, Math.floor(largeurs[j] * 0.9));
+      const n = texte(r[c.key]).split("\n").reduce((tot, p) => tot + Math.max(1, Math.ceil(p.length / cpl)), 0);
+      if (n > maxLignes) maxLignes = n;
+    });
+    ligne.height = Math.min(409, Math.max(20, maxLignes * 15 + 4));
+  });
+  const pied = ws.getCell(LIGNE_ENTETE + rows.length + 2, 1);
+  pied.value = `EcoVigil — Plateforme Africaine d'Actions et de Contrôle Environnemental — ${rows.length} ligne${rows.length > 1 ? "s" : ""}`;
+  pied.font = { size: 9, color: { argb: "FF777777" } };
+
+  const buf = await wb.xlsx.writeBuffer();
+  const blob = new Blob([buf], { type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 2000);
+}
+
 export function exportExcel(filename, rows, columns, title, options) {
+  if (!rows || rows.length === 0) { exportExcelSimple(filename, rows || [], columns, title, options); return; }
+  chargerExcelJS()
+    .then(E => exportExcelPro(E, filename, rows, columns, title, options))
+    .catch(() => exportExcelSimple(filename, rows, columns, title, options));
+}
+
+// --- Export Excel (fichier .xlsx réel, via SheetJS déjà chargé en CDN) ---
+function exportExcelSimple(filename, rows, columns, title, options) {
   if (!window.XLSX) { alert("Bibliothèque Excel indisponible (vérifie ta connexion)."); return; }
   // Note technique : l'intégration d'une image réelle et la mise en forme des cellules (gras,
   // couleur) sont des fonctionnalités payantes de SheetJS Pro. La version gratuite utilisée ici
