@@ -68,9 +68,6 @@ La connexion à Supabase (URL du projet et clé publique `anon`) est intégrée 
 
 ## Licence
 
-À définir par le porteur du projet.
-## Licence
-
 Copyright (c) 2026 Mansa Diallo.
 Ce code est distribué sous licence GNU AGPL-3.0 (voir le fichier LICENSE).
 Toute version modifiée, y compris proposée en ligne, doit rester ouverte sous la même licence.
